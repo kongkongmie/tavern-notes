@@ -1,10 +1,9 @@
 # 酒馆笔记 / Tavern Notes
 
 酒馆笔记是一个给 SillyTavern 使用的本地笔记扩展。
-
 它会按角色卡保存两类内容：
 
-- User 输入：自动记录你发出去的用户消息，方便过很久以后快速找回、复制、重新放回输入栏。
+- User 输入：自动记录你发出去的用户消息，方便隔很久以后快速找回、复制、重新放回输入栏。
 - 摘抄：保存你在聊天页面选中的文字，支持查看、复制、分享成图片。
 
 数据会写入当前 SillyTavern 用户自己的 `data/<用户>/tavern-notes/` 文件夹，不写入世界书，也不会自动发给模型。
@@ -30,59 +29,67 @@
 1. 前端扩展：显示按钮、面板和分享卡。
 2. 后端插件：负责把笔记保存为本地文件。
 
-只装前端会看到界面，但不能保存笔记。必须安装后端插件。
+请先安装前端扩展，再运行一次自动安装器安装后端插件。
 
 ### 1. 安装前端扩展
 
-在 SillyTavern 的扩展安装页面里，填入本仓库 Git 地址安装。
+在 SillyTavern 的扩展安装页面里，填入本仓库 Git 地址：
 
-如果你手动安装，把整个仓库文件夹放到：
+```text
+https://github.com/kongkongmie/tavern-notes
+```
+
+安装后刷新一次浏览器页面。
+
+### 2. 安装后端插件
+
+前端扩展安装好以后，扩展目录里会自带安装器。
+
+#### Windows / PC
+
+打开这个文件夹：
 
 ```text
 SillyTavern/public/scripts/extensions/third-party/tavern-notes/
 ```
 
-确认这个目录下有：
+双击运行：
 
 ```text
-manifest.json
-index.js
-style.css
-README.md
-server-plugin/
+install-server-plugin.bat
 ```
 
-### 2. 安装后端插件
+看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
 
-把本仓库里的：
+#### 安卓 Termux / Linux / Mac / 云服务器
 
-```text
-server-plugin/tavern-notes/
+进入 SillyTavern 根目录，运行：
+
+```bash
+node public/scripts/extensions/third-party/tavern-notes/install-server-plugin.js
 ```
 
-复制到你的 SillyTavern：
+如果你的扩展目录不在默认位置，也可以直接指定 SillyTavern 根目录：
 
-```text
-SillyTavern/plugins/tavern-notes/
+```bash
+node /path/to/tavern-notes/install-server-plugin.js /path/to/SillyTavern
 ```
 
-复制后应当能看到：
+看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
 
-```text
-SillyTavern/plugins/tavern-notes/index.js
-```
+### 安装器会做什么？
 
-### 3. 开启 Server Plugins
+安装器会自动完成这些事：
 
-打开 SillyTavern 的 `config.yaml`，确认有：
+- 找到 SillyTavern 根目录。
+- 把 `server-plugin/tavern-notes` 复制到 `SillyTavern/plugins/tavern-notes`。
+- 如果旧的后端插件已经存在，会先备份成 `tavern-notes.backup-时间`。
+- 备份 `config.yaml`。
+- 把 `enableServerPlugins` 改成 `true`。
 
-```yaml
-enableServerPlugins: true
-```
+安装器不会删除你的笔记数据。
 
-修改后重启 SillyTavern。
-
-### 4. 检查是否成功
+### 3. 检查是否成功
 
 进入聊天页面后，输入栏附近会出现酒馆笔记按钮。
 
@@ -90,10 +97,11 @@ enableServerPlugins: true
 
 如果提示“后端未连接”或“找不到酒馆笔记后端”，请检查：
 
-- `plugins/tavern-notes/index.js` 是否存在。
-- `config.yaml` 是否开启了 `enableServerPlugins: true`。
+- 是否运行过安装器。
+- `SillyTavern/plugins/tavern-notes/index.js` 是否存在。
+- `config.yaml` 里是否有 `enableServerPlugins: true`。
 - 修改配置后是否重启过 SillyTavern。
-- 浏览器是否刷新过页面。
+- 浏览器页面是否刷新过。
 
 ## 数据位置
 
@@ -101,12 +109,12 @@ enableServerPlugins: true
 
 ```text
 SillyTavern/data/<当前用户>/tavern-notes/
-├─ index.json
-├─ notes-0001.jsonl
-├─ themes/
-├─ exports/
-├─ cards/
-└─ backups/
+├── index.json
+├── notes-0001.jsonl
+├── themes/
+├── exports/
+├── cards/
+└── backups/
 ```
 
 例如：
@@ -136,30 +144,26 @@ https://fontsapi.zeoseven.com/488/main/result.css
 body { font-family: "STDongGuanTi"; }
 ```
 
-网络字体需要浏览器能访问对应网址。
+网络字体需要浏览器能访问对应网站。
 
 ## 安全说明
 
 酒馆笔记包含 SillyTavern Server Plugin。
-
 Server Plugin 不是沙盒环境，理论上可以访问本机文件系统。请只安装你信任来源的版本。
 
-酒馆笔记 V1.0 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
+酒馆笔记 V1.0.1 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
 
-## 发布说明
-
-当前公开仓库：
+## 仓库
 
 ```text
 https://github.com/kongkongmie/tavern-notes
 ```
 
-发布 Release 时请继续提醒用户：本扩展需要额外安装 `server-plugin/tavern-notes`，并且不要把自己的 `data/<用户>/tavern-notes/` 数据上传到仓库。
-
 ## 版本
 
-V1.0.0
+V1.0.1
 
-- 第一个可分享安装版本。
-- 内置默认主题和分享卡 V1。
-- 支持本地文件保存、多用户目录、角色分类、输入版本、导出和分享卡。
+- 增加自动安装器，降低后端插件安装门槛。
+- Windows 支持双击 `install-server-plugin.bat`。
+- 安卓 Termux、Linux、Mac、云服务器支持运行 `install-server-plugin.js`。
+- 保留 V1.0.0 的本地文件保存、多用户目录、角色分类、输入版本、导出和分享卡功能。

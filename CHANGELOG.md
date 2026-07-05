@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.1
+
+- Added installer scripts for the required server plugin.
+- Windows users can run `install-server-plugin.bat`.
+- Android Termux, Linux, macOS, and cloud server users can run `install-server-plugin.js`.
+- The installer copies `server-plugin/tavern-notes`, backs up existing plugin files, backs up `config.yaml`, and enables `enableServerPlugins`.
+
 ## 1.0.0
 
 - First installable release.
