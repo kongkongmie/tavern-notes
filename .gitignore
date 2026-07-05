@@ -1,0 +1,17 @@
+# Local editor files
+.DS_Store
+Thumbs.db
+*.log
+
+# Release archives
+*.zip
+
+# Do not commit SillyTavern user data.
+data/
+theme-active.json
+notes-*.jsonl
+index.json
+
+# Temporary files
+*.tmp
+*.bak
