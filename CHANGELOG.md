@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3
+
+- The all-in-one installer now tries to detect a running SillyTavern process before asking for a path.
+- Windows users can keep the SillyTavern console running, then double-click `install-tavern-notes.bat` to complete installation automatically in most common setups.
+
 ## 1.0.2
 
 - Added all-in-one installers: `install-tavern-notes.bat`, `install-tavern-notes.js`, and `install-tavern-notes.sh`.

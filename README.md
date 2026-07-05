@@ -33,11 +33,13 @@
 
 ### 推荐：下载压缩包安装
 
-1. 到 GitHub Release 下载 `tavern-notes-v1.0.2.zip`。
+1. 到 GitHub Release 下载 `tavern-notes-v1.0.3.zip`。
 2. 解压压缩包。
 3. 运行安装器。
 
 #### Windows / PC 双击安装
+
+先让 SillyTavern 保持运行，也就是酒馆黑窗不要关。
 
 双击解压出来的：
 
@@ -45,7 +47,8 @@
 install-tavern-notes.bat
 ```
 
-如果安装器没有自动找到 SillyTavern 目录，它会要求你输入 SillyTavern 根目录路径。
+安装器会优先从正在运行的 SillyTavern 黑窗识别酒馆目录，然后自动安装。
+如果没有识别成功，它才会要求你输入 SillyTavern 根目录路径。
 
 看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
 
@@ -55,6 +58,12 @@ install-tavern-notes.bat
 
 ```bash
 node install-tavern-notes.js /path/to/SillyTavern
+```
+
+如果命令行里能识别到正在运行的 SillyTavern 进程，也可以直接运行：
+
+```bash
+node install-tavern-notes.js
 ```
 
 看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
@@ -159,7 +168,7 @@ body { font-family: "STDongGuanTi"; }
 酒馆笔记包含 SillyTavern Server Plugin。
 Server Plugin 不是沙盒环境，理论上可以访问本机文件系统。请只安装你信任来源的版本。
 
-酒馆笔记 V1.0.2 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
+酒馆笔记 V1.0.3 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
 
 ## 仓库
 
@@ -169,9 +178,10 @@ https://github.com/kongkongmie/tavern-notes
 
 ## 版本
 
-V1.0.2
+V1.0.3
 
 - 增加一键安装器，自动安装前端扩展、后端插件，并开启 `enableServerPlugins`。
+- Windows 下会优先从正在运行的 SillyTavern 黑窗识别酒馆目录。
 - Windows 支持双击 `install-tavern-notes.bat`。
 - 安卓 Termux、Linux、Mac、云服务器支持运行 `install-tavern-notes.js`。
 - 保留 V1.0.0 的本地文件保存、多用户目录、角色分类、输入版本、导出和分享卡功能。

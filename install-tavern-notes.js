@@ -5,6 +5,7 @@ import path from 'node:path';
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 const EXTENSION_ID = 'tavern-notes';
 const __filename = fileURLToPath(import.meta.url);
@@ -50,6 +51,86 @@ function findSillyTavernRoot(startDirectory) {
         const parent = path.dirname(directory);
         if (parent === directory) return null;
         directory = parent;
+    }
+}
+
+function findSillyTavernRootFromPath(candidatePath) {
+    if (!candidatePath) return null;
+
+    let directory = path.resolve(candidatePath);
+
+    if (exists(directory)) {
+        const stat = fs.statSync(directory);
+        if (stat.isFile()) directory = path.dirname(directory);
+    } else if (path.extname(directory)) {
+        directory = path.dirname(directory);
+    }
+
+    return findSillyTavernRoot(directory);
+}
+
+function unique(values) {
+    return [...new Set(values.filter(Boolean))];
+}
+
+function extractWindowsPaths(text) {
+    const matches = String(text || '').match(/[A-Za-z]:\\(?:[^<>:"|?*\r\n]+\\)*[^<>:"|?*\r\n]*/g) || [];
+    return matches.map(value => value.trim().replace(/[)"']+$/g, ''));
+}
+
+function extractPosixPaths(text) {
+    const matches = String(text || '').match(/\/(?:[^\s"'`<>|])+/g) || [];
+    return matches.map(value => value.trim().replace(/[)"']+$/g, ''));
+}
+
+function findRunningSillyTavernRootOnWindows() {
+    const command = [
+        '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;',
+        "Get-CimInstance Win32_Process |",
+        "Where-Object { $_.CommandLine -match 'SillyTavern|server\\.js|Start\\.bat|start\\.sh|npm.*start' } |",
+        'ForEach-Object { $_.CommandLine }',
+    ].join(' ');
+
+    const outputText = execFileSync('powershell.exe', ['-NoProfile', '-Command', command], {
+        encoding: 'utf8',
+        windowsHide: true,
+    });
+
+    for (const candidate of unique(extractWindowsPaths(outputText))) {
+        const root = findSillyTavernRootFromPath(candidate);
+        if (root) return root;
+    }
+
+    return null;
+}
+
+function findRunningSillyTavernRootOnPosix() {
+    const outputText = execFileSync('ps', ['-eo', 'args='], {
+        encoding: 'utf8',
+    });
+
+    const relevantLines = outputText
+        .split(/\r?\n/)
+        .filter(line => /SillyTavern|server\.js|Start\.bat|start\.sh|npm.*start/.test(line));
+
+    for (const candidate of unique(relevantLines.flatMap(extractPosixPaths))) {
+        const root = findSillyTavernRootFromPath(candidate);
+        if (root) return root;
+    }
+
+    return null;
+}
+
+function findRunningSillyTavernRoot() {
+    try {
+        const root = process.platform === 'win32'
+            ? findRunningSillyTavernRootOnWindows()
+            : findRunningSillyTavernRootOnPosix();
+
+        if (root) info(`已从正在运行的 SillyTavern 进程识别目录：${root}`);
+        return root;
+    } catch {
+        return null;
     }
 }
 
@@ -179,6 +260,7 @@ async function main() {
     const rootFromArgument = process.argv[2] ? path.resolve(normalizeUserPath(process.argv[2])) : null;
     const rootDirectory = rootFromArgument
         || findSillyTavernRoot(packageDirectory)
+        || findRunningSillyTavernRoot()
         || await askForSillyTavernRoot();
 
     if (!isSillyTavernRoot(rootDirectory)) {
