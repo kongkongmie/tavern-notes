@@ -1,10 +1,10 @@
 @echo off
+setlocal
 chcp 65001 >nul
-cd /d "%~dp0"
-echo 酒馆笔记一键安装器
+echo Tavern Notes online installer
+echo Keep your SillyTavern console running while installing.
 echo.
-node "%~dp0install-tavern-notes.js"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-RestMethod 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/install-online.ps1' | Invoke-Expression"
 echo.
-echo 如果上面显示“安装完成”，请重启 SillyTavern，然后刷新浏览器页面。
-echo.
-pause
+echo Press any key to close this window.
+pause >nul

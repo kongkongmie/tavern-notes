@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.4
+
+- Added `Install-Tavern-Notes.bat` as a one-file Windows online installer.
+- Added `install-online.ps1`, used by the one-file installer to download the latest package and run installation.
+- Release zip packaging now places `Install-Tavern-Notes.bat` at the outermost level, with the extension files in a `tavern-notes` folder.
+- Batch files now avoid Chinese text to prevent Windows CMD encoding issues.
+
 ## 1.0.3
 
 - The all-in-one installer now tries to detect a running SillyTavern process before asking for a path.
