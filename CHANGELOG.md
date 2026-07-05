@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.2
+
+- Added all-in-one installers: `install-tavern-notes.bat`, `install-tavern-notes.js`, and `install-tavern-notes.sh`.
+- The all-in-one installer copies the frontend extension, installs the server plugin, backs up old files, backs up `config.yaml`, and enables `enableServerPlugins`.
+- Users can now download the release zip, extract it, and run one installer instead of manually installing the frontend first.
+
 ## 1.0.1
 
 - Added installer scripts for the required server plugin.

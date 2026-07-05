@@ -29,50 +29,56 @@
 1. 前端扩展：显示按钮、面板和分享卡。
 2. 后端插件：负责把笔记保存为本地文件。
 
-请先安装前端扩展，再运行一次自动安装器安装后端插件。
+推荐使用一键安装包。安装器会一次性安装前端扩展、后端插件，并开启必要配置。
 
-### 1. 安装前端扩展
+### 推荐：下载压缩包安装
 
-在 SillyTavern 的扩展安装页面里，填入本仓库 Git 地址：
+1. 到 GitHub Release 下载 `tavern-notes-v1.0.2.zip`。
+2. 解压压缩包。
+3. 运行安装器。
 
-```text
-https://github.com/kongkongmie/tavern-notes
-```
+#### Windows / PC 双击安装
 
-安装后刷新一次浏览器页面。
-
-### 2. 安装后端插件
-
-前端扩展安装好以后，扩展目录里会自带安装器。
-
-#### Windows / PC
-
-打开这个文件夹：
+双击解压出来的：
 
 ```text
-SillyTavern/public/scripts/extensions/third-party/tavern-notes/
+install-tavern-notes.bat
 ```
 
-双击运行：
-
-```text
-install-server-plugin.bat
-```
+如果安装器没有自动找到 SillyTavern 目录，它会要求你输入 SillyTavern 根目录路径。
 
 看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
 
 #### 安卓 Termux / Linux / Mac / 云服务器
 
-进入 SillyTavern 根目录，运行：
+进入解压出来的 `tavern-notes` 文件夹，运行：
 
 ```bash
-node public/scripts/extensions/third-party/tavern-notes/install-server-plugin.js
+node install-tavern-notes.js /path/to/SillyTavern
 ```
 
-如果你的扩展目录不在默认位置，也可以直接指定 SillyTavern 根目录：
+看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
+
+### 进阶：Git 地址安装前端
+
+如果你已经会使用 SillyTavern 的扩展安装器，也可以先粘贴 Git 地址安装前端扩展：
+
+```text
+https://github.com/kongkongmie/tavern-notes
+```
+
+然后再运行扩展目录里的后端安装器：
+
+Windows：
+
+```text
+SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-server-plugin.bat
+```
+
+安卓 Termux / Linux / Mac / 云服务器：
 
 ```bash
-node /path/to/tavern-notes/install-server-plugin.js /path/to/SillyTavern
+node SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-server-plugin.js
 ```
 
 看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
@@ -82,7 +88,9 @@ node /path/to/tavern-notes/install-server-plugin.js /path/to/SillyTavern
 安装器会自动完成这些事：
 
 - 找到 SillyTavern 根目录。
+- 把前端扩展复制到 `SillyTavern/public/scripts/extensions/third-party/tavern-notes`。
 - 把 `server-plugin/tavern-notes` 复制到 `SillyTavern/plugins/tavern-notes`。
+- 如果旧的前端扩展已经存在，会先备份成 `tavern-notes.backup-时间`。
 - 如果旧的后端插件已经存在，会先备份成 `tavern-notes.backup-时间`。
 - 备份 `config.yaml`。
 - 把 `enableServerPlugins` 改成 `true`。
@@ -151,7 +159,7 @@ body { font-family: "STDongGuanTi"; }
 酒馆笔记包含 SillyTavern Server Plugin。
 Server Plugin 不是沙盒环境，理论上可以访问本机文件系统。请只安装你信任来源的版本。
 
-酒馆笔记 V1.0.1 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
+酒馆笔记 V1.0.2 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
 
 ## 仓库
 
@@ -161,9 +169,9 @@ https://github.com/kongkongmie/tavern-notes
 
 ## 版本
 
-V1.0.1
+V1.0.2
 
-- 增加自动安装器，降低后端插件安装门槛。
-- Windows 支持双击 `install-server-plugin.bat`。
-- 安卓 Termux、Linux、Mac、云服务器支持运行 `install-server-plugin.js`。
+- 增加一键安装器，自动安装前端扩展、后端插件，并开启 `enableServerPlugins`。
+- Windows 支持双击 `install-tavern-notes.bat`。
+- 安卓 Termux、Linux、Mac、云服务器支持运行 `install-tavern-notes.js`。
 - 保留 V1.0.0 的本地文件保存、多用户目录、角色分类、输入版本、导出和分享卡功能。
