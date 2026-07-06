@@ -7,7 +7,7 @@ set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 if not exist "%PS%" set "PS=%windir%\System32\WindowsPowerShell\v1.0\powershell.exe"
 if not exist "%PS%" (
     echo Windows PowerShell was not found.
-    echo Please download the full zip package and run Install-Tavern-Notes.bat from the extracted folder.
+    echo Please download the full zip package and run Tavern-Notes-Installer.bat from the extracted folder.
     echo.
     pause
     exit /b 1

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.7
+
+- Improved online installer auto-detection of a running SillyTavern process.
+- The online installer now scans parent processes, so it can find common Windows launches such as `Start.bat -> node server.js`.
+- Fixed the case where the installer still asked for the SillyTavern root path even while SillyTavern was running.
+
 ## 1.0.6
 
 - Renamed the one-file Windows online installer to `Tavern-Notes-Installer.bat`.

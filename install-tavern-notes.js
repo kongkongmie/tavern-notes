@@ -84,6 +84,12 @@ function extractPosixPaths(text) {
 }
 
 function findRunningSillyTavernRootOnWindows() {
+    const powershellPath = process.env.SystemRoot
+        ? path.join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+        : path.join(process.env.windir || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+
+    if (!exists(powershellPath)) return null;
+
     const command = [
         '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8;',
         "Get-CimInstance Win32_Process |",
@@ -91,7 +97,7 @@ function findRunningSillyTavernRootOnWindows() {
         'ForEach-Object { $_.CommandLine }',
     ].join(' ');
 
-    const outputText = execFileSync('powershell.exe', ['-NoProfile', '-Command', command], {
+    const outputText = execFileSync(powershellPath, ['-NoProfile', '-Command', command], {
         encoding: 'utf8',
         windowsHide: true,
     });
