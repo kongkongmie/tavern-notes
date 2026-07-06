@@ -1,5 +1,9 @@
 ﻿# Changelog
 
+## 1.0.9
+
+- Added repository line-ending rules so shell installers stay compatible with Android, Linux, Mac, and cloud servers.
+
 ## 1.0.8
 
 - Added one-line online installer for Android Termux, Linux, Mac, and cloud servers.
@@ -61,4 +65,5 @@
 - Generate share-card PNG images with themes, backgrounds, local font names, and network font CSS.
 - Include a default theme system with theme import/export.
 - Include `server-plugin/tavern-notes` for local file storage.
+
 

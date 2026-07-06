@@ -45,7 +45,7 @@
 
 ### 备选：下载完整压缩包安装
 
-1. 到 GitHub Release 下载 `tavern-notes-v1.0.8.zip`。
+1. 到 GitHub Release 下载 `tavern-notes-v1.0.9.zip`。
 2. 解压压缩包。
 3. Windows 用户直接双击最外层的：
 
@@ -181,7 +181,7 @@ body { font-family: "STDongGuanTi"; }
 酒馆笔记包含 SillyTavern Server Plugin。
 Server Plugin 不是沙盒环境，理论上可以访问本机文件系统。请只安装你信任来源的版本。
 
-酒馆笔记 v1.0.8 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
+酒馆笔记 v1.0.9 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
 
 ## 仓库
 
@@ -191,7 +191,7 @@ https://github.com/kongkongmie/tavern-notes
 
 ## 版本
 
-v1.0.8
+v1.0.9
 
 - 增加一键安装器，自动安装前端扩展、后端插件，并开启 `enableServerPlugins`。
 - Windows 下会优先从正在运行的 SillyTavern 黑窗识别酒馆目录。
@@ -199,6 +199,7 @@ v1.0.8
 - 完整压缩包把 `Tavern-Notes-Installer.bat` 放在最外层，减少用户翻文件夹。
 - 安卓 Termux、Linux、Mac、云服务器支持一行命令在线安装，也支持完整包离线安装。
 - 保留 V1.0.0 的本地文件保存、多用户目录、角色分类、输入版本、导出和分享卡功能。
+
 
 
 
