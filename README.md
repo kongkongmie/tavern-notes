@@ -1,4 +1,4 @@
-# 酒馆笔记 / Tavern Notes
+﻿# 酒馆笔记 / Tavern Notes
 
 酒馆笔记是一个给 SillyTavern 使用的本地笔记扩展。
 它会按角色卡保存两类内容：
@@ -34,7 +34,7 @@
 ### Windows / PC 推荐：单文件黑窗安装
 
 1. 先让 SillyTavern 保持运行，也就是酒馆黑窗不要关。
-2. 下载 `Install-Tavern-Notes.bat`。
+2. 下载 `Tavern-Notes-Installer.bat`。
 3. 双击运行。
 
 这个安装器会自动联网下载最新版酒馆笔记，然后完成安装。
@@ -45,12 +45,12 @@
 
 ### 备选：下载完整压缩包安装
 
-1. 到 GitHub Release 下载 `tavern-notes-v1.0.4.zip`。
+1. 到 GitHub Release 下载 `tavern-notes-v1.0.6.zip`。
 2. 解压压缩包。
 3. Windows 用户直接双击最外层的：
 
 ```text
-Install-Tavern-Notes.bat
+Tavern-Notes-Installer.bat
 ```
 
 压缩包里也会有 `tavern-notes` 文件夹，那是安装器使用的文件，不需要普通用户手动翻找。
@@ -173,7 +173,7 @@ body { font-family: "STDongGuanTi"; }
 酒馆笔记包含 SillyTavern Server Plugin。
 Server Plugin 不是沙盒环境，理论上可以访问本机文件系统。请只安装你信任来源的版本。
 
-酒馆笔记 V1.0.4 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
+酒馆笔记 V1.0.6 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
 
 ## 仓库
 
@@ -183,11 +183,14 @@ https://github.com/kongkongmie/tavern-notes
 
 ## 版本
 
-V1.0.4
+V1.0.6
 
 - 增加一键安装器，自动安装前端扩展、后端插件，并开启 `enableServerPlugins`。
 - Windows 下会优先从正在运行的 SillyTavern 黑窗识别酒馆目录。
-- Windows 支持下载单个 `Install-Tavern-Notes.bat` 后双击在线安装。
-- 完整压缩包把 `Install-Tavern-Notes.bat` 放在最外层，减少用户翻文件夹。
+- Windows 支持下载单个 `Tavern-Notes-Installer.bat` 后双击在线安装。
+- 完整压缩包把 `Tavern-Notes-Installer.bat` 放在最外层，减少用户翻文件夹。
 - 安卓 Termux、Linux、Mac、云服务器支持运行 `install-tavern-notes.js`。
 - 保留 V1.0.0 的本地文件保存、多用户目录、角色分类、输入版本、导出和分享卡功能。
+
+
+

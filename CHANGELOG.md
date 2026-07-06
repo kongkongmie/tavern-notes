@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.6
+
+- Renamed the one-file Windows online installer to `Tavern-Notes-Installer.bat`.
+- Fixed Windows filename collision between `Install-Tavern-Notes.bat` and `install-tavern-notes.bat`.
+- The zip package now uses `Tavern-Notes-Installer.bat` as the outermost install entry.
+
+## 1.0.5
+
+- Fixed Windows batch installers failing when `chcp` or `powershell` is missing from PATH.
+- `Install-Tavern-Notes.bat` now uses the absolute Windows PowerShell path.
+- Local batch installers no longer call `chcp`.
+- Restored `install-tavern-notes.bat` as the local zip installer instead of the online installer.
+
 ## 1.0.4
 
 - Added `Install-Tavern-Notes.bat` as a one-file Windows online installer.
