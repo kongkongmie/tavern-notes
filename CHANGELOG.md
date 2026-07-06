@@ -1,4 +1,10 @@
-# Changelog
+﻿# Changelog
+
+## 1.0.8
+
+- Added one-line online installer for Android Termux, Linux, Mac, and cloud servers.
+- Added offline shell installer guidance for the full zip package.
+- Cleaned the local shell installer completion message.
 
 ## 1.0.7
 
@@ -55,3 +61,4 @@
 - Generate share-card PNG images with themes, backgrounds, local font names, and network font CSS.
 - Include a default theme system with theme import/export.
 - Include `server-plugin/tavern-notes` for local file storage.
+

@@ -45,7 +45,7 @@
 
 ### 备选：下载完整压缩包安装
 
-1. 到 GitHub Release 下载 `tavern-notes-v1.0.7.zip`。
+1. 到 GitHub Release 下载 `tavern-notes-v1.0.8.zip`。
 2. 解压压缩包。
 3. Windows 用户直接双击最外层的：
 
@@ -55,20 +55,28 @@ Tavern-Notes-Installer.bat
 
 压缩包里也会有 `tavern-notes` 文件夹，那是安装器使用的文件，不需要普通用户手动翻找。
 
+完整压缩包是离线包。只要已经下载并解压，安装时不需要再联网。
+
 看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
 
 ### 安卓 Termux / Linux / Mac / 云服务器
 
-进入解压出来的 `tavern-notes` 文件夹，运行：
+推荐保持 SillyTavern 正在运行，然后在 Termux 或服务器终端里粘贴这一行：
 
 ```bash
-node install-tavern-notes.js /path/to/SillyTavern
+sh -c "$(curl -fsSL https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/install-online.sh)"
 ```
 
-如果命令行里能识别到正在运行的 SillyTavern 进程，也可以直接运行：
+如果设备没有 `curl`，可以用：
 
 ```bash
-node install-tavern-notes.js
+wget -O - https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/install-online.sh | sh
+```
+
+离线安装也可以。下载完整压缩包并解压后，进入解压出来的 `tavern-notes` 文件夹，运行：
+
+```bash
+sh install-tavern-notes.sh
 ```
 
 看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
@@ -173,7 +181,7 @@ body { font-family: "STDongGuanTi"; }
 酒馆笔记包含 SillyTavern Server Plugin。
 Server Plugin 不是沙盒环境，理论上可以访问本机文件系统。请只安装你信任来源的版本。
 
-酒馆笔记 V1.0.7 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
+酒馆笔记 v1.0.8 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
 
 ## 仓库
 
@@ -183,14 +191,15 @@ https://github.com/kongkongmie/tavern-notes
 
 ## 版本
 
-V1.0.7
+v1.0.8
 
 - 增加一键安装器，自动安装前端扩展、后端插件，并开启 `enableServerPlugins`。
 - Windows 下会优先从正在运行的 SillyTavern 黑窗识别酒馆目录。
 - Windows 支持下载单个 `Tavern-Notes-Installer.bat` 后双击在线安装。
 - 完整压缩包把 `Tavern-Notes-Installer.bat` 放在最外层，减少用户翻文件夹。
-- 安卓 Termux、Linux、Mac、云服务器支持运行 `install-tavern-notes.js`。
+- 安卓 Termux、Linux、Mac、云服务器支持一行命令在线安装，也支持完整包离线安装。
 - 保留 V1.0.0 的本地文件保存、多用户目录、角色分类、输入版本、导出和分享卡功能。
+
 
 
 
