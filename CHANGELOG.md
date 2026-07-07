@@ -1,5 +1,12 @@
 ﻿# Changelog
 
+## 1.0.10
+
+- Added Simplified Chinese, Traditional Chinese, English, and Korean UI language support with a top-right language selector.
+- Improved the theme editor layout, including a combined preview-and-save action that reads the current JSON editor content.
+- Refined share-card themes, font-size controls, page buttons, theme isolation behavior, and dark/background presets.
+- Fixed remaining untranslated labels and tooltips in the theme panel, share-card controls, and side page buttons.
+
 ## 1.0.9
 
 - Added repository line-ending rules so shell installers stay compatible with Android, Linux, Mac, and cloud servers.

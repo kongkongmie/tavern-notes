@@ -6,7 +6,9 @@
     getCurrentChatId,
     getRequestHeaders,
     getThumbnailUrl,
+    name1,
     this_chid,
+    user_avatar,
 } from '../../../../script.js';
 
 const API_BASE = '/api/plugins/tavern-notes';
@@ -21,6 +23,12 @@ function loadLocalSettings() {
 }
 
 const localSettings = loadLocalSettings();
+const savedLanguage = ['auto', 'zh-CN', 'zh-TW', 'en', 'ko'].includes(localSettings.language)
+    ? localSettings.language
+    : 'auto';
+const savedShareTheme = ['calendar', 'jianshu', 'dialogue', 'mobai'].includes(localSettings.shareCard?.theme)
+    ? localSettings.shareCard.theme
+    : 'calendar';
 
 const state = {
     open: false,
@@ -34,6 +42,8 @@ const state = {
     page: 1,
     pageSize: 15,
     status: null,
+    language: savedLanguage,
+    currentUserName: localSettings.currentUserName || '',
     lastCapturedMessageId: null,
     capturedUserInputs: {},
     variantIndexByGroup: {},
@@ -41,22 +51,555 @@ const state = {
     searchTimer: null,
     qrBarObserver: null,
     theme: null,
+    previewTheme: null,
+    themePreviewActive: false,
     themes: [],
     activeThemeId: 'default',
     themeDraft: false,
     exportScope: 'all',
     showPageDownButton: localSettings.showPageDownButton !== false,
+    scrollButtonsTop: Number(localSettings.scrollButtonsTop || 46),
     shareCardNote: null,
     shareCardSettings: {
-        theme: localSettings.shareCard?.theme || 'calendar',
-        background: localSettings.shareCard?.background || '#f7f4ef',
+        theme: savedShareTheme,
+        background: localSettings.shareCard?.background || '#eef7f2',
         textColor: localSettings.shareCard?.textColor || '',
         fontFamily: localSettings.shareCard?.fontFamily || 'system-ui',
         fontImport: localSettings.shareCard?.fontImport || '',
+        fontScale: Number(localSettings.shareCard?.fontScale || 0.8),
         showCharacter: localSettings.shareCard?.showCharacter !== false,
         showDate: localSettings.shareCard?.showDate !== false,
     },
 };
+
+const LANGUAGE_OPTIONS = [
+    { id: 'auto', label: '跟随酒馆' },
+    { id: 'zh-CN', label: '简体中文' },
+    { id: 'zh-TW', label: '繁體中文' },
+    { id: 'en', label: 'English' },
+    { id: 'ko', label: '한국어' },
+];
+
+const TEXT_ZH_CN = {
+    appName: '酒馆笔记',
+    autoLanguage: '跟随酒馆',
+    language: '语言',
+    languageSaved: '语言已保存，刷新页面后生效。',
+    subtitle: 'soft notes · character memory',
+    theme: '主题',
+    paging: '翻页',
+    refreshNotes: '刷新笔记',
+    exportNotes: '导出笔记',
+    closeNotes: '关闭酒馆笔记',
+    searchPlaceholder: '搜索笔记、角色、聊天...',
+    connecting: '正在连接酒馆笔记...',
+    prevPage: '上一页',
+    nextPage: '下一页',
+    jumpPage: '跳页',
+    exportScope: '导出范围',
+    allNotes: '全部笔记',
+    currentPage: '当前页面',
+    exportHint: '当前页面只导出现在列表里这一页看到的笔记。',
+    exportJson: '可再次导入 JSON',
+    exportTxt: '清爽 TXT 文本',
+    exportBoth: '两个都导出',
+    themeFiles: '主题文件',
+    currentTheme: '当前：{name}',
+    themeName: '主题名称',
+    mergeTheme: '融合当前酒馆主题',
+    themeGuide: '主题制作说明',
+    preview: '预览',
+    save: '保存',
+    saveAs: '另存为',
+    resetDefault: '恢复默认',
+    shareCard: '分享卡片',
+    font: '字体',
+    fontSize: '字号',
+    fontImport: '字体地址或 @import',
+    fontHelp: '粘贴 ZeoSeven 的 result.css 地址，或整段 @import CSS，然后点“导入字体”。识别成功后会自动填入字体名并刷新图片。',
+    findFonts: '查找免费商用字体',
+    background: '背景',
+    display: '显示',
+    characterName: '角色名',
+    date: '日期',
+    importFont: '导入字体',
+    redrawPreview: '刷新预览',
+    exportPng: '导出 PNG',
+    filtersAll: '全部',
+    filtersCharacters: '角色',
+    filtersUserInput: 'User 输入',
+    filtersExcerpt: '摘抄',
+    hintAllNotes: '全部记录',
+    hintByCard: '按角色',
+    hintYourWords: '你的输入',
+    hintSelectedText: '选中文字',
+    userInput: 'User 输入',
+    excerpt: '摘抄',
+    manual: '手动',
+    unnamedCharacter: '未命名角色',
+    noNotes: '这里还没有笔记',
+    noNotesHint: '发送消息会自动记录 User 输入；选中聊天文字后点“摘录选中”会保存摘抄。',
+    noCharacterNotes: '还没有角色笔记',
+    noCharacterNotesHint: '发送 User 输入或摘录聊天文字后，这里会按角色汇总。',
+    currentCharacter: '当前角色',
+    priority: '优先显示',
+    browseByCharacter: '按角色浏览',
+    characterCount: '{count} 个角色',
+    otherCharactersEmpty: '其他角色有记录后会显示在这里。',
+    viewingCharacter: '正在查看这个角色的笔记',
+    backCharacters: '返回角色列表',
+    fillInput: '输入',
+    copy: '复制',
+    share: '分享',
+    delete: '删除',
+    viewFull: '查看全文',
+    captured: '已摘录选中文字。',
+    copied: '已复制。',
+    filled: '已进入输入栏。',
+    deleted: '已删除。',
+    selectTextFirst: '先在聊天里选中一段文字，再点“摘录选中”。',
+    noInput: '没有找到输入框。',
+    shownCharacters: '已显示 {count} 个角色',
+    shownNotes: '已显示 {shown} 条，当前筛选共 {total} 条',
+    connected: '已连接：{user}，V{version}，总记录约 {count} 条',
+    backendDisconnected: '后端未连接：{message}',
+    openNotes: '打开酒馆笔记',
+    captureSelected: '摘录选中',
+    captureSelectedTitle: '摘录选中的聊天文字',
+    scrollUp: '向上翻一页',
+    scrollDown: '向下翻一页',
+    showPageButtons: '显示侧边上下翻页按钮',
+    hidePageButtons: '隐藏侧边上下翻页按钮',
+    pageButtonsShown: '已显示侧边上下翻页按钮。',
+    pageButtonsHidden: '已隐藏侧边上下翻页按钮。',
+    fromTavernNotes: '来自酒馆笔记',
+    brandForShare: '酒馆笔记',
+    excerptedAt: '摘录于',
+    openThemePanel: '打开主题面板：切换、导入、导出或编辑酒馆笔记主题',
+    togglePageButtons: '显示或隐藏侧边上下翻页按钮',
+    close: '关闭',
+    closeThemePanel: '关闭主题面板',
+    switchTheme: '切换主题',
+    importTheme: '导入主题',
+    exportCurrentTheme: '导出当前主题',
+    openThemeFolder: '打开主题文件夹',
+    deleteTheme: '删除主题',
+    previewTheme: '预览：{name}',
+    tempMergedTheme: '临时融合：{name}',
+    unnamedTheme: '未命名主题',
+    previewSave: '预览并保存',
+    themeCalendar: '日历',
+    themeJianshu: '简书',
+    themeDialogue: '对话',
+    themeMobai: '墨白',
+    themeGuideContent: `主题文件说明
+
+主题 JSON 由 variables 和 assets 两部分组成。
+
+variables 控制颜色、圆角、字体、卡片、按钮和笔记样式。
+assets 控制标题图标、输入栏图标、摘录图标和背景图。
+
+融合当前酒馆主题会读取 SillyTavern 的主题变量，并生成一个临时预览。
+只有点击“预览并保存”或“另存为”才会生成主题文件。`,
+    invalidThemeFile: '这不是酒馆笔记主题文件。',
+    previewedTheme: '已预览主题，还没有保存。',
+    mergedThemeDraft: '已生成临时融合预览；点“预览并保存”或“另存为”才会生成主题文件。',
+    savedAsTheme: '已另存为新主题。',
+    savedTheme: '主题已保存。',
+    switchedTheme: '主题已切换。',
+    importedTheme: '主题已导入并切换。',
+    requestedThemeFolder: '已请求打开主题文件夹。默认主题是内嵌的，不在这个文件夹里。',
+    defaultThemeCannotDelete: '默认主题不能删除。',
+    confirmDeleteTheme: '确定删除主题“{name}”吗？',
+    deletedTheme: '主题已删除。',
+    themeNamePrompt: '{action}主题名称：',
+    themeNameEmpty: '主题名称不能为空。',
+    saveAction: '保存',
+    saveAsAction: '另存为',
+    currentTavernTheme: '当前酒馆主题',
+    mergedThemeName: '融合酒馆主题 - {name}',
+    confirmDeleteNote: '确定删除这条笔记吗？\n\n{preview}{ellipsis}',
+};
+
+const TEXTS = {
+    'zh-CN': TEXT_ZH_CN,
+    'zh-TW': {
+        ...TEXT_ZH_CN,
+        autoLanguage: '跟隨酒館',
+        language: '語言',
+        languageSaved: '語言已保存，重新整理頁面後生效。',
+        appName: '酒館筆記',
+        theme: '主題',
+        paging: '翻頁',
+        refreshNotes: '重新讀取筆記',
+        exportNotes: '匯出筆記',
+        closeNotes: '關閉酒館筆記',
+        searchPlaceholder: '搜尋筆記、角色、聊天...',
+        connecting: '正在連接酒館筆記...',
+        currentPage: '目前頁面',
+        themeFiles: '主題檔案',
+        currentTheme: '目前：{name}',
+        themeName: '主題名稱',
+        mergeTheme: '融合目前酒館主題',
+        saveAs: '另存為',
+        resetDefault: '恢復預設',
+        importFont: '匯入字體',
+        fontHelp: '貼上 ZeoSeven 的 result.css 地址，或整段 @import CSS，然後點「匯入字體」。識別成功後會自動填入字體名稱並重新整理圖片。',
+        findFonts: '查找免費商用字體',
+        redrawPreview: '重新整理預覽',
+        exportPng: '匯出 PNG',
+        userInput: 'User 輸入',
+        hintAllNotes: '全部記錄',
+        hintByCard: '按角色',
+        hintYourWords: '你的輸入',
+        hintSelectedText: '選中文字',
+        unnamedCharacter: '未命名角色',
+        currentCharacter: '目前角色',
+        copied: '已複製。',
+        filled: '已進入輸入框。',
+        openNotes: '打開酒館筆記',
+        fromTavernNotes: '來自酒館筆記',
+        brandForShare: '酒館筆記',
+        excerptedAt: '摘錄於',
+        openThemePanel: '打開主題面板：切換、匯入、匯出或編輯酒館筆記主題',
+        togglePageButtons: '顯示或隱藏側邊上下翻頁按鈕',
+        close: '關閉',
+        showPageButtons: '顯示側邊上下翻頁按鈕',
+        hidePageButtons: '隱藏側邊上下翻頁按鈕',
+        pageButtonsShown: '已顯示側邊上下翻頁按鈕。',
+        pageButtonsHidden: '已隱藏側邊上下翻頁按鈕。',
+        closeThemePanel: '關閉主題面板',
+        switchTheme: '切換主題',
+        importTheme: '匯入主題',
+        exportCurrentTheme: '匯出目前主題',
+        openThemeFolder: '打開主題資料夾',
+        deleteTheme: '刪除主題',
+        previewTheme: '預覽：{name}',
+        tempMergedTheme: '臨時融合：{name}',
+        unnamedTheme: '未命名主題',
+        previewSave: '預覽並儲存',
+        themeCalendar: '日曆',
+        themeJianshu: '簡書',
+        themeDialogue: '對話',
+        themeMobai: '墨白',
+        themeGuideContent: `主題 JSON 由 variables 和 assets 兩部分組成。
+
+variables 控制顏色、圓角、字體、卡片、按鈕和筆記樣式。
+assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
+
+融合目前酒館主題會讀取 SillyTavern 的主題變數，並產生一個臨時預覽。
+只有點擊「預覽並儲存」或「另存為」才會產生主題檔案。`,
+        invalidThemeFile: '這不是酒館筆記主題檔案。',
+        previewedTheme: '已預覽主題，尚未儲存。',
+        mergedThemeDraft: '已產生臨時融合預覽；點「預覽並儲存」或「另存為」才會產生主題檔案。',
+        savedAsTheme: '已另存為新主題。',
+        savedTheme: '主題已儲存。',
+        switchedTheme: '主題已切換。',
+        importedTheme: '主題已匯入並切換。',
+        requestedThemeFolder: '已請求打開主題資料夾。預設主題是內嵌的，不在這個資料夾裡。',
+        defaultThemeCannotDelete: '預設主題不能刪除。',
+        confirmDeleteTheme: '確定刪除主題「{name}」嗎？',
+        deletedTheme: '主題已刪除。',
+        themeNamePrompt: '{action}主題名稱：',
+        themeNameEmpty: '主題名稱不能為空。',
+        saveAction: '儲存',
+        saveAsAction: '另存為',
+        currentTavernTheme: '目前酒館主題',
+        mergedThemeName: '融合酒館主題 - {name}',
+        confirmDeleteNote: '確定刪除這條筆記嗎？\n\n{preview}{ellipsis}',
+    },
+    en: {
+        ...TEXT_ZH_CN,
+        autoLanguage: 'Follow Tavern',
+        language: 'Language',
+        languageSaved: 'Language saved. Refresh the page to apply it.',
+        appName: 'Tavern Notes',
+        theme: 'Theme',
+        paging: 'Paging',
+        refreshNotes: 'Refresh notes',
+        exportNotes: 'Export notes',
+        closeNotes: 'Close Tavern Notes',
+        searchPlaceholder: 'Search notes, characters, chats...',
+        connecting: 'Connecting to Tavern Notes...',
+        prevPage: 'Previous page',
+        nextPage: 'Next page',
+        jumpPage: 'Jump',
+        exportScope: 'Export scope',
+        allNotes: 'All notes',
+        currentPage: 'Current page',
+        exportHint: 'Current page exports only the notes visible on this page.',
+        exportJson: 'Re-importable JSON',
+        exportTxt: 'Clean TXT',
+        exportBoth: 'Export both',
+        themeFiles: 'Theme Files',
+        currentTheme: 'Current: {name}',
+        themeName: 'Theme name',
+        mergeTheme: 'Merge current Tavern theme',
+        themeGuide: 'Theme guide',
+        preview: 'Preview',
+        save: 'Save',
+        saveAs: 'Save as',
+        resetDefault: 'Reset default',
+        shareCard: 'Share Card',
+        font: 'Font',
+        fontSize: 'Font size',
+        fontImport: 'Font URL or @import',
+        fontHelp: 'Paste a ZeoSeven result.css URL, or a full @import CSS snippet, then click Import font. When recognized, the font name is filled in and the image refreshes.',
+        findFonts: 'Find free commercial fonts',
+        background: 'Background',
+        display: 'Display',
+        characterName: 'Character name',
+        date: 'Date',
+        importFont: 'Import font',
+        redrawPreview: 'Refresh preview',
+        exportPng: 'Export PNG',
+        filtersAll: 'All',
+        filtersCharacters: 'Characters',
+        filtersUserInput: 'User input',
+        filtersExcerpt: 'Excerpts',
+        hintAllNotes: 'all notes',
+        hintByCard: 'by card',
+        hintYourWords: 'your words',
+        hintSelectedText: 'selected text',
+        userInput: 'User input',
+        excerpt: 'Excerpt',
+        manual: 'Manual',
+        unnamedCharacter: 'Unnamed character',
+        noNotes: 'No notes yet',
+        noCharacterNotes: 'No character notes yet',
+        currentCharacter: 'Current character',
+        priority: 'Pinned first',
+        browseByCharacter: 'Browse by character',
+        characterCount: '{count} characters',
+        viewingCharacter: 'Viewing notes for this character',
+        backCharacters: 'Back to characters',
+        fillInput: 'Input',
+        copy: 'Copy',
+        share: 'Share',
+        delete: 'Delete',
+        viewFull: 'View full note',
+        captured: 'Selected text captured.',
+        copied: 'Copied.',
+        filled: 'Moved to input box.',
+        deleted: 'Deleted.',
+        selectTextFirst: 'Select some chat text first, then click Capture selected.',
+        noInput: 'Input box not found.',
+        shownCharacters: 'Showing {count} characters',
+        shownNotes: 'Showing {shown}; {total} in current filter',
+        connected: 'Connected: {user}, V{version}, about {count} total notes',
+        backendDisconnected: 'Backend disconnected: {message}',
+        openNotes: 'Open Tavern Notes',
+        captureSelected: 'Capture selected',
+        captureSelectedTitle: 'Capture selected chat text',
+        scrollUp: 'Page up',
+        scrollDown: 'Page down',
+        showPageButtons: 'Show side page buttons',
+        hidePageButtons: 'Hide side page buttons',
+        pageButtonsShown: 'Side page buttons shown.',
+        pageButtonsHidden: 'Side page buttons hidden.',
+        fromTavernNotes: 'From Tavern Notes',
+        brandForShare: 'Tavern Notes',
+        excerptedAt: 'excerpted on',
+        openThemePanel: 'Open the theme panel to switch, import, export, or edit Tavern Notes themes',
+        togglePageButtons: 'Show or hide the side page buttons',
+        close: 'Close',
+        closeThemePanel: 'Close theme panel',
+        switchTheme: 'Switch theme',
+        importTheme: 'Import theme',
+        exportCurrentTheme: 'Export current theme',
+        openThemeFolder: 'Open theme folder',
+        deleteTheme: 'Delete theme',
+        previewTheme: 'Preview: {name}',
+        tempMergedTheme: 'Temporary merge: {name}',
+        unnamedTheme: 'Untitled theme',
+        previewSave: 'Preview & save',
+        themeCalendar: 'Calendar',
+        themeJianshu: 'Jianshu',
+        themeDialogue: 'Dialogue',
+        themeMobai: 'Ink White',
+        themeGuideContent: `Theme JSON has two main sections: variables and assets.
+
+variables control colors, radius, fonts, cards, buttons, and note styles.
+assets control the header icon, input-bar icon, capture icon, and background image.
+
+Merge current Tavern theme reads SillyTavern theme variables and creates a temporary preview.
+Click Preview & save or Save as to create a theme file.`,
+        invalidThemeFile: 'This is not a Tavern Notes theme file.',
+        previewedTheme: 'Theme previewed. It is not saved yet.',
+        mergedThemeDraft: 'Temporary merged preview created. Use Preview & save or Save as to create a theme file.',
+        savedAsTheme: 'Saved as a new theme.',
+        savedTheme: 'Theme saved.',
+        switchedTheme: 'Theme switched.',
+        importedTheme: 'Theme imported and activated.',
+        requestedThemeFolder: 'Theme folder open requested. The default theme is built in, so it is not in that folder.',
+        defaultThemeCannotDelete: 'The default theme cannot be deleted.',
+        confirmDeleteTheme: 'Delete theme "{name}"?',
+        deletedTheme: 'Theme deleted.',
+        themeNamePrompt: '{action} theme name:',
+        themeNameEmpty: 'Theme name cannot be empty.',
+        saveAction: 'Save',
+        saveAsAction: 'Save as',
+        currentTavernTheme: 'Current Tavern theme',
+        mergedThemeName: 'Merged Tavern theme - {name}',
+        confirmDeleteNote: 'Delete this note?\n\n{preview}{ellipsis}',
+    },
+    ko: {
+        ...TEXT_ZH_CN,
+        autoLanguage: '술집 언어 따르기',
+        language: '언어',
+        languageSaved: '언어가 저장되었습니다. 페이지를 새로고침하면 적용됩니다.',
+        appName: '술집 노트',
+        theme: '테마',
+        paging: '페이지',
+        refreshNotes: '노트 새로고침',
+        exportNotes: '노트 내보내기',
+        closeNotes: '술집 노트 닫기',
+        searchPlaceholder: '노트, 캐릭터, 채팅 검색...',
+        connecting: '술집 노트에 연결 중...',
+        prevPage: '이전 페이지',
+        nextPage: '다음 페이지',
+        jumpPage: '이동',
+        exportScope: '내보내기 범위',
+        allNotes: '전체 노트',
+        currentPage: '현재 페이지',
+        exportHint: '현재 페이지는 지금 목록에 보이는 노트만 내보냅니다.',
+        exportJson: '다시 가져올 수 있는 JSON',
+        exportTxt: '깔끔한 TXT',
+        exportBoth: '둘 다 내보내기',
+        themeFiles: '테마 파일',
+        currentTheme: '현재: {name}',
+        themeName: '테마 이름',
+        mergeTheme: '현재 술집 테마 병합',
+        themeGuide: '테마 제작 설명',
+        preview: '미리보기',
+        save: '저장',
+        saveAs: '다른 이름으로 저장',
+        resetDefault: '기본값 복원',
+        shareCard: '공유 카드',
+        font: '글꼴',
+        fontSize: '글자 크기',
+        fontImport: '글꼴 주소 또는 @import',
+        fontHelp: 'ZeoSeven result.css 주소나 전체 @import CSS를 붙여 넣은 뒤 글꼴 가져오기를 누르세요. 인식되면 글꼴 이름이 자동으로 채워지고 이미지가 새로고침됩니다.',
+        findFonts: '무료 상업용 글꼴 찾기',
+        background: '배경',
+        display: '표시',
+        characterName: '캐릭터 이름',
+        date: '날짜',
+        importFont: '글꼴 가져오기',
+        redrawPreview: '미리보기 새로고침',
+        exportPng: 'PNG 내보내기',
+        filtersAll: '전체',
+        filtersCharacters: '캐릭터',
+        filtersUserInput: 'User 입력',
+        filtersExcerpt: '발췌',
+        hintAllNotes: '전체 노트',
+        hintByCard: '캐릭터별',
+        hintYourWords: '내 입력',
+        hintSelectedText: '선택한 글',
+        userInput: 'User 입력',
+        excerpt: '발췌',
+        manual: '수동',
+        unnamedCharacter: '이름 없는 캐릭터',
+        noNotes: '아직 노트가 없습니다',
+        noCharacterNotes: '아직 캐릭터 노트가 없습니다',
+        currentCharacter: '현재 캐릭터',
+        priority: '우선 표시',
+        browseByCharacter: '캐릭터별 보기',
+        characterCount: '캐릭터 {count}명',
+        viewingCharacter: '이 캐릭터의 노트를 보는 중',
+        backCharacters: '캐릭터 목록으로',
+        fillInput: '입력',
+        copy: '복사',
+        share: '공유',
+        delete: '삭제',
+        viewFull: '전체 보기',
+        captured: '선택한 글을 발췌했습니다.',
+        copied: '복사했습니다.',
+        filled: '입력창에 넣었습니다.',
+        deleted: '삭제했습니다.',
+        selectTextFirst: '먼저 채팅 글을 선택한 뒤 “선택 발췌”를 누르세요.',
+        noInput: '입력창을 찾지 못했습니다.',
+        shownCharacters: '캐릭터 {count}명 표시 중',
+        shownNotes: '{shown}개 표시 중, 현재 필터 전체 {total}개',
+        connected: '연결됨: {user}, V{version}, 전체 약 {count}개',
+        backendDisconnected: '백엔드 연결 안 됨: {message}',
+        openNotes: '술집 노트 열기',
+        captureSelected: '선택 발췌',
+        captureSelectedTitle: '선택한 채팅 글 발췌',
+        scrollUp: '한 페이지 위로',
+        scrollDown: '한 페이지 아래로',
+        showPageButtons: '측면 페이지 버튼 보이기',
+        hidePageButtons: '측면 페이지 버튼 숨기기',
+        pageButtonsShown: '측면 페이지 버튼을 표시했습니다.',
+        pageButtonsHidden: '측면 페이지 버튼을 숨겼습니다.',
+        fromTavernNotes: '술집 노트에서',
+        brandForShare: '술집 노트',
+        excerptedAt: '발췌일',
+        openThemePanel: '테마 패널 열기: 술집 노트 테마를 전환, 가져오기, 내보내기, 편집합니다',
+        togglePageButtons: '측면 페이지 버튼 보이기/숨기기',
+        close: '닫기',
+        closeThemePanel: '테마 패널 닫기',
+        switchTheme: '테마 전환',
+        importTheme: '테마 가져오기',
+        exportCurrentTheme: '현재 테마 내보내기',
+        openThemeFolder: '테마 폴더 열기',
+        deleteTheme: '테마 삭제',
+        previewTheme: '미리보기: {name}',
+        tempMergedTheme: '임시 병합: {name}',
+        unnamedTheme: '이름 없는 테마',
+        previewSave: '미리보기 후 저장',
+        themeCalendar: '캘린더',
+        themeJianshu: '젠슈',
+        themeDialogue: '대화',
+        themeMobai: '묵백',
+        themeGuideContent: `테마 JSON은 variables와 assets 두 부분으로 구성됩니다.
+
+variables는 색상, 둥근 모서리, 글꼴, 카드, 버튼, 노트 스타일을 제어합니다.
+assets는 제목 아이콘, 입력창 아이콘, 발췌 아이콘, 배경 이미지를 제어합니다.
+
+현재 술집 테마 병합은 SillyTavern 테마 변수를 읽어 임시 미리보기를 만듭니다.
+미리보기 후 저장 또는 다른 이름으로 저장을 눌러야 테마 파일이 생성됩니다.`,
+        invalidThemeFile: '술집 노트 테마 파일이 아닙니다.',
+        previewedTheme: '테마를 미리보았습니다. 아직 저장되지 않았습니다.',
+        mergedThemeDraft: '임시 병합 미리보기를 만들었습니다. 미리보기 후 저장 또는 다른 이름으로 저장을 눌러 테마 파일을 만드세요.',
+        savedAsTheme: '새 테마로 저장했습니다.',
+        savedTheme: '테마를 저장했습니다.',
+        switchedTheme: '테마를 전환했습니다.',
+        importedTheme: '테마를 가져오고 적용했습니다.',
+        requestedThemeFolder: '테마 폴더 열기를 요청했습니다. 기본 테마는 내장되어 있어 이 폴더에 없습니다.',
+        defaultThemeCannotDelete: '기본 테마는 삭제할 수 없습니다.',
+        confirmDeleteTheme: '"{name}" 테마를 삭제할까요?',
+        deletedTheme: '테마를 삭제했습니다.',
+        themeNamePrompt: '{action} 테마 이름:',
+        themeNameEmpty: '테마 이름은 비워둘 수 없습니다.',
+        saveAction: '저장',
+        saveAsAction: '다른 이름으로 저장',
+        currentTavernTheme: '현재 술집 테마',
+        mergedThemeName: '병합한 술집 테마 - {name}',
+        confirmDeleteNote: '이 노트를 삭제할까요?\n\n{preview}{ellipsis}',
+    },
+};
+
+function normalizeLanguage(value) {
+    const language = String(value || '').toLowerCase();
+    if (language.startsWith('zh-tw') || language.startsWith('zh-hk') || language.startsWith('zh-hant')) return 'zh-TW';
+    if (language.startsWith('zh')) return 'zh-CN';
+    if (language.startsWith('ko')) return 'ko';
+    if (language.startsWith('en')) return 'en';
+    return 'zh-CN';
+}
+
+function getActiveLanguage() {
+    const language = state.language === 'auto'
+        ? (localStorage.getItem('language') || navigator.language)
+        : state.language;
+    return normalizeLanguage(language);
+}
+
+function t(key, values = {}) {
+    const table = TEXTS[getActiveLanguage()] || TEXT_ZH_CN;
+    return String(table[key] ?? TEXT_ZH_CN[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => values[name] ?? '');
+}
 
 const DEFAULT_THEME = {
     format: 'tavern-notes-theme',
@@ -148,19 +691,20 @@ const DEFAULT_THEME = {
 };
 
 const FILTERS = [
-    { id: 'all', icon: 'fa-layer-group', label: '全部', hint: 'all notes' },
-    { id: 'characters', icon: 'fa-user', label: '角色', hint: 'by card' },
-    { id: 'user_input', icon: 'fa-keyboard', label: 'User 输入', hint: 'your words' },
-    { id: 'excerpt', icon: 'fa-highlighter', label: '摘抄', hint: 'selected text' },
+    { id: 'all', icon: 'fa-layer-group', label: 'filtersAll', hint: 'hintAllNotes' },
+    { id: 'characters', icon: 'fa-user', label: 'filtersCharacters', hint: 'hintByCard' },
+    { id: 'user_input', icon: 'fa-keyboard', label: 'filtersUserInput', hint: 'hintYourWords' },
+    { id: 'excerpt', icon: 'fa-highlighter', label: 'filtersExcerpt', hint: 'hintSelectedText' },
 ];
 
 const SHARE_CARD_THEMES = [
-    { id: 'calendar', label: '日历' },
-    { id: 'classic', label: '经典' },
-    { id: 'ink', label: '墨白' },
+    { id: 'calendar', labelKey: 'themeCalendar' },
+    { id: 'jianshu', labelKey: 'themeJianshu' },
+    { id: 'dialogue', labelKey: 'themeDialogue' },
+    { id: 'mobai', labelKey: 'themeMobai' },
 ];
 
-const SHARE_CARD_BACKGROUNDS = ['#6f7fa8', '#f5f7fb', '#fff5f3', '#f5f8ef', '#eff8f4', '#f2e4b8', '#f7f4ef', '#ffffff', '#1f1f1f'];
+const SHARE_CARD_BACKGROUNDS = ['#eef7f2', '#f4f0e5', '#fff4ec', '#edf2ff', '#f2e4b8', '#ffffff', '#1f1f1f', '#203b2a', '#182235', '#3a2330'];
 
 const THEME_GUIDE = `主题文件说明
 
@@ -249,26 +793,38 @@ function setStatus(message) {
 
 function saveLocalSettings() {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+        language: state.language,
         showPageDownButton: state.showPageDownButton,
+        scrollButtonsTop: state.scrollButtonsTop,
+        currentUserName: state.currentUserName,
         shareCard: state.shareCardSettings,
     }));
+}
+
+function saveLanguageSetting(language) {
+    state.language = ['auto', 'zh-CN', 'zh-TW', 'en', 'ko'].includes(language) ? language : 'auto';
+    saveLocalSettings();
+    updatePageDownSettingButton();
+    updateScrollButtonLabels();
+    notify(t('languageSaved'), 'success');
 }
 
 function updatePageDownSettingButton() {
     const button = document.querySelector('#tavern-notes-page-down-setting');
     if (!button) return;
     button.classList.toggle('active', state.showPageDownButton);
-    button.title = state.showPageDownButton
-        ? '隐藏输入栏上的向下翻页按钮，适合不需要手机快捷翻页时关闭'
-        : '显示输入栏上的向下翻页按钮，手机端常用';
+    const label = state.showPageDownButton ? t('hidePageButtons') : t('showPageButtons');
+    button.title = label;
+    button.setAttribute('aria-label', label);
 }
 
 function togglePageDownButtonSetting() {
     state.showPageDownButton = !state.showPageDownButton;
     saveLocalSettings();
     updatePageDownSettingButton();
-    addInputToolbar();
-    notify(state.showPageDownButton ? '已显示向下翻页按钮。' : '已隐藏向下翻页按钮。', 'success');
+    updateScrollButtonsVisibility();
+    updateScrollButtonLabels();
+    notify(state.showPageDownButton ? t('pageButtonsShown') : t('pageButtonsHidden'), 'success');
 }
 
 function htmlEscape(value) {
@@ -318,9 +874,9 @@ function renderQuotedText(value) {
 }
 
 function noteTypeLabel(type) {
-    if (type === 'user_input') return 'User 输入';
-    if (type === 'excerpt') return '摘抄';
-    return '手动';
+    if (type === 'user_input') return t('userInput');
+    if (type === 'excerpt') return t('excerpt');
+    return t('manual');
 }
 
 function noteTypeClass(type) {
@@ -373,9 +929,9 @@ async function refreshNotes() {
         }
         renderNotes();
         if (isCharacterDirectory) {
-            setStatus(`已显示 ${state.characters.length} 个角色`);
+            setStatus(t('shownCharacters', { count: state.characters.length }));
         } else {
-            setStatus(`已显示 ${state.notes.length} 条，当前筛选共 ${state.totalNotes} 条`);
+            setStatus(t('shownNotes', { shown: state.notes.length, total: state.totalNotes }));
         }
     } catch (error) {
         notify(error.message, 'error');
@@ -402,7 +958,7 @@ function getCharacterAvatar(character) {
 }
 
 function getCharacterInitial(name) {
-    return String(name || '未').trim().slice(0, 1) || '未';
+    return String(name || t('unnamedCharacter')).trim().slice(0, 1) || t('unnamedCharacter').slice(0, 1);
 }
 
 function getCharacterKey(character) {
@@ -474,8 +1030,8 @@ function renderCharacterOverview() {
         return `
             <div class="tn-empty">
                 <div class="tn-empty-orb"><i class="fa-solid fa-user"></i></div>
-                <div class="tn-empty-title">还没有角色笔记</div>
-                <small>发送 User 输入或摘录聊天文字后，这里会按角色汇总。</small>
+                <div class="tn-empty-title">${htmlEscape(t('noCharacterNotes'))}</div>
+                <small>${htmlEscape(t('noCharacterNotesHint'))}</small>
             </div>
         `;
     }
@@ -488,12 +1044,12 @@ function renderCharacterOverview() {
                 data-character-name="${htmlEscape(character.name || '')}">
                 <span class="tn-character-avatar">
                     ${avatar
-                        ? `<img src="${htmlEscape(avatar)}" alt="${htmlEscape(character.name || '角色头像')}" loading="lazy" />`
+                        ? `<img src="${htmlEscape(avatar)}" alt="${htmlEscape(character.name || t('characterName'))}" loading="lazy" />`
                         : `<span>${htmlEscape(getCharacterInitial(character.name))}</span>`}
                 </span>
                 <span class="tn-character-info">
-                    <b>${htmlEscape(character.name || '未命名角色')}${isCurrent ? '<em>当前</em>' : ''}</b>
-                    <small>${htmlEscape(character.total)} 条 · 输入 ${htmlEscape(character.userInput)} · 摘抄 ${htmlEscape(character.excerpt)}</small>
+                    <b>${htmlEscape(character.name || t('unnamedCharacter'))}${isCurrent ? `<em>${htmlEscape(t('currentCharacter'))}</em>` : ''}</b>
+                    <small>${htmlEscape(character.total)} · ${htmlEscape(t('fillInput'))} ${htmlEscape(character.userInput)} · ${htmlEscape(t('excerpt'))} ${htmlEscape(character.excerpt)}</small>
                 </span>
                 <i class="fa-solid fa-chevron-right"></i>
             </button>
@@ -505,15 +1061,15 @@ function renderCharacterOverview() {
     return `
         <section class="tn-character-overview">
             <div class="tn-section-title">
-                <span>当前角色</span>
-                <small>优先显示</small>
+                <span>${htmlEscape(t('currentCharacter'))}</span>
+                <small>${htmlEscape(t('priority'))}</small>
             </div>
             <div class="tn-character-featured">${renderCard(current, true)}</div>
             <div class="tn-section-title">
-                <span>按角色浏览</span>
-                <small>${state.characters.length} 个角色</small>
+                <span>${htmlEscape(t('browseByCharacter'))}</span>
+                <small>${htmlEscape(t('characterCount', { count: state.characters.length }))}</small>
             </div>
-            ${cards ? `<div class="tn-character-grid">${cards}</div>` : '<div class="tn-character-empty-line">其他角色有记录后会显示在这里。</div>'}
+            ${cards ? `<div class="tn-character-grid">${cards}</div>` : `<div class="tn-character-empty-line">${htmlEscape(t('otherCharactersEmpty'))}</div>`}
         </section>
     `;
 }
@@ -525,14 +1081,14 @@ function renderCharacterScope() {
         <section class="tn-character-scope">
             <span class="tn-character-avatar">
                 ${avatar
-                    ? `<img src="${htmlEscape(avatar)}" alt="${htmlEscape(state.characterFilter.name || '角色头像')}" loading="lazy" />`
+                    ? `<img src="${htmlEscape(avatar)}" alt="${htmlEscape(state.characterFilter.name || t('characterName'))}" loading="lazy" />`
                     : `<span>${htmlEscape(getCharacterInitial(state.characterFilter.name))}</span>`}
             </span>
             <div>
-                <b>${htmlEscape(state.characterFilter.name || '未命名角色')}</b>
-                <small>正在查看这个角色的笔记</small>
+                <b>${htmlEscape(state.characterFilter.name || t('unnamedCharacter'))}</b>
+                <small>${htmlEscape(t('viewingCharacter'))}</small>
             </div>
-            <button class="tn-clear-character" type="button"><i class="fa-solid fa-arrow-left"></i><span>返回角色列表</span></button>
+            <button class="tn-clear-character" type="button"><i class="fa-solid fa-arrow-left"></i><span>${htmlEscape(t('backCharacters'))}</span></button>
         </section>
     `;
 }
@@ -542,8 +1098,8 @@ function renderNoteArticles() {
         return `
             <div class="tn-empty">
                 <div class="tn-empty-orb"><i class="fa-regular fa-note-sticky"></i></div>
-                <div class="tn-empty-title">这里还没有笔记</div>
-                <small>发送消息会自动记录 User 输入；选中聊天文字后点“摘录选中”会保存摘抄。</small>
+                <div class="tn-empty-title">${htmlEscape(t('noNotes'))}</div>
+                <small>${htmlEscape(t('noNotesHint'))}</small>
             </div>
         `;
     }
@@ -557,27 +1113,27 @@ function renderNoteArticles() {
                 ${renderVariantControls(note)}
                 <div class="tn-note-topline">
                     <span class="tn-note-type">${htmlEscape(noteTypeLabel(note.type))}</span>
-                    <span class="tn-note-character">${htmlEscape(note.character?.name || '未命名角色')}</span>
+                    <span class="tn-note-character">${htmlEscape(note.character?.name || t('unnamedCharacter'))}</span>
                     <span class="tn-note-muted">${htmlEscape(activeNote.chat?.name || note.chat?.name || '')}</span>
                     <span class="tn-note-muted">#${htmlEscape(messageId)}</span>
                     <span class="tn-note-time">${htmlEscape(created)}</span>
                 </div>
                 <div class="tn-note-body">
                     <div class="tn-note-content">${renderQuotedText(activeNote.content)}</div>
-                    ${isLongNote(activeNote) ? '<button class="tn-expand" title="查看全文">...</button>' : ''}
+                    ${isLongNote(activeNote) ? `<button class="tn-expand" title="${htmlEscape(t('viewFull'))}">...</button>` : ''}
                 </div>
                 <div class="tn-note-actions">
-                    <button class="menu_button tn-fill" title="把这条内容放进输入框">
-                        <i class="fa-solid fa-arrow-turn-down"></i><span>输入</span>
+                    <button class="menu_button tn-fill" title="${htmlEscape(t('fillInput'))}">
+                        <i class="fa-solid fa-arrow-turn-down"></i><span>${htmlEscape(t('fillInput'))}</span>
                     </button>
-                    <button class="menu_button tn-copy" title="复制这条笔记">
-                        <i class="fa-regular fa-copy"></i><span>复制</span>
+                    <button class="menu_button tn-copy" title="${htmlEscape(t('copy'))}">
+                        <i class="fa-regular fa-copy"></i><span>${htmlEscape(t('copy'))}</span>
                     </button>
-                    <button class="menu_button tn-share" title="分享这条笔记">
-                        <i class="fa-solid fa-share-nodes"></i><span>分享</span>
+                    <button class="menu_button tn-share" title="${htmlEscape(t('share'))}">
+                        <i class="fa-solid fa-share-nodes"></i><span>${htmlEscape(t('share'))}</span>
                     </button>
-                    <button class="menu_button tn-delete" title="删除这条笔记">
-                        <i class="fa-regular fa-trash-can"></i><span>删除</span>
+                    <button class="menu_button tn-delete" title="${htmlEscape(t('delete'))}">
+                        <i class="fa-regular fa-trash-can"></i><span>${htmlEscape(t('delete'))}</span>
                     </button>
                 </div>
             </article>
@@ -642,7 +1198,7 @@ function getInputBox() {
 function writeInput(text, append = false) {
     const input = getInputBox();
     if (!input) {
-        notify('没有找到输入框。', 'error');
+        notify(t('noInput'), 'error');
         return;
     }
     input.value = append && input.value ? `${input.value}\n${text}` : text;
@@ -668,7 +1224,7 @@ async function captureSelection() {
     const messageId = currentText ? getSelectionMessageId(selection) : cached?.messageId;
 
     if (!selected) {
-        notify('先在聊天里选中一段文字，再点“摘录选中”。');
+        notify(t('selectTextFirst'));
         return;
     }
 
@@ -683,7 +1239,7 @@ async function captureSelection() {
         },
         source: 'selected_text',
     });
-    notify('已摘录选中文字。', 'success');
+    notify(t('captured'), 'success');
 }
 
 function getSelectionMessageId(selection = window.getSelection()) {
@@ -778,34 +1334,42 @@ function buildPanel() {
     if (document.querySelector('#tavern-notes-panel')) return;
 
     document.body.insertAdjacentHTML('beforeend', `
-        <section id="tavern-notes-panel" aria-label="酒馆笔记">
+        <section id="tavern-notes-panel" aria-label="${htmlEscape(t('appName'))}">
             <header class="tn-header">
                 <div class="tn-brand-mark"><i class="fa-solid fa-book-open"></i></div>
                 <div class="tn-heading">
-                    <div class="tn-title">酒馆笔记 <span>@KKM</span></div>
-                    <div class="tn-subtitle">soft notes · character memory</div>
+                    <div class="tn-title">${htmlEscape(t('appName'))} <span>@KKM</span></div>
+                    <div class="tn-subtitle">${htmlEscape(t('subtitle'))}</div>
+                </div>
+                <div class="tn-window-actions">
+                    <label class="tn-language-select" title="${htmlEscape(t('language'))}">
+                        <i class="fa-solid fa-language"></i>
+                        <select id="tavern-notes-language">
+                            ${LANGUAGE_OPTIONS.map(option => `<option value="${option.id}" ${option.id === state.language ? 'selected' : ''}>${option.id === 'auto' ? htmlEscape(t('autoLanguage')) : htmlEscape(option.label)}</option>`).join('')}
+                        </select>
+                    </label>
+                    <button class="tn-icon-button tn-close" title="${htmlEscape(t('closeNotes'))}" aria-label="${htmlEscape(t('closeNotes'))}">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
                 </div>
                 <div class="tn-header-actions">
-                    <button id="tavern-notes-theme" class="tn-soft-button" title="打开主题面板：切换、导入、导出或编辑酒馆笔记主题" aria-label="打开主题面板">
-                        <i class="fa-solid fa-palette"></i><span>主题</span>
+                    <button id="tavern-notes-theme" class="tn-soft-button" title="${htmlEscape(t('openThemePanel'))}" aria-label="${htmlEscape(t('openThemePanel'))}">
+                        <i class="fa-solid fa-palette"></i><span>${htmlEscape(t('theme'))}</span>
                     </button>
-                    <button id="tavern-notes-page-down-setting" class="tn-soft-button" title="显示或隐藏输入栏上的向下翻页按钮，手机端常用" aria-label="切换向下翻页按钮">
-                        <i class="fa-solid fa-arrow-down"></i><span>翻页</span>
+                    <button id="tavern-notes-page-down-setting" class="tn-soft-button" title="${htmlEscape(t('togglePageButtons'))}" aria-label="${htmlEscape(t('togglePageButtons'))}">
+                        <i class="fa-solid fa-up-down"></i><span>${htmlEscape(t('paging'))}</span>
                     </button>
-                    <button id="tavern-notes-refresh" class="tn-icon-button" title="重新读取当前筛选和分页的笔记" aria-label="刷新笔记">
+                    <button id="tavern-notes-refresh" class="tn-icon-button" title="${htmlEscape(t('refreshNotes'))}" aria-label="${htmlEscape(t('refreshNotes'))}">
                         <i class="fa-solid fa-rotate-right"></i>
                     </button>
-                    <button id="tavern-notes-export" class="tn-icon-button" title="打开导出面板：可导出全部笔记或当前页面" aria-label="导出笔记">
+                    <button id="tavern-notes-export" class="tn-icon-button" title="${htmlEscape(t('exportNotes'))}" aria-label="${htmlEscape(t('exportNotes'))}">
                         <i class="fa-solid fa-download"></i>
-                    </button>
-                    <button class="tn-icon-button tn-close" title="关闭酒馆笔记面板" aria-label="关闭酒馆笔记">
-                        <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
             </header>
             <div class="tn-search-row">
                 <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="tavern-notes-search" class="text_pole" type="search" placeholder="搜索笔记、角色、聊天..." />
+                <input id="tavern-notes-search" class="text_pole" type="search" placeholder="${htmlEscape(t('searchPlaceholder'))}" />
             </div>
             <div class="tn-shell">
                 <nav class="tn-filters">
@@ -813,8 +1377,8 @@ function buildPanel() {
                         <button class="tn-filter ${filter.id === 'all' ? 'active' : ''}" data-filter="${filter.id}">
                             <span class="tn-filter-icon"><i class="fa-solid ${filter.icon}"></i></span>
                             <span class="tn-filter-text">
-                                <b>${filter.label}</b>
-                                <small>${filter.hint}</small>
+                                <b>${htmlEscape(t(filter.label))}</b>
+                                <small>${htmlEscape(t(filter.hint))}</small>
                             </span>
                             <span class="tn-filter-count"></span>
                         </button>
@@ -823,18 +1387,18 @@ function buildPanel() {
                 <main id="tavern-notes-list" class="tn-list"></main>
             </div>
             <footer class="tn-footer">
-                <span class="tavern-notes-status">正在连接酒馆笔记...</span>
+                <span class="tavern-notes-status">${htmlEscape(t('connecting'))}</span>
                 <div class="tn-pagination">
-                    <button id="tavern-notes-prev" class="tn-page-button" title="上一页"><i class="fa-solid fa-chevron-left"></i></button>
+                    <button id="tavern-notes-prev" class="tn-page-button" title="${htmlEscape(t('prevPage'))}"><i class="fa-solid fa-chevron-left"></i></button>
                     <span id="tavern-notes-page-label">1 / 1</span>
-                    <button id="tavern-notes-next" class="tn-page-button" title="下一页"><i class="fa-solid fa-chevron-right"></i></button>
+                    <button id="tavern-notes-next" class="tn-page-button" title="${htmlEscape(t('nextPage'))}"><i class="fa-solid fa-chevron-right"></i></button>
                     <input id="tavern-notes-page-input" type="number" min="1" value="1" />
-                    <button id="tavern-notes-page-jump" class="tn-page-button">跳页</button>
+                    <button id="tavern-notes-page-jump" class="tn-page-button">${htmlEscape(t('jumpPage'))}</button>
                 </div>
             </footer>
             <div id="tavern-notes-modal" aria-hidden="true">
                 <div class="tn-modal-card">
-                    <button class="tn-icon-button tn-modal-close" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+                    <button class="tn-icon-button tn-modal-close" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>
                     <div class="tn-modal-kicker"></div>
                     <div class="tn-modal-title"></div>
                     <div class="tn-modal-content"></div>
@@ -842,80 +1406,82 @@ function buildPanel() {
             </div>
             <div id="tavern-notes-export-menu" aria-hidden="true">
                 <div class="tn-export-card">
-                    <div class="tn-export-title">导出笔记</div>
+                    <div class="tn-export-title">${htmlEscape(t('exportNotes'))}</div>
                     <div class="tn-export-scope">
-                        <div class="tn-export-scope-label">导出范围</div>
-                        <div class="tn-export-scope-options" role="group" aria-label="导出范围">
-                            <button class="tn-export-scope-choice active" data-scope="all" type="button">全部笔记</button>
-                            <button class="tn-export-scope-choice" data-scope="page" type="button">当前页面</button>
+                        <div class="tn-export-scope-label">${htmlEscape(t('exportScope'))}</div>
+                        <div class="tn-export-scope-options" role="group" aria-label="${htmlEscape(t('exportScope'))}">
+                            <button class="tn-export-scope-choice active" data-scope="all" type="button">${htmlEscape(t('allNotes'))}</button>
+                            <button class="tn-export-scope-choice" data-scope="page" type="button">${htmlEscape(t('currentPage'))}</button>
                         </div>
-                        <small class="tn-export-hint">当前页面只导出现在列表里这一页看到的笔记。</small>
+                        <small class="tn-export-hint">${htmlEscape(t('exportHint'))}</small>
                     </div>
-                    <button class="tn-export-choice" data-format="json" title="导出结构化 JSON，适合以后重新导入或备份"><i class="fa-solid fa-file-code"></i><span>可再次导入 JSON</span></button>
-                    <button class="tn-export-choice" data-format="txt" title="导出干净的 TXT 文本，User 输入和摘抄会分区显示"><i class="fa-solid fa-file-lines"></i><span>清爽 TXT 文本</span></button>
-                    <button class="tn-export-choice" data-format="both" title="同时导出 JSON 和 TXT 两个文件"><i class="fa-solid fa-layer-group"></i><span>两个都导出</span></button>
+                    <button class="tn-export-choice" data-format="json" title="JSON"><i class="fa-solid fa-file-code"></i><span>${htmlEscape(t('exportJson'))}</span></button>
+                    <button class="tn-export-choice" data-format="txt" title="TXT"><i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('exportTxt'))}</span></button>
+                    <button class="tn-export-choice" data-format="both" title="JSON + TXT"><i class="fa-solid fa-layer-group"></i><span>${htmlEscape(t('exportBoth'))}</span></button>
                 </div>
             </div>
             <div id="tavern-notes-theme-menu" aria-hidden="true">
                 <div class="tn-theme-card">
-                    <div class="tn-export-title">主题文件</div>
-                    <div class="tn-theme-name">当前：Soft Neomorphism</div>
+                    <button class="tn-icon-button tn-theme-close" title="${htmlEscape(t('closeThemePanel'))}" aria-label="${htmlEscape(t('closeThemePanel'))}"><i class="fa-solid fa-xmark"></i></button>
+                    <div class="tn-export-title">${htmlEscape(t('themeFiles'))}</div>
+                    <div class="tn-theme-name">${htmlEscape(t('currentTheme', { name: 'Soft Neomorphism' }))}</div>
                     <div class="tn-theme-picker">
-                        <select id="tavern-notes-theme-select" title="切换主题"></select>
-                        <button id="tavern-notes-theme-import" class="tn-theme-icon-button" title="导入主题"><i class="fa-solid fa-file-import"></i></button>
-                        <button id="tavern-notes-theme-export" class="tn-theme-icon-button" title="导出当前主题"><i class="fa-solid fa-file-export"></i></button>
-                        <button id="tavern-notes-theme-open-folder" class="tn-theme-icon-button" title="打开主题文件夹"><i class="fa-solid fa-folder-open"></i></button>
-                        <button id="tavern-notes-theme-delete" class="tn-theme-icon-button" title="删除主题"><i class="fa-solid fa-trash-can"></i></button>
+                        <select id="tavern-notes-theme-select" title="${htmlEscape(t('switchTheme'))}"></select>
+                        <button id="tavern-notes-theme-import" class="tn-theme-icon-button" title="${htmlEscape(t('importTheme'))}" aria-label="${htmlEscape(t('importTheme'))}"><i class="fa-solid fa-file-import"></i></button>
+                        <button id="tavern-notes-theme-export" class="tn-theme-icon-button" title="${htmlEscape(t('exportCurrentTheme'))}" aria-label="${htmlEscape(t('exportCurrentTheme'))}"><i class="fa-solid fa-file-export"></i></button>
+                        <button id="tavern-notes-theme-open-folder" class="tn-theme-icon-button" title="${htmlEscape(t('openThemeFolder'))}" aria-label="${htmlEscape(t('openThemeFolder'))}"><i class="fa-solid fa-folder-open"></i></button>
+                        <button id="tavern-notes-theme-delete" class="tn-theme-icon-button" title="${htmlEscape(t('deleteTheme'))}" aria-label="${htmlEscape(t('deleteTheme'))}"><i class="fa-solid fa-trash-can"></i></button>
                     </div>
-                    <input id="tavern-notes-theme-name-input" class="tn-theme-input" type="text" placeholder="主题名称" />
-                    <button id="tavern-notes-theme-merge-st" class="tn-theme-merge-button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>融合当前酒馆主题</span></button>
+                    <input id="tavern-notes-theme-name-input" class="tn-theme-input" type="text" placeholder="${htmlEscape(t('themeName'))}" />
+                    <button id="tavern-notes-theme-merge-st" class="tn-theme-merge-button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>${htmlEscape(t('mergeTheme'))}</span></button>
+                    <div class="tn-theme-actions">
+                        <button id="tavern-notes-theme-preview-save" class="tn-export-choice"><i class="fa-solid fa-eye"></i><span>${htmlEscape(t('previewSave'))}</span></button>
+                        <button id="tavern-notes-theme-save-as" class="tn-export-choice"><i class="fa-solid fa-copy"></i><span>${htmlEscape(t('saveAs'))}</span></button>
+                        <button id="tavern-notes-theme-reset" class="tn-export-choice"><i class="fa-solid fa-rotate-left"></i><span>${htmlEscape(t('resetDefault'))}</span></button>
+                    </div>
                     <details class="tn-theme-guide">
-                        <summary><i class="fa-solid fa-circle-info"></i><span>主题制作说明</span></summary>
-                        <pre>${htmlEscape(THEME_GUIDE)}</pre>
+                        <summary><i class="fa-solid fa-circle-info"></i><span>${htmlEscape(t('themeGuide'))}</span></summary>
+                        <pre>${htmlEscape(t('themeGuideContent'))}</pre>
                     </details>
                     <textarea id="tavern-notes-theme-code" spellcheck="false"></textarea>
-                    <div class="tn-theme-actions">
-                        <button id="tavern-notes-theme-preview" class="tn-export-choice"><i class="fa-solid fa-eye"></i><span>预览</span></button>
-                        <button id="tavern-notes-theme-save" class="tn-export-choice"><i class="fa-solid fa-floppy-disk"></i><span>保存</span></button>
-                        <button id="tavern-notes-theme-save-as" class="tn-export-choice"><i class="fa-solid fa-copy"></i><span>另存为</span></button>
-                        <button id="tavern-notes-theme-reset" class="tn-export-choice"><i class="fa-solid fa-rotate-left"></i><span>恢复默认</span></button>
-                    </div>
                     <input id="tavern-notes-theme-file" type="file" accept=".json,application/json" hidden />
                 </div>
             </div>
             <div id="tavern-notes-share-menu" aria-hidden="true">
                 <div class="tn-share-card">
-                    <button class="tn-icon-button tn-share-close" title="关闭"><i class="fa-solid fa-xmark"></i></button>
+                    <button class="tn-icon-button tn-share-close" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>
                     <div class="tn-share-preview-wrap">
                         <canvas id="tavern-notes-share-canvas" width="900" height="1400"></canvas>
                     </div>
                     <div class="tn-share-controls">
-                        <div class="tn-export-title">分享卡片</div>
-                        <label class="tn-share-label">主题</label>
+                        <div class="tn-export-title">${htmlEscape(t('shareCard'))}</div>
+                        <label class="tn-share-label">${htmlEscape(t('theme'))}</label>
                         <div class="tn-share-theme-row">
-                            ${SHARE_CARD_THEMES.map(theme => `<button class="tn-share-choice" data-share-theme="${theme.id}" type="button">${theme.label}</button>`).join('')}
+                            ${SHARE_CARD_THEMES.map(theme => `<button class="tn-share-choice" data-share-theme="${theme.id}" type="button">${htmlEscape(t(theme.labelKey))}</button>`).join('')}
                         </div>
-                        <label class="tn-share-label">字体</label>
+                        <label class="tn-share-label">${htmlEscape(t('font'))}</label>
                         <input id="tavern-notes-share-font" class="tn-theme-input" type="text" placeholder='例如 STDongGuanTi, 思源宋体, serif' />
-                        <label class="tn-share-label">字体地址或 @import</label>
+                        <label class="tn-share-label">${htmlEscape(t('fontSize'))} <span id="tavern-notes-share-font-size-value">80%</span></label>
+                        <input id="tavern-notes-share-font-size" type="range" min="65" max="110" step="5" value="80" />
+                        <label class="tn-share-label">${htmlEscape(t('fontImport'))}</label>
                         <textarea id="tavern-notes-share-font-import" class="tn-share-font-import" spellcheck="false" placeholder='https://fontsapi.zeoseven.com/488/main/result.css'></textarea>
                         <div class="tn-share-help">
-                            粘贴 ZeoSeven 的 result.css 地址，或整段 @import CSS，然后点“导入字体”。识别成功后会自动填入字体名并刷新图片。
-                            <a href="https://fonts.zeoseven.com/" target="_blank" rel="noopener noreferrer">查找免费商用字体</a>
+                            ${htmlEscape(t('fontHelp'))}
+                            <a href="https://fonts.zeoseven.com/" target="_blank" rel="noopener noreferrer">${htmlEscape(t('findFonts'))}</a>
                         </div>
-                        <label class="tn-share-label">背景</label>
+                        <label class="tn-share-label">${htmlEscape(t('background'))}</label>
                         <div class="tn-share-bg-row">
                             ${SHARE_CARD_BACKGROUNDS.map(color => `<button class="tn-share-bg" data-share-bg="${color}" type="button" style="--share-bg:${color}"></button>`).join('')}
                         </div>
-                        <label class="tn-share-label">显示</label>
+                        <label class="tn-share-label">${htmlEscape(t('display'))}</label>
                         <div class="tn-share-toggle-row">
-                            <label><input id="tavern-notes-share-show-character" type="checkbox" />角色名</label>
-                            <label><input id="tavern-notes-share-show-date" type="checkbox" />日期</label>
+                            <label><input id="tavern-notes-share-show-character" type="checkbox" />${htmlEscape(t('characterName'))}</label>
+                            <label><input id="tavern-notes-share-show-date" type="checkbox" />${htmlEscape(t('date'))}</label>
                         </div>
                         <div class="tn-share-actions">
-                            <button id="tavern-notes-share-import-font" class="tn-export-choice" type="button"><i class="fa-solid fa-font"></i><span>导入字体</span></button>
-                            <button id="tavern-notes-share-redraw" class="tn-export-choice" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>刷新预览</span></button>
-                            <button id="tavern-notes-share-download" class="tn-export-choice" type="button"><i class="fa-solid fa-download"></i><span>导出 PNG</span></button>
+                            <button id="tavern-notes-share-import-font" class="tn-export-choice" type="button"><i class="fa-solid fa-font"></i><span>${htmlEscape(t('importFont'))}</span></button>
+                            <button id="tavern-notes-share-redraw" class="tn-export-choice" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>${htmlEscape(t('redrawPreview'))}</span></button>
+                            <button id="tavern-notes-share-download" class="tn-export-choice" type="button"><i class="fa-solid fa-download"></i><span>${htmlEscape(t('exportPng'))}</span></button>
                         </div>
                     </div>
                     <style id="tavern-notes-share-font-style"></style>
@@ -925,12 +1491,15 @@ function buildPanel() {
     `);
 
     addInputToolbar();
+    addScrollButtons();
     addExtensionsMenuEntry();
     bindEvents();
 }
 
 function bindEvents() {
+    document.querySelector('#tavern-notes-language')?.addEventListener('change', event => saveLanguageSetting(event.target.value));
     document.querySelector('#tavern-notes-theme')?.addEventListener('click', toggleThemeMenu);
+    document.querySelector('.tn-theme-close')?.addEventListener('click', closeThemeMenu);
     document.querySelector('#tavern-notes-page-down-setting')?.addEventListener('click', togglePageDownButtonSetting);
     document.querySelector('.tn-close')?.addEventListener('click', closePanel);
     document.querySelector('#tavern-notes-refresh')?.addEventListener('click', refreshNotes);
@@ -966,6 +1535,9 @@ function bindEvents() {
         button.addEventListener('click', () => updateShareCardSetting({ background: button.dataset.shareBg || '#f7f4ef' }));
     });
     document.querySelector('#tavern-notes-share-font')?.addEventListener('input', event => updateShareCardSetting({ fontFamily: event.target.value || 'system-ui' }));
+    document.querySelector('#tavern-notes-share-font-size')?.addEventListener('input', event => {
+        updateShareCardSetting({ fontScale: Math.min(Math.max(Number(event.target.value || 80) / 100, 0.65), 1.1) });
+    });
     document.querySelector('#tavern-notes-share-font-import')?.addEventListener('input', event => {
         state.shareCardSettings = {
             ...state.shareCardSettings,
@@ -991,11 +1563,10 @@ function bindEvents() {
         if (event.key === 'Enter') jumpToInputPage();
     });
     document.querySelector('#tavern-notes-theme-export')?.addEventListener('click', exportTheme);
-    document.querySelector('#tavern-notes-theme-preview')?.addEventListener('click', previewThemeFromEditor);
+    document.querySelector('#tavern-notes-theme-preview-save')?.addEventListener('click', () => previewAndSaveThemeFromEditor().catch(error => notify(error.message, 'error')));
     document.querySelector('#tavern-notes-theme-merge-st')?.addEventListener('click', () => {
         mergeCurrentSillyTavernTheme().catch(error => notify(error.message, 'error'));
     });
-    document.querySelector('#tavern-notes-theme-save')?.addEventListener('click', () => saveThemeFromEditor().catch(error => notify(error.message, 'error')));
     document.querySelector('#tavern-notes-theme-save-as')?.addEventListener('click', () => saveThemeAsFromEditor().catch(error => notify(error.message, 'error')));
     document.querySelector('#tavern-notes-theme-import')?.addEventListener('click', () => document.querySelector('#tavern-notes-theme-file')?.click());
     document.querySelector('#tavern-notes-theme-open-folder')?.addEventListener('click', () => openThemeFolder().catch(error => notify(error.message, 'error')));
@@ -1053,11 +1624,11 @@ async function handleNoteAction(event) {
         openFullNote(note);
     } else if (button.classList.contains('tn-copy')) {
         await navigator.clipboard.writeText(note.content);
-        notify('已复制。', 'success');
+        notify(t('copied'), 'success');
     } else if (button.classList.contains('tn-fill')) {
         writeInput(note.content, false);
         closePanel();
-        notify('已进入输入栏。', 'success');
+        notify(t('filled'), 'success');
     } else if (button.classList.contains('tn-share')) {
         openShareCard(note);
     } else if (button.classList.contains('tn-delete')) {
@@ -1065,7 +1636,7 @@ async function handleNoteAction(event) {
         if (!confirmed) return;
         await api(`/notes/${encodeURIComponent(note.id)}`, { method: 'DELETE' });
         await refreshNotes();
-        notify('已删除。', 'success');
+        notify(t('deleted'), 'success');
     }
 }
 
@@ -1155,14 +1726,19 @@ function setExportScope(scope = 'all') {
 function toggleThemeMenu() {
     const menu = document.querySelector('#tavern-notes-theme-menu');
     if (!menu) return;
+    if (menu.classList.contains('open')) {
+        closeThemeMenu();
+        return;
+    }
     syncThemeEditor();
     refreshThemeList().catch(() => {});
-    menu.classList.toggle('open');
-    menu.setAttribute('aria-hidden', menu.classList.contains('open') ? 'false' : 'true');
+    menu.classList.add('open');
+    menu.setAttribute('aria-hidden', 'false');
 }
 
 function closeThemeMenu() {
     const menu = document.querySelector('#tavern-notes-theme-menu');
+    revertThemePreview();
     menu?.classList.remove('open');
     menu?.setAttribute('aria-hidden', 'true');
 }
@@ -1329,10 +1905,15 @@ function syncShareCardControls() {
         button.classList.toggle('active', button.dataset.shareBg === settings.background);
     });
     const font = document.querySelector('#tavern-notes-share-font');
+    const fontSize = document.querySelector('#tavern-notes-share-font-size');
+    const fontSizeValue = document.querySelector('#tavern-notes-share-font-size-value');
     const fontImport = document.querySelector('#tavern-notes-share-font-import');
     const showCharacter = document.querySelector('#tavern-notes-share-show-character');
     const showDate = document.querySelector('#tavern-notes-share-show-date');
     if (font) font.value = settings.fontFamily || '';
+    const percent = Math.round(Math.min(Math.max(Number(settings.fontScale || 0.8), 0.65), 1.1) * 100);
+    if (fontSize) fontSize.value = String(percent);
+    if (fontSizeValue) fontSizeValue.textContent = `${percent}%`;
     if (fontImport) fontImport.value = settings.fontImport || '';
     if (showCharacter) showCharacter.checked = settings.showCharacter;
     if (showDate) showDate.checked = settings.showDate;
@@ -1446,6 +2027,21 @@ function getShareCardAvatarUrl(note) {
     return '';
 }
 
+function getShareCardUserName() {
+    const currentName = String(name1 || '').trim();
+    if (currentName && currentName !== 'User') return currentName;
+    return String(state.currentUserName || currentName || 'User').trim() || 'User';
+}
+
+function getShareCardUserAvatarUrl() {
+    if (!user_avatar || user_avatar === 'none') return '';
+    try {
+        return getThumbnailUrl('persona', user_avatar);
+    } catch {
+        return '';
+    }
+}
+
 function loadShareCardImage(url) {
     return new Promise(resolve => {
         if (!url) {
@@ -1463,12 +2059,33 @@ function shareCardDateParts(note) {
     const date = note?.createdAt ? new Date(note.createdAt) : new Date();
     const month = date.toLocaleString('en-US', { month: 'long' }).toUpperCase();
     const weekday = date.toLocaleDateString('zh-CN', { weekday: 'long' });
+    const zhDate = date.toLocaleDateString('zh-CN', {
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+    });
+    const zhDigits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+    const zhYearDigits = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+    const toZhNumber = value => {
+        const number = Number(value);
+        if (number <= 10) return number === 10 ? '十' : zhDigits[number];
+        if (number < 20) return `十${zhDigits[number - 10]}`;
+        const tens = Math.floor(number / 10);
+        const ones = number % 10;
+        return `${zhDigits[tens]}十${ones ? zhDigits[ones] : ''}`;
+    };
+    const zhYear = String(date.getFullYear()).split('').map(item => zhYearDigits[Number(item)] || item).join('');
+    const zhMonth = toZhNumber(date.getMonth() + 1);
+    const zhDay = toZhNumber(date.getDate());
+
     return {
         day: String(date.getDate()),
         month,
         year: String(date.getFullYear()),
         weekday,
-        full: date.toLocaleDateString('zh-CN'),
+        full: zhDate,
+        vertical: `${date.getFullYear()}年 · ${date.getMonth() + 1}月 · ${date.getDate()}日`,
+        verticalZh: `${zhYear}年·${zhMonth}月·${zhDay}日`,
     };
 }
 
@@ -1523,6 +2140,122 @@ function drawMultiline(ctx, lines, x, y, lineHeight, maxLines) {
     }
 }
 
+function drawMultilineFit(ctx, lines, x, y, lineHeight, maxY) {
+    const maxLines = Math.max(1, Math.floor((maxY - y) / lineHeight));
+    drawMultiline(ctx, lines, x, y, lineHeight, maxLines);
+}
+
+function hasLatinText(text) {
+    return /[a-z]/i.test(String(text || ''));
+}
+
+function drawShareTitle(ctx, title, x, y, options = {}) {
+    const {
+        font,
+        color,
+        maxWidth = 360,
+        largeSize = 72,
+        smallSize = 38,
+        verticalLine = false,
+        lineColor = color,
+    } = options;
+    ctx.save();
+    ctx.fillStyle = color;
+
+    if (hasLatinText(title)) {
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.font = `600 ${smallSize}px ${font}`;
+        const lines = wrapCanvasText(ctx, title, maxWidth).filter(Boolean).slice(0, 3);
+        drawMultiline(ctx, lines, x, y, Math.round(smallSize * 1.35), 3);
+        if (verticalLine) {
+            ctx.strokeStyle = lineColor;
+            ctx.globalAlpha = 0.26;
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(x - 28, y - smallSize);
+            ctx.lineTo(x - 28, y + lines.length * smallSize * 1.35 + 12);
+            ctx.stroke();
+        }
+    } else {
+        ctx.font = `500 ${largeSize}px ${font}`;
+        drawVerticalText(ctx, title, x + 34, y - largeSize, Math.round(largeSize * 1.04), verticalLine ? { lineRight: 64, lineColor } : {});
+    }
+
+    ctx.restore();
+}
+
+function drawVerticalText(ctx, text, x, y, lineHeight, options = {}) {
+    const chars = Array.from(String(text || ''));
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    const baseFont = ctx.font;
+    let offset = 0;
+    chars.forEach(char => {
+        const isDot = char === '·' || char === '・' || char === '。';
+        if (isDot) {
+            ctx.save();
+            ctx.font = baseFont.replace(/(\d+(?:\.\d+)?)px/, (_, size) => `${Math.max(10, Math.round(Number(size) * 0.48))}px`);
+            ctx.fillText('·', x, y + offset + lineHeight * 0.18);
+            ctx.restore();
+            offset += lineHeight * 0.42;
+            return;
+        }
+        ctx.font = baseFont;
+        ctx.fillText(char, x, y + offset);
+        offset += lineHeight;
+    });
+    if (options.lineLeft || options.lineRight) {
+        const height = offset;
+        ctx.strokeStyle = options.lineColor || ctx.fillStyle;
+        ctx.lineWidth = options.lineWidth || 1;
+        ctx.globalAlpha = options.lineAlpha ?? 0.34;
+        if (options.lineLeft) {
+            ctx.beginPath();
+            ctx.moveTo(x - options.lineLeft, y - 8);
+            ctx.lineTo(x - options.lineLeft, y + height + 2);
+            ctx.stroke();
+        }
+        if (options.lineRight) {
+            ctx.beginPath();
+            ctx.moveTo(x + options.lineRight, y - 8);
+            ctx.lineTo(x + options.lineRight, y + height + 2);
+            ctx.stroke();
+        }
+    }
+    ctx.restore();
+}
+
+function drawMobaiUserColumn(ctx, text, x, y, fontSize, font, color, lineColor) {
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.font = `400 ${fontSize}px ${font}`;
+    if (hasLatinText(text)) {
+        ctx.translate(x, y);
+        ctx.rotate(Math.PI / 2);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 0, 0);
+        ctx.restore();
+
+        ctx.save();
+        ctx.strokeStyle = lineColor;
+        ctx.globalAlpha = 0.34;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(x - 34, y - 28);
+        ctx.lineTo(x - 34, y + 220);
+        ctx.moveTo(x + 34, y - 28);
+        ctx.lineTo(x + 34, y + 220);
+        ctx.stroke();
+        ctx.restore();
+        return;
+    }
+    drawVerticalText(ctx, text, x, y, Math.round(fontSize * 1.42), { lineLeft: 32, lineRight: 32, lineColor });
+    ctx.restore();
+}
+
 function drawCircleImage(ctx, image, x, y, size) {
     ctx.save();
     roundedRectPath(ctx, x, y, size, size, size / 2);
@@ -1534,6 +2267,87 @@ function drawCircleImage(ctx, image, x, y, size) {
     ctx.restore();
 }
 
+function drawCoverImage(ctx, image, x, y, width, height, radius = 0) {
+    ctx.save();
+    roundedRectPath(ctx, x, y, width, height, radius);
+    ctx.clip();
+    const scale = Math.max(width / image.width, height / image.height);
+    const drawW = image.width * scale;
+    const drawH = image.height * scale;
+    ctx.drawImage(image, x + (width - drawW) / 2, y + (height - drawH) / 2, drawW, drawH);
+    ctx.restore();
+}
+
+function drawShareAvatarBox(ctx, image, x, y, size, color, font, label) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.26;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, size, size);
+    ctx.globalAlpha = 1;
+    if (image) {
+        drawCoverImage(ctx, image, x + 6, y + 6, size - 12, size - 12, 2);
+    } else {
+        ctx.fillStyle = 'rgba(10, 69, 38, 0.08)';
+        ctx.fillRect(x + 6, y + 6, size - 12, size - 12);
+        ctx.fillStyle = color;
+        ctx.font = `700 34px ${font}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(getCharacterInitial(label), x + size / 2, y + size / 2);
+    }
+    ctx.restore();
+}
+
+function drawShareCardFooter(ctx, layout) {
+    const {
+        width,
+        height,
+        font,
+        userName,
+        dateText,
+        avatar,
+        character,
+        textColor,
+        muted,
+        lineColor,
+        left = 88,
+        right = width - 88,
+        footerY = height - 244,
+        avatarSize = 124,
+        showMeta = true,
+    } = layout;
+
+    ctx.save();
+    ctx.strokeStyle = lineColor;
+    ctx.globalAlpha = 0.26;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(left, footerY);
+    ctx.lineTo(right, footerY);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    if (showMeta) {
+        ctx.fillStyle = textColor;
+        ctx.font = `600 28px ${font}`;
+        ctx.fillText(`${userName} · ${t('excerptedAt')} ${dateText}`, left, footerY + 94);
+    }
+    ctx.fillStyle = muted;
+    ctx.font = `600 29px ${font}`;
+    ctx.fillText(t('brandForShare'), left, footerY + (showMeta ? 148 : 112));
+
+    drawShareAvatarBox(ctx, avatar, right - avatarSize, footerY + 44, avatarSize, textColor, font, character);
+    ctx.restore();
+}
+
+function shareCardSourceLine(note, character) {
+    const chatName = String(note?.chat?.name || '').trim();
+    return ` / ${chatName || character}`;
+}
+
 async function drawShareCard() {
     const canvas = document.querySelector('#tavern-notes-share-canvas');
     const note = state.shareCardNote;
@@ -1542,135 +2356,243 @@ async function drawShareCard() {
     applyShareFontImport();
     const font = shareCardFontStack();
     await waitForShareCardFonts(font);
-    const avatar = await loadShareCardImage(getShareCardAvatarUrl(note));
+    const [characterAvatar, userAvatar] = await Promise.all([
+        loadShareCardImage(getShareCardAvatarUrl(note)),
+        loadShareCardImage(getShareCardUserAvatarUrl()),
+    ]);
 
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
     const height = canvas.height;
     const settings = state.shareCardSettings;
-    const background = settings.background || '#f7f4ef';
+    const background = settings.background || '#eef7f2';
     const themeId = settings.theme || 'calendar';
     const darkBackground = isDarkShareCardColor(background);
-    const themeStyles = {
-        calendar: {
-            title: 'calendar',
-            text: settings.textColor || (darkBackground ? '#f6f3ed' : '#211d19'),
-            muted: darkBackground ? 'rgba(246,243,237,0.62)' : 'rgba(33,29,25,0.58)',
-            accent: darkBackground ? 'rgba(246,243,237,0.46)' : 'rgba(33,29,25,0.32)',
-            weight: 700,
-            lineHeight: 68,
-        },
-        classic: {
-            title: 'classic',
-            text: settings.textColor || (darkBackground ? '#fbf4dc' : '#2d2418'),
-            muted: darkBackground ? 'rgba(251,244,220,0.64)' : 'rgba(83,69,49,0.62)',
-            accent: darkBackground ? 'rgba(221,196,139,0.76)' : 'rgba(122,91,42,0.38)',
-            weight: 600,
-            lineHeight: 66,
-        },
-        ink: {
-            title: 'ink',
-            text: settings.textColor || (darkBackground ? '#f4f4f2' : '#151515'),
-            muted: darkBackground ? 'rgba(244,244,242,0.58)' : 'rgba(21,21,21,0.46)',
-            accent: darkBackground ? 'rgba(244,244,242,0.32)' : 'rgba(21,21,21,0.18)',
-            weight: 400,
-            lineHeight: 72,
-        },
-    };
-    const themeStyle = themeStyles[themeId] || themeStyles.calendar;
-    const textColor = themeStyle.text;
-    const muted = themeStyle.muted;
+    const textColor = settings.textColor || (darkBackground ? '#f6f3ed' : '#103f25');
+    const muted = darkBackground ? 'rgba(246,243,237,0.62)' : 'rgba(16,63,37,0.64)';
+    const lineColor = darkBackground ? 'rgba(246,243,237,0.42)' : 'rgba(16,63,37,0.26)';
     const dates = shareCardDateParts(note);
     const character = note.character?.name || '未命名角色';
     const content = String(note.content || '').trim();
+    const userName = getShareCardUserName();
+    const readFont = '"Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif';
+    const fontScale = Math.min(Math.max(Number(settings.fontScale || 0.8), 0.65), 1.1);
+    const s = size => Math.round(size * fontScale);
 
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = background;
     ctx.fillRect(0, 0, width, height);
 
-    const contentColor = textColor;
-    const contentMuted = muted;
-    const left = 126;
-    const right = width - 126;
-    const maxTextWidth = right - left;
-    let y = 180;
-
-    ctx.textAlign = 'center';
-    ctx.fillStyle = contentColor;
-
     if (themeId === 'calendar') {
-        if (settings.showDate) {
-            ctx.font = `800 164px ${font}`;
-            ctx.fillText(dates.day, width / 2, y + 48);
-            ctx.font = `800 44px ${font}`;
-            ctx.fillText(`${dates.month} ${dates.year}`, width / 2, y + 140);
-            ctx.font = `400 27px ${font}`;
-            ctx.fillStyle = contentMuted;
-            ctx.fillText(dates.weekday, width / 2, y + 196);
-            ctx.strokeStyle = contentMuted;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(width / 2 - 56, y + 275);
-            ctx.lineTo(width / 2 + 56, y + 275);
-            ctx.stroke();
-            y += 360;
-        }
-    } else if (themeId === 'classic') {
-        ctx.font = `800 40px ${font}`;
-        ctx.fillStyle = contentColor;
-        ctx.fillText('TAVERN NOTES', width / 2, y);
-        ctx.font = `400 22px ${font}`;
-        ctx.fillStyle = contentMuted;
-        ctx.fillText('selected excerpt', width / 2, y + 42);
-        ctx.strokeStyle = themeStyle.accent;
-        ctx.lineWidth = 2;
+        const calendarText = settings.textColor || (darkBackground ? '#f6f3ed' : '#211d19');
+        const calendarMuted = darkBackground ? 'rgba(246,243,237,0.62)' : 'rgba(33,29,25,0.58)';
+        const left = 126;
+        const right = width - 126;
+        let y = 180;
+
+        ctx.textAlign = 'center';
+        ctx.fillStyle = calendarText;
+        ctx.font = `800 164px ${font}`;
+        ctx.fillText(dates.day, width / 2, y + 48);
+        ctx.font = `800 44px ${font}`;
+        ctx.fillText(`${dates.month} ${dates.year}`, width / 2, y + 140);
+        ctx.font = `400 27px ${font}`;
+        ctx.fillStyle = calendarMuted;
+        ctx.fillText(dates.weekday, width / 2, y + 196);
+        ctx.strokeStyle = calendarMuted;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(width / 2 - 62, y + 82);
-        ctx.lineTo(width / 2 + 62, y + 82);
+        ctx.moveTo(width / 2 - 56, y + 275);
+        ctx.lineTo(width / 2 + 56, y + 275);
         ctx.stroke();
-        y += 154;
-    } else {
-        ctx.font = `300 28px ${font}`;
-        ctx.fillStyle = contentMuted;
-        ctx.fillText('TAVERN NOTES', width / 2, y - 28);
-        ctx.font = `700 108px ${font}`;
-        ctx.fillStyle = contentColor;
-        ctx.fillText('“', width / 2, y + 42);
-        y += 150;
+        y += 360;
+
+        ctx.textAlign = 'left';
+        ctx.fillStyle = calendarText;
+        ctx.font = `800 36px ${font}`;
+        if (settings.showCharacter) {
+            ctx.fillText(`《${character}》`, left, y);
+            y += 76;
+        }
+
+        ctx.font = `700 34px ${font}`;
+        const lines = wrapCanvasText(ctx, content, right - left);
+        drawMultiline(ctx, lines, left, y, 68, 11);
+
+        const footerY = height - 112;
+        const avatarSize = 58;
+        if (characterAvatar) {
+            drawCircleImage(ctx, characterAvatar, right - avatarSize, footerY - avatarSize + 18, avatarSize);
+        } else {
+            ctx.save();
+            roundedRectPath(ctx, right - avatarSize, footerY - avatarSize + 18, avatarSize, avatarSize, avatarSize / 2);
+            ctx.fillStyle = darkBackground ? 'rgba(255,255,255,0.13)' : 'rgba(0,0,0,0.08)';
+            ctx.fill();
+            ctx.fillStyle = calendarMuted;
+            ctx.font = `700 26px ${font}`;
+            ctx.textAlign = 'center';
+            ctx.fillText(getCharacterInitial(character), right - avatarSize / 2, footerY - 2);
+            ctx.restore();
+        }
+
+        ctx.textAlign = 'right';
+        ctx.fillStyle = calendarMuted;
+        ctx.font = `400 22px ${font}`;
+        ctx.fillText(t('fromTavernNotes'), right - avatarSize - 18, footerY);
+        return;
     }
+
+    const left = 88;
+    const right = width - 88;
+
+    if (themeId === 'dialogue') {
+        const avatarSize = 118;
+        if (userAvatar) {
+            drawCircleImage(ctx, userAvatar, left, 122, avatarSize);
+        } else {
+            ctx.save();
+            roundedRectPath(ctx, left, 122, avatarSize, avatarSize, avatarSize / 2);
+            ctx.fillStyle = 'rgba(18,63,37,0.12)';
+            ctx.fill();
+            ctx.fillStyle = textColor;
+            ctx.font = `600 ${s(42)}px ${readFont}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(getCharacterInitial(userName), left + avatarSize / 2, 122 + avatarSize / 2);
+            ctx.restore();
+        }
+
+        ctx.fillStyle = darkBackground ? '#fffaf2' : '#2b2824';
+        ctx.font = `600 ${s(46)}px ${readFont}`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
+        ctx.fillText(userName, left, 324);
+        ctx.font = `600 ${s(31)}px ${readFont}`;
+        ctx.fillText(`${t('excerptedAt')} ${dates.full}`, left, 390);
+
+        const footerY = 1154;
+        ctx.font = `400 ${s(46)}px ${readFont}`;
+        const lines = wrapCanvasText(ctx, content, right - left);
+        drawMultilineFit(ctx, lines, left, 520, s(88), 1016);
+
+        ctx.fillStyle = muted;
+        ctx.font = `400 ${s(29)}px ${readFont}`;
+        drawMultiline(ctx, wrapCanvasText(ctx, shareCardSourceLine(note, character), right - left), left, 1040, s(44), 1);
+
+        drawShareCardFooter(ctx, {
+            width,
+            height,
+            font: readFont,
+            userName,
+            dateText: dates.full,
+            avatar: characterAvatar,
+            character,
+            textColor: darkBackground ? '#fffaf2' : '#2b2824',
+            muted,
+            lineColor,
+            left,
+            right,
+            footerY,
+            showMeta: false,
+        });
+        return;
+    }
+
+    if (themeId === 'mobai') {
+        const mobaiOffsetY = 38;
+        ctx.save();
+        drawShareTitle(ctx, character, left, 196 + mobaiOffsetY, {
+            font: readFont,
+            color: textColor,
+            maxWidth: 360,
+            largeSize: s(64),
+            smallSize: s(36),
+            verticalLine: false,
+            lineColor,
+        });
+
+        ctx.fillStyle = muted;
+        ctx.font = `400 ${s(25)}px ${readFont}`;
+        drawVerticalText(ctx, dates.verticalZh, right - 34, 142 + mobaiOffsetY, s(36), { lineLeft: 28, lineRight: 28, lineColor });
+        drawMobaiUserColumn(ctx, `${userName}·${t('excerptedAt')}`, right - 126, 166 + mobaiOffsetY, s(25), readFont, muted, lineColor);
+        ctx.restore();
+
+        ctx.fillStyle = textColor;
+        ctx.font = `400 ${s(38)}px ${readFont}`;
+        ctx.textAlign = 'left';
+        const contentRight = right - 70;
+        const lines = wrapCanvasText(ctx, content, contentRight - left);
+        drawMultilineFit(ctx, lines, left, 430 + mobaiOffsetY, s(70), 1056);
+
+        ctx.fillStyle = muted;
+        ctx.font = `400 ${s(29)}px ${readFont}`;
+        ctx.fillText(shareCardSourceLine(note, character), left, 1098 + mobaiOffsetY);
+
+        drawShareCardFooter(ctx, {
+            width,
+            height,
+            font: readFont,
+            userName,
+            dateText: dates.full,
+            avatar: characterAvatar,
+            character,
+            textColor,
+            muted,
+            lineColor,
+            left,
+            right,
+            footerY: 1160 + mobaiOffsetY,
+            showMeta: false,
+        });
+
+        ctx.save();
+        ctx.strokeStyle = textColor;
+        ctx.globalAlpha = 0.88;
+        ctx.lineWidth = 20;
+        ctx.beginPath();
+        ctx.moveTo(left - 18, height - 58);
+        ctx.lineTo(right + 18, height - 58);
+        ctx.stroke();
+        ctx.restore();
+        return;
+    }
+
+    drawShareTitle(ctx, character, left, 300, {
+        font: readFont,
+        color: textColor,
+        maxWidth: 420,
+        largeSize: s(76),
+        smallSize: s(42),
+        verticalLine: false,
+        lineColor,
+    });
 
     ctx.textAlign = 'left';
-    ctx.fillStyle = contentColor;
-    ctx.font = `${themeId === 'ink' ? 500 : 800} 36px ${font}`;
-    if (settings.showCharacter) {
-        ctx.fillText(themeId === 'ink' ? character : `《${character}》`, left, y);
-        y += 76;
-    }
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = textColor;
+    ctx.font = `400 ${s(42)}px ${readFont}`;
+    const lines = wrapCanvasText(ctx, content, right - left);
+    drawMultilineFit(ctx, lines, left, 560, s(78), 1054);
 
-    ctx.font = `${themeStyle.weight} 34px ${font}`;
-    const lines = wrapCanvasText(ctx, content, maxTextWidth);
-    drawMultiline(ctx, lines, left, y, themeStyle.lineHeight, 11);
+    ctx.fillStyle = muted;
+    ctx.font = `400 ${s(30)}px ${readFont}`;
+    ctx.fillText(shareCardSourceLine(note, character), left, 1100);
 
-    const footerY = height - 112;
-    const avatarSize = 58;
-    if (avatar) {
-        drawCircleImage(ctx, avatar, right - avatarSize, footerY - avatarSize + 18, avatarSize);
-    } else {
-        ctx.save();
-        roundedRectPath(ctx, right - avatarSize, footerY - avatarSize + 18, avatarSize, avatarSize, avatarSize / 2);
-        ctx.fillStyle = darkBackground ? 'rgba(255,255,255,0.13)' : 'rgba(0,0,0,0.08)';
-        ctx.fill();
-        ctx.fillStyle = contentMuted;
-        ctx.font = `700 26px ${font}`;
-        ctx.textAlign = 'center';
-        ctx.fillText(getCharacterInitial(character), right - avatarSize / 2, footerY - 2);
-        ctx.restore();
-    }
-
-    ctx.textAlign = 'right';
-    ctx.fillStyle = contentMuted;
-    ctx.font = `400 22px ${font}`;
-    ctx.fillText('来自酒馆笔记', right - avatarSize - 18, footerY);
+    drawShareCardFooter(ctx, {
+        width,
+        height,
+        font: readFont,
+        userName,
+        dateText: dates.full,
+        avatar: characterAvatar,
+        character,
+        textColor,
+        muted,
+        lineColor,
+        left,
+        right,
+        footerY: 1162,
+    });
 }
 
 async function downloadShareCard() {
@@ -1686,7 +2608,7 @@ async function downloadShareCard() {
             return;
         }
         const url = URL.createObjectURL(blob);
-        exportFile(url, `酒馆笔记分享卡-${character}-${stamp}.png`);
+        exportFile(url, `${t('brandForShare')}-${character}-${stamp}.png`);
         setTimeout(() => URL.revokeObjectURL(url), 1000);
         notify('已导出分享卡。', 'success');
     }, 'image/png');
@@ -1694,7 +2616,10 @@ async function downloadShareCard() {
 
 async function confirmDelete(note) {
     const preview = String(note.content || '').slice(0, 40).replace(/\s+/g, ' ');
-    return window.confirm(`确定删除这条笔记吗？\n\n${preview}${note.content.length > 40 ? '...' : ''}`);
+    return window.confirm(t('confirmDeleteNote', {
+        preview,
+        ellipsis: note.content.length > 40 ? '...' : '',
+    }));
 }
 
 function openFullNote(note) {
@@ -1750,11 +2675,31 @@ function paintTheme(theme) {
     return clean;
 }
 
-function applyTheme(theme) {
+function applyTheme(theme, options = {}) {
+    const {
+        commit = true,
+        syncEditor = true,
+        labelKey = commit ? 'currentTheme' : 'previewTheme',
+    } = options;
     const clean = paintTheme(theme);
-    state.theme = clean;
-    document.querySelector('.tn-theme-name')?.replaceChildren(document.createTextNode(`当前：${clean.name || '未命名主题'}`));
-    syncThemeEditor(clean);
+    if (commit) {
+        state.theme = clean;
+        state.previewTheme = null;
+        state.themePreviewActive = false;
+    } else {
+        state.previewTheme = clean;
+        state.themePreviewActive = true;
+    }
+    document.querySelector('.tn-theme-name')?.replaceChildren(document.createTextNode(t(labelKey, { name: clean.name || t('unnamedTheme') })));
+    if (syncEditor) syncThemeEditor(clean);
+    return clean;
+}
+
+function revertThemePreview() {
+    if (!state.themePreviewActive) return;
+    const theme = state.theme || DEFAULT_THEME;
+    applyTheme(theme, { commit: true, syncEditor: false, labelKey: 'currentTheme' });
+    state.themeDraft = false;
 }
 
 function renderThemeSelect() {
@@ -1783,7 +2728,7 @@ function getThemeFromEditor() {
     const nameInput = document.querySelector('#tavern-notes-theme-name-input');
     const theme = JSON.parse(code?.value || '{}');
     if (nameInput?.value?.trim()) theme.name = nameInput.value.trim();
-    if (theme.format && theme.format !== 'tavern-notes-theme') throw new Error('这不是酒馆笔记主题文件。');
+    if (theme.format && theme.format !== 'tavern-notes-theme') throw new Error(t('invalidThemeFile'));
     return normalizeTheme(theme);
 }
 
@@ -1878,7 +2823,7 @@ function getSillyTavernThemeName() {
     const select = document.querySelector('#themes');
     const selected = select?.selectedOptions?.[0];
     const name = selected?.textContent?.trim() || select?.value?.trim() || '';
-    return name || '当前酒馆主题';
+    return name || t('currentTavernTheme');
 }
 
 function extractCurrentSillyTavernTheme() {
@@ -1934,7 +2879,7 @@ function extractCurrentSillyTavernTheme() {
     const themeName = getSillyTavernThemeName();
 
     const theme = normalizeTheme({
-        name: `融合酒馆主题 - ${themeName}`,
+        name: t('mergedThemeName', { name: themeName }),
         author: 'Tavern Notes',
         variables: {
             '--tn-paper': panelSolid,
@@ -2046,9 +2991,14 @@ function extractCurrentSillyTavernTheme() {
 }
 
 function previewThemeFromEditor() {
-    const theme = paintTheme(getThemeFromEditor());
-    document.querySelector('.tn-theme-name')?.replaceChildren(document.createTextNode(`预览：${theme.name || '未命名主题'}`));
-    notify('已预览主题，还没有保存。', 'success');
+    applyTheme(getThemeFromEditor(), { commit: false, syncEditor: false, labelKey: 'previewTheme' });
+    notify(t('previewedTheme'), 'success');
+}
+
+async function previewAndSaveThemeFromEditor() {
+    const theme = getThemeFromEditor();
+    applyTheme(theme, { commit: false, syncEditor: false, labelKey: 'previewTheme' });
+    await saveThemeFromEditor(theme);
 }
 
 async function mergeCurrentSillyTavernTheme() {
@@ -2064,27 +3014,26 @@ async function mergeCurrentSillyTavernTheme() {
     theme.name = `${theme.name} - ${stamp}`;
     state.themeDraft = true;
     syncThemeEditor(theme);
-    paintTheme(theme);
-    document.querySelector('.tn-theme-name')?.replaceChildren(document.createTextNode(`临时融合：${theme.name}`));
-    notify('已生成临时融合预览；点“保存”或“另存为”才会生成主题文件。', 'success');
+    applyTheme(theme, { commit: false, syncEditor: false, labelKey: 'tempMergedTheme' });
+    notify(t('mergedThemeDraft'), 'success');
 }
 
 function askThemeName(theme, actionLabel) {
-    const currentName = theme?.name || document.querySelector('#tavern-notes-theme-name-input')?.value || '未命名主题';
-    const nextName = window.prompt(`${actionLabel}主题名称：`, currentName);
+    const currentName = theme?.name || document.querySelector('#tavern-notes-theme-name-input')?.value || t('unnamedTheme');
+    const nextName = window.prompt(t('themeNamePrompt', { action: actionLabel }), currentName);
     if (nextName === null) return null;
     const cleanName = nextName.trim();
     if (!cleanName) {
-        notify('主题名称不能为空。', 'warning');
+        notify(t('themeNameEmpty'), 'warning');
         return null;
     }
     return cleanName;
 }
 
-async function saveThemeFromEditor() {
-    const theme = getThemeFromEditor();
+async function saveThemeFromEditor(themeFromEditor = null) {
+    const theme = themeFromEditor || getThemeFromEditor();
     const shouldSaveAs = state.themeDraft || !state.activeThemeId || state.activeThemeId === 'default';
-    const name = askThemeName(theme, shouldSaveAs ? '另存为' : '保存');
+    const name = askThemeName(theme, shouldSaveAs ? t('saveAsAction') : t('saveAction'));
     if (!name) return;
     theme.name = name;
     syncThemeEditor(theme);
@@ -2092,24 +3041,27 @@ async function saveThemeFromEditor() {
         const data = await saveTheme(theme, null);
         state.activeThemeId = data.id || state.activeThemeId;
         state.themeDraft = false;
-        notify('已另存为新主题。', 'success');
+        state.themePreviewActive = false;
+        notify(t('savedAsTheme'), 'success');
         return;
     }
     await saveTheme(theme, state.activeThemeId);
     state.themeDraft = false;
-    notify('主题已保存。', 'success');
+    state.themePreviewActive = false;
+    notify(t('savedTheme'), 'success');
 }
 
 async function saveThemeAsFromEditor() {
     const theme = getThemeFromEditor();
-    const name = askThemeName(theme, '另存为');
+    const name = askThemeName(theme, t('saveAsAction'));
     if (!name) return;
     theme.name = name;
     syncThemeEditor(theme);
     const data = await saveTheme(theme, null);
     state.activeThemeId = data.id || state.activeThemeId;
     state.themeDraft = false;
-    notify('已另存为新主题。', 'success');
+    state.themePreviewActive = false;
+    notify(t('savedAsTheme'), 'success');
 }
 
 function updateIconElement(element, iconName, extraClass = '') {
@@ -2157,7 +3109,7 @@ async function activateTheme(id) {
     state.themeDraft = false;
     renderThemeSelect();
     applyTheme(data.theme || DEFAULT_THEME);
-    notify('主题已切换。', 'success');
+    notify(t('switchedTheme'), 'success');
 }
 
 async function saveTheme(theme, id = state.activeThemeId) {
@@ -2189,31 +3141,31 @@ async function importThemeFile(event) {
     if (!file) return;
     const text = await file.text();
     const theme = JSON.parse(text);
-    if (theme.format && theme.format !== 'tavern-notes-theme') throw new Error('这不是酒馆笔记主题文件。');
+    if (theme.format && theme.format !== 'tavern-notes-theme') throw new Error(t('invalidThemeFile'));
     await saveTheme(theme, null);
-    notify('主题已导入并切换。', 'success');
+    notify(t('importedTheme'), 'success');
 }
 
 async function openThemeFolder() {
     await api('/themes/folder/open', { method: 'POST' });
-    notify('已请求打开主题文件夹。默认主题是内嵌的，不在这个文件夹里。', 'success');
+    notify(t('requestedThemeFolder'), 'success');
 }
 
 async function deleteSelectedTheme() {
     const id = document.querySelector('#tavern-notes-theme-select')?.value || state.activeThemeId;
     if (!id || id === 'default') {
-        notify('默认主题不能删除。', 'warning');
+        notify(t('defaultThemeCannotDelete'), 'warning');
         return;
     }
     const selected = state.themes.find(theme => theme.id === id);
-    if (!window.confirm(`确定删除主题“${selected?.name || id}”吗？`)) return;
+    if (!window.confirm(t('confirmDeleteTheme', { name: selected?.name || id }))) return;
     const data = await api(`/themes/${encodeURIComponent(id)}`, { method: 'DELETE' });
     state.themes = data.themes || [];
     state.activeThemeId = data.activeId || 'default';
     state.themeDraft = false;
     renderThemeSelect();
     applyTheme(data.theme || state.theme || DEFAULT_THEME);
-    notify('主题已删除。', 'success');
+    notify(t('deletedTheme'), 'success');
 }
 
 function getChatScroller() {
@@ -2228,11 +3180,73 @@ function getChatScroller() {
     return candidates.find(element => element.scrollHeight > element.clientHeight + 20) || document.scrollingElement;
 }
 
-function pageDownChat() {
+function scrollChatPage(direction = 1) {
     const scroller = getChatScroller();
     if (!scroller) return;
-    const distance = Math.max(Math.floor(scroller.clientHeight * 0.86), 360);
+    const distance = Math.max(Math.floor(scroller.clientHeight * 0.86), 360) * direction;
     scroller.scrollBy({ top: distance, behavior: 'smooth' });
+}
+
+function updateScrollButtonsVisibility() {
+    const rail = document.querySelector('#tavern-notes-scroll-buttons');
+    if (!rail) return;
+    rail.classList.toggle('tn-hidden', !state.showPageDownButton);
+    rail.style.setProperty('--tn-scroll-buttons-top', `${Math.min(Math.max(state.scrollButtonsTop, 12), 82)}vh`);
+}
+
+function updateScrollButtonLabels() {
+    document.querySelectorAll('#tavern-notes-scroll-buttons .tn-scroll-page-button').forEach(button => {
+        const label = Number(button.dataset.scrollDir || 1) < 0 ? t('scrollUp') : t('scrollDown');
+        button.title = label;
+        button.setAttribute('aria-label', label);
+    });
+}
+
+function addScrollButtons() {
+    let rail = document.querySelector('#tavern-notes-scroll-buttons');
+    if (!rail) {
+        rail = document.createElement('div');
+        rail.id = 'tavern-notes-scroll-buttons';
+        rail.innerHTML = `
+            <button class="tn-scroll-page-button" data-scroll-dir="-1" title="${htmlEscape(t('scrollUp'))}" aria-label="${htmlEscape(t('scrollUp'))}"><i class="fa-solid fa-chevron-up"></i></button>
+            <button class="tn-scroll-page-button" data-scroll-dir="1" title="${htmlEscape(t('scrollDown'))}" aria-label="${htmlEscape(t('scrollDown'))}"><i class="fa-solid fa-chevron-down"></i></button>
+        `;
+        document.body.append(rail);
+        rail.querySelectorAll('.tn-scroll-page-button').forEach(button => {
+            button.addEventListener('click', event => {
+                event.stopPropagation();
+                scrollChatPage(Number(button.dataset.scrollDir || 1));
+            });
+        });
+
+        let dragging = false;
+        let startY = 0;
+        let startTop = 0;
+        rail.addEventListener('pointerdown', event => {
+            if (event.target.closest('button')) return;
+            dragging = true;
+            startY = event.clientY;
+            startTop = state.scrollButtonsTop;
+            rail.setPointerCapture?.(event.pointerId);
+        });
+        rail.addEventListener('pointermove', event => {
+            if (!dragging) return;
+            const delta = ((event.clientY - startY) / Math.max(window.innerHeight, 1)) * 100;
+            state.scrollButtonsTop = Math.min(Math.max(startTop + delta, 12), 82);
+            updateScrollButtonsVisibility();
+        });
+        rail.addEventListener('pointerup', event => {
+            if (!dragging) return;
+            dragging = false;
+            rail.releasePointerCapture?.(event.pointerId);
+            saveLocalSettings();
+        });
+        rail.addEventListener('pointercancel', () => {
+            dragging = false;
+        });
+    }
+    updateScrollButtonLabels();
+    updateScrollButtonsVisibility();
 }
 
 function addInputToolbar() {
@@ -2249,8 +3263,7 @@ function addInputToolbar() {
 
     const existingOpen = document.querySelector('#tavern-notes-open');
     const existingCapture = document.querySelector('#tavern-notes-capture');
-    const existingPageDown = document.querySelector('#tavern-notes-page-down');
-    if (existingOpen && existingCapture && Boolean(existingPageDown) === state.showPageDownButton) {
+    if (existingOpen && existingCapture) {
         updatePageDownSettingButton();
         return;
     }
@@ -2262,30 +3275,18 @@ function addInputToolbar() {
     const openButton = document.createElement('div');
     openButton.id = 'tavern-notes-open';
     openButton.className = 'qr--button tavern-notes-qr-button interactable';
-    openButton.title = '打开酒馆笔记';
+    openButton.title = t('openNotes');
     openButton.tabIndex = 0;
-    openButton.innerHTML = '<i class="fa-solid fa-book-open qr--button-icon"></i><span class="qr--hidden">酒馆笔记</span>';
+    openButton.innerHTML = `<i class="fa-solid fa-book-open qr--button-icon"></i><span class="qr--hidden">${htmlEscape(t('appName'))}</span>`;
 
     const captureButton = document.createElement('div');
     captureButton.id = 'tavern-notes-capture';
     captureButton.className = 'qr--button tavern-notes-qr-button interactable';
-    captureButton.title = '摘录选中的聊天文字';
+    captureButton.title = t('captureSelectedTitle');
     captureButton.tabIndex = 0;
-    captureButton.innerHTML = '<i class="fa-solid fa-highlighter qr--button-icon"></i><span class="qr--hidden">摘录选中</span>';
+    captureButton.innerHTML = `<i class="fa-solid fa-highlighter qr--button-icon"></i><span class="qr--hidden">${htmlEscape(t('captureSelected'))}</span>`;
 
-    const buttons = [openButton, captureButton];
-    let pageDownButton = null;
-    if (state.showPageDownButton) {
-        pageDownButton = document.createElement('div');
-        pageDownButton.id = 'tavern-notes-page-down';
-        pageDownButton.className = 'qr--button tavern-notes-qr-button tavern-notes-page-down-button interactable';
-        pageDownButton.title = '向下翻一页';
-        pageDownButton.tabIndex = 0;
-        pageDownButton.innerHTML = '<i class="fa-solid fa-chevron-down qr--button-icon"></i><span class="qr--hidden">向下翻页</span>';
-        buttons.push(pageDownButton);
-    }
-
-    target.append(...buttons);
+    target.append(openButton, captureButton);
     updateThemeIcons();
     updatePageDownSettingButton();
 
@@ -2296,10 +3297,6 @@ function addInputToolbar() {
     captureButton.addEventListener('click', () => captureSelection().catch(error => notify(error.message, 'error')));
     captureButton.addEventListener('keydown', event => {
         if (event.key === 'Enter' || event.key === ' ') captureSelection().catch(error => notify(error.message, 'error'));
-    });
-    pageDownButton?.addEventListener('click', pageDownChat);
-    pageDownButton?.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') pageDownChat();
     });
 }
 
@@ -2319,9 +3316,9 @@ function addExtensionsMenuEntry() {
     if (!menu || document.querySelector('#tavern-notes-menu-entry')) return;
 
     menu.insertAdjacentHTML('beforeend', `
-        <div id="tavern-notes-menu-entry" class="list-group-item flex-container flexGap5 interactable" title="打开酒馆笔记" tabindex="0">
+        <div id="tavern-notes-menu-entry" class="list-group-item flex-container flexGap5 interactable" title="${htmlEscape(t('openNotes'))}" tabindex="0">
             <i class="fa-solid fa-book-open"></i>
-            <span>酒馆笔记</span>
+            <span>${htmlEscape(t('appName'))}</span>
         </div>
     `);
     document.querySelector('#tavern-notes-menu-entry')?.addEventListener('click', openPanel);
@@ -2346,14 +3343,16 @@ async function init() {
     buildPanel();
     await loadTheme();
     addInputToolbar();
+    addScrollButtons();
     watchQuickReplyBar();
 
     try {
         const status = await api('/status');
-        state.status = status;
-        setStatus(`已连接：${status.user}，V${status.version || '1.0.0'}，总记录约 ${status.totalNotes || 0} 条`);
+        state.currentUserName = status.user || state.currentUserName || '';
+        saveLocalSettings();
+        setStatus(t('connected', { user: status.user, version: status.version || '1.0.0', count: status.totalNotes || 0 }));
     } catch (error) {
-        notify(`后端未连接：${error.message}`, 'error');
+        notify(t('backendDisconnected', { message: error.message }), 'error');
     }
 
     eventSource.on(event_types.MESSAGE_SENT, messageId => {

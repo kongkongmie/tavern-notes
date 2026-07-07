@@ -29,8 +29,46 @@
     margin: 0 0.5em;
 }
 
-#qr--bar > .tavern-notes-page-down-button {
-    color: var(--SmartThemeQuoteColor, var(--SmartThemeBodyColor));
+#tavern-notes-scroll-buttons {
+    --tn-scroll-buttons-top: 46vh;
+    position: fixed;
+    right: 10px;
+    top: var(--tn-scroll-buttons-top);
+    z-index: 30000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 6px;
+    border-radius: 999px;
+    background: rgba(20, 24, 22, 0.035);
+    box-shadow: none;
+    backdrop-filter: blur(4px);
+    cursor: grab;
+    transform: translateY(-50%);
+    touch-action: none;
+}
+
+#tavern-notes-scroll-buttons:active {
+    cursor: grabbing;
+}
+
+.tn-scroll-page-button {
+    width: 34px;
+    height: 42px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.38);
+    background: rgba(24, 28, 26, 0.08);
+    box-shadow: none;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.tn-scroll-page-button:hover {
+    color: rgba(255, 255, 255, 0.72);
+    background: rgba(24, 28, 26, 0.2);
 }
 
 #tavern-notes-panel {
@@ -154,11 +192,12 @@
 }
 
 .tn-header {
+    position: relative;
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: start;
     gap: 14px;
-    padding: 22px 24px 16px;
+    padding: 58px 24px 16px;
 }
 
 .tn-brand-mark {
@@ -220,6 +259,16 @@
     align-self: start;
 }
 
+.tn-window-actions {
+    position: absolute;
+    top: 14px;
+    right: 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 2;
+}
+
 .tn-soft-button,
 .tn-icon-button {
     border: 0;
@@ -264,6 +313,34 @@
     gap: 8px;
     font-size: 13px;
     white-space: nowrap;
+}
+
+.tn-language-select {
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--tn-ink);
+    background: var(--tn-control-bg);
+    box-shadow: var(--tn-control-shadow);
+}
+
+.tn-language-select i {
+    color: var(--tn-quote);
+    font-size: 14px;
+}
+
+.tn-language-select select {
+    max-width: 116px;
+    border: 0;
+    outline: 0;
+    color: var(--tn-ink);
+    background: transparent;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
 }
 
 .tn-primary {
@@ -1136,12 +1213,20 @@
 }
 
 .tn-theme-card {
+    position: relative;
     width: min(560px, calc(100% - 24px));
     max-height: calc(100% - 24px);
     padding: 22px;
     box-sizing: border-box;
     overflow-y: auto;
     overflow-x: hidden;
+}
+
+.tn-theme-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 1;
 }
 
 .tn-share-card {
@@ -1193,6 +1278,46 @@
     color: var(--tn-em);
     font-size: 12px;
     letter-spacing: 0;
+}
+
+#tavern-notes-share-font-size {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    margin: 8px 0 16px;
+    border: 0;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(244, 181, 31, 0.82), rgba(244, 181, 31, 0.24));
+    box-shadow: none;
+    outline: none;
+}
+
+#tavern-notes-share-font-size::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #d89400;
+    border-radius: 50%;
+    background: #fff8dc;
+    box-shadow: 0 2px 8px rgba(216, 148, 0, 0.28);
+    cursor: pointer;
+}
+
+#tavern-notes-share-font-size::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: 2px solid #d89400;
+    border-radius: 50%;
+    background: #fff8dc;
+    box-shadow: 0 2px 8px rgba(216, 148, 0, 0.28);
+    cursor: pointer;
+}
+
+#tavern-notes-share-font-size-value {
+    color: #d89400;
+    font-weight: 600;
 }
 
 .tn-share-theme-row,
@@ -1455,7 +1580,7 @@
 
 .tn-theme-actions {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 8px;
     margin-top: 10px;
 }
@@ -1559,7 +1684,16 @@
 
     .tn-header {
         grid-template-columns: auto minmax(0, 1fr) auto;
-        padding: 14px 18px 10px;
+        padding: 54px 18px 10px;
+    }
+
+    .tn-window-actions {
+        top: 12px;
+        right: 14px;
+    }
+
+    .tn-language-select select {
+        max-width: 104px;
     }
 
     .tn-brand-mark {
@@ -1721,7 +1855,7 @@
         grid-row: 2;
         width: 100%;
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         justify-content: stretch;
         gap: 8px;
     }
@@ -1826,7 +1960,7 @@
     }
 
     .tn-theme-actions {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .tn-share-card {
