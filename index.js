@@ -14,10 +14,12 @@
 const API_BASE = '/api/plugins/tavern-notes';
 const SETTINGS_KEY = 'tavern-notes-settings';
 const UPDATE_NOTICE_KEY = 'tavern-notes-update-notice';
-const EXTENSION_VERSION = '1.0.12';
+const EXTENSION_VERSION = '1.0.13';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/manifest.json';
 const FONT_DB_NAME = 'tavern-notes-fonts';
 const FONT_DB_STORE = 'fonts';
+const BACKEND_INSTALL_WINDOWS_PATH = 'SillyTavern\\public\\scripts\\extensions\\third-party\\tavern-notes\\install-server-plugin.bat';
+const BACKEND_INSTALL_SHELL_COMMAND = 'node SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-server-plugin.js';
 
 function loadLocalSettings() {
     try {
@@ -187,6 +189,13 @@ const TEXT_ZH_CN = {
     backendDisconnected: '后端未连接：{message}',
     updateAvailableTitle: '酒馆笔记有新版本',
     updateAvailable: '检测到 v{version}。请在 SillyTavern 扩展面板里更新；如果当初用黑窗安装，也可以重新运行安装器。',
+    backendInstallTitle: '酒馆笔记还差一步',
+    backendInstallMessage: '前端已经安装完成。为了把笔记保存到本地文件，还需要运行一次后端安装器，然后重启 SillyTavern。',
+    backendInstallWindows: 'Windows：打开并运行这个文件',
+    backendInstallOther: 'Mac / Linux / 安卓 Termux / 云服务器：在终端运行',
+    copyWindowsPath: '复制 Windows 路径',
+    copyShellCommand: '复制终端命令',
+    copiedInstallCommand: '已复制后端安装命令。',
     openNotes: '打开酒馆笔记',
     captureSelected: '摘录选中',
     captureSelectedTitle: '摘录选中的聊天文字',
@@ -301,6 +310,13 @@ const TEXTS = {
         openNotes: '打開酒館筆記',
         updateAvailableTitle: '酒館筆記有新版本',
         updateAvailable: '偵測到 v{version}。請在 SillyTavern 擴充面板裡更新；如果當初用黑窗安裝，也可以重新執行安裝器。',
+        backendInstallTitle: '酒館筆記還差一步',
+        backendInstallMessage: '前端已安裝完成。為了把筆記保存到本機檔案，還需要執行一次後端安裝器，然後重啟 SillyTavern。',
+        backendInstallWindows: 'Windows：打開並執行這個檔案',
+        backendInstallOther: 'Mac / Linux / Android Termux / 雲端伺服器：在終端執行',
+        copyWindowsPath: '複製 Windows 路徑',
+        copyShellCommand: '複製終端命令',
+        copiedInstallCommand: '已複製後端安裝命令。',
         launcherMode: '入口',
         toolbarButtons: '工具列',
         floatingBall: '懸浮球',
@@ -450,6 +466,13 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         backendDisconnected: 'Backend disconnected: {message}',
         updateAvailableTitle: 'Tavern Notes update available',
         updateAvailable: 'Version {version} is available. Update it in the SillyTavern extensions panel, or rerun the installer if you originally used the installer.',
+        backendInstallTitle: 'One more step for Tavern Notes',
+        backendInstallMessage: 'The frontend is installed. To save notes as local files, run the backend installer once, then restart SillyTavern.',
+        backendInstallWindows: 'Windows: open and run this file',
+        backendInstallOther: 'Mac / Linux / Android Termux / cloud server: run this in a terminal',
+        copyWindowsPath: 'Copy Windows path',
+        copyShellCommand: 'Copy terminal command',
+        copiedInstallCommand: 'Backend install command copied.',
         openNotes: 'Open Tavern Notes',
         captureSelected: 'Capture selected',
         captureSelectedTitle: 'Capture selected chat text',
@@ -604,6 +627,13 @@ Click Preview & save or Save as to create a theme file.`,
         backendDisconnected: '백엔드 연결 안 됨: {message}',
         updateAvailableTitle: 'Tavern Notes 업데이트 가능',
         updateAvailable: 'v{version} 버전이 있습니다. SillyTavern 확장 패널에서 업데이트하거나, 설치기로 설치했다면 설치기를 다시 실행하세요.',
+        backendInstallTitle: 'Tavern Notes 설치가 한 단계 남았습니다',
+        backendInstallMessage: '프론트엔드는 설치되었습니다. 노트를 로컬 파일로 저장하려면 백엔드 설치기를 한 번 실행한 뒤 SillyTavern을 다시 시작하세요.',
+        backendInstallWindows: 'Windows: 이 파일을 열어 실행하세요',
+        backendInstallOther: 'Mac / Linux / Android Termux / 클라우드 서버: 터미널에서 실행하세요',
+        copyWindowsPath: 'Windows 경로 복사',
+        copyShellCommand: '터미널 명령 복사',
+        copiedInstallCommand: '백엔드 설치 명령을 복사했습니다.',
         openNotes: '술집 노트 열기',
         captureSelected: '선택 발췌',
         captureSelectedTitle: '선택한 채팅 글 발췌',
@@ -876,6 +906,67 @@ function notify(message, kind = 'info') {
     if (kind === 'success') toastrApi.success(message);
     else if (kind === 'error') toastrApi.error(message);
     else toastrApi.info(message);
+}
+
+async function copyTextToClipboard(text) {
+    if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return;
+    }
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', 'readonly');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.append(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    textarea.remove();
+}
+
+function showBackendInstallGuide() {
+    document.querySelector('#tavern-notes-install-guide')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'tavern-notes-install-guide';
+    overlay.innerHTML = `
+        <div class="tn-install-card" role="dialog" aria-modal="true" aria-label="${htmlEscape(t('backendInstallTitle'))}">
+            <button class="tn-install-close" type="button" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <h2>${htmlEscape(t('backendInstallTitle'))}</h2>
+            <p>${htmlEscape(t('backendInstallMessage'))}</p>
+            <section>
+                <b>${htmlEscape(t('backendInstallWindows'))}</b>
+                <code>${htmlEscape(BACKEND_INSTALL_WINDOWS_PATH)}</code>
+                <button class="tn-install-copy" data-copy-kind="windows" type="button">
+                    <i class="fa-solid fa-copy"></i><span>${htmlEscape(t('copyWindowsPath'))}</span>
+                </button>
+            </section>
+            <section>
+                <b>${htmlEscape(t('backendInstallOther'))}</b>
+                <code>${htmlEscape(BACKEND_INSTALL_SHELL_COMMAND)}</code>
+                <button class="tn-install-copy" data-copy-kind="shell" type="button">
+                    <i class="fa-solid fa-copy"></i><span>${htmlEscape(t('copyShellCommand'))}</span>
+                </button>
+            </section>
+        </div>
+    `;
+    document.body.append(overlay);
+    const close = () => overlay.remove();
+    overlay.addEventListener('click', event => {
+        if (event.target === overlay || event.target.closest('.tn-install-close')) close();
+    });
+    overlay.querySelectorAll('.tn-install-copy').forEach(button => {
+        button.addEventListener('click', async () => {
+            const text = button.dataset.copyKind === 'windows' ? BACKEND_INSTALL_WINDOWS_PATH : BACKEND_INSTALL_SHELL_COMMAND;
+            await copyTextToClipboard(text);
+            notify(t('copiedInstallCommand'), 'success');
+        });
+    });
+}
+
+export function showInstallGuide() {
+    setTimeout(showBackendInstallGuide, 500);
 }
 
 function setStatus(message) {

@@ -1,5 +1,10 @@
 ﻿# Changelog
 
+## 1.0.13
+
+- Added a beginner-friendly post-install guide that appears after installing from the SillyTavern extension installer.
+- The guide explains the required backend installer step and provides one-click copy buttons for Windows and terminal commands.
+
 ## 1.0.12
 
 - Added a built-in update reminder that checks the latest GitHub manifest and notifies users when a newer Tavern Notes version is available.

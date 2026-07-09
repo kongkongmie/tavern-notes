@@ -6,6 +6,91 @@
     display: none !important;
 }
 
+#tavern-notes-install-guide {
+    position: fixed;
+    inset: 0;
+    z-index: 40000;
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    background: rgba(10, 10, 12, 0.48);
+    backdrop-filter: blur(8px);
+}
+
+.tn-install-card {
+    position: relative;
+    width: min(560px, 100%);
+    max-height: min(86dvh, 680px);
+    overflow: auto;
+    padding: 30px;
+    border: 1px solid rgba(244, 181, 31, 0.28);
+    border-radius: 24px;
+    color: var(--SmartThemeBodyColor, #2f2d2a);
+    background:
+        linear-gradient(135deg, rgba(244, 181, 31, 0.16), transparent 38%),
+        var(--SmartThemeBlurTintColor, #fbf6df);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.32);
+}
+
+.tn-install-card h2 {
+    margin: 0 42px 12px 0;
+    font-size: 24px;
+    line-height: 1.25;
+}
+
+.tn-install-card p {
+    margin: 0 0 18px;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor, #2f2d2a) 78%, transparent);
+    line-height: 1.65;
+}
+
+.tn-install-card section {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+    padding: 14px;
+    border: 1px solid rgba(244, 181, 31, 0.2);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.tn-install-card code {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 10px;
+    color: var(--SmartThemeBodyColor, #2f2d2a);
+    background: rgba(0, 0, 0, 0.08);
+    font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+    overflow-wrap: anywhere;
+}
+
+.tn-install-close,
+.tn-install-copy {
+    border: 0;
+    color: var(--SmartThemeBodyColor, #2f2d2a);
+    background: color-mix(in srgb, var(--SmartThemeQuoteColor, #f4b51f) 24%, transparent);
+    cursor: pointer;
+}
+
+.tn-install-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+}
+
+.tn-install-copy {
+    min-height: 38px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 14px;
+}
+
 #qr--bar > .tavern-notes-qr-button {
     color: var(--SmartThemeBodyColor);
     border: 1px solid var(--SmartThemeBorderColor);
