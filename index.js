@@ -13,6 +13,8 @@
 
 const API_BASE = '/api/plugins/tavern-notes';
 const SETTINGS_KEY = 'tavern-notes-settings';
+const FONT_DB_NAME = 'tavern-notes-fonts';
+const FONT_DB_STORE = 'fonts';
 
 function loadLocalSettings() {
     try {
@@ -29,6 +31,17 @@ const savedLanguage = ['auto', 'zh-CN', 'zh-TW', 'en', 'ko'].includes(localSetti
 const savedShareTheme = ['calendar', 'jianshu', 'dialogue', 'mobai'].includes(localSettings.shareCard?.theme)
     ? localSettings.shareCard.theme
     : 'calendar';
+const savedLauncherMode = ['toolbar', 'floating'].includes(localSettings.launcherMode)
+    ? localSettings.launcherMode
+    : 'toolbar';
+
+function sanitizeImportedFonts(fonts) {
+    if (!Array.isArray(fonts)) return [];
+    return fonts
+        .filter(font => font && font.id && font.name && (font.css || font.type === 'local'))
+        .map(font => ({ ...font, dataUrl: '' }))
+        .slice(0, 16);
+}
 
 const state = {
     open: false,
@@ -57,6 +70,7 @@ const state = {
     activeThemeId: 'default',
     themeDraft: false,
     exportScope: 'all',
+    launcherMode: savedLauncherMode,
     showPageDownButton: localSettings.showPageDownButton !== false,
     scrollButtonsTop: Number(localSettings.scrollButtonsTop || 46),
     shareCardNote: null,
@@ -66,6 +80,7 @@ const state = {
         textColor: localSettings.shareCard?.textColor || '',
         fontFamily: localSettings.shareCard?.fontFamily || 'system-ui',
         fontImport: localSettings.shareCard?.fontImport || '',
+        importedFonts: sanitizeImportedFonts(localSettings.shareCard?.importedFonts),
         fontScale: Number(localSettings.shareCard?.fontScale || 0.8),
         showCharacter: localSettings.shareCard?.showCharacter !== false,
         showDate: localSettings.shareCard?.showDate !== false,
@@ -114,6 +129,9 @@ const TEXT_ZH_CN = {
     resetDefault: '恢复默认',
     shareCard: '分享卡片',
     font: '字体',
+    savedFonts: '已导入字体',
+    savedFontsPlaceholder: '选择已导入字体',
+    noSavedFonts: '还没有已导入字体',
     fontSize: '字号',
     fontImport: '字体地址或 @import',
     fontHelp: '粘贴 ZeoSeven 的 result.css 地址，或整段 @import CSS，然后点“导入字体”。识别成功后会自动填入字体名并刷新图片。',
@@ -123,6 +141,7 @@ const TEXT_ZH_CN = {
     characterName: '角色名',
     date: '日期',
     importFont: '导入字体',
+    importLocalFont: '导入本地字体',
     redrawPreview: '刷新预览',
     exportPng: '导出 PNG',
     filtersAll: '全部',
@@ -166,6 +185,12 @@ const TEXT_ZH_CN = {
     openNotes: '打开酒馆笔记',
     captureSelected: '摘录选中',
     captureSelectedTitle: '摘录选中的聊天文字',
+    launcherMode: '入口',
+    toolbarButtons: '工具栏',
+    floatingBall: '悬浮球',
+    switchLauncherMode: '切换酒馆笔记入口显示方式',
+    toolbarLauncherShown: '已切换为工具栏入口。',
+    floatingLauncherShown: '已切换为悬浮球入口。',
     scrollUp: '向上翻一页',
     scrollDown: '向下翻一页',
     showPageButtons: '显示侧边上下翻页按钮',
@@ -219,6 +244,13 @@ assets 控制标题图标、输入栏图标、摘录图标和背景图。
     currentTavernTheme: '当前酒馆主题',
     mergedThemeName: '融合酒馆主题 - {name}',
     confirmDeleteNote: '确定删除这条笔记吗？\n\n{preview}{ellipsis}',
+    pasteFontFirst: '先粘贴字体地址或 @import 代码。',
+    importedFont: '已导入字体：{name}',
+    importedFontCode: '已导入字体代码，请确认字体名。',
+    localFontImported: '已导入本地字体：{name}',
+    localFontSessionOnly: '字体文件较大，已临时导入。本次页面可用，下次需要重新选择文件。',
+    localFontUnsupported: '当前浏览器不支持本地字体导入。',
+    savedFontMissing: '这个字体缺少可读取的数据，请重新导入。',
 };
 
 const TEXTS = {
@@ -244,6 +276,10 @@ const TEXTS = {
         saveAs: '另存為',
         resetDefault: '恢復預設',
         importFont: '匯入字體',
+        importLocalFont: '匯入本機字體',
+        savedFonts: '已匯入字體',
+        savedFontsPlaceholder: '選擇已匯入字體',
+        noSavedFonts: '還沒有已匯入字體',
         fontHelp: '貼上 ZeoSeven 的 result.css 地址，或整段 @import CSS，然後點「匯入字體」。識別成功後會自動填入字體名稱並重新整理圖片。',
         findFonts: '查找免費商用字體',
         redrawPreview: '重新整理預覽',
@@ -258,6 +294,12 @@ const TEXTS = {
         copied: '已複製。',
         filled: '已進入輸入框。',
         openNotes: '打開酒館筆記',
+        launcherMode: '入口',
+        toolbarButtons: '工具列',
+        floatingBall: '懸浮球',
+        switchLauncherMode: '切換酒館筆記入口顯示方式',
+        toolbarLauncherShown: '已切換為工具列入口。',
+        floatingLauncherShown: '已切換為懸浮球入口。',
         fromTavernNotes: '來自酒館筆記',
         brandForShare: '酒館筆記',
         excerptedAt: '摘錄於',
@@ -307,6 +349,13 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         currentTavernTheme: '目前酒館主題',
         mergedThemeName: '融合酒館主題 - {name}',
         confirmDeleteNote: '確定刪除這條筆記嗎？\n\n{preview}{ellipsis}',
+        pasteFontFirst: '先貼上字體地址或 @import 代碼。',
+        importedFont: '已匯入字體：{name}',
+        importedFontCode: '已匯入字體代碼，請確認字體名稱。',
+        localFontImported: '已匯入本機字體：{name}',
+        localFontSessionOnly: '字體檔案較大，已臨時匯入。本次頁面可用，下次需要重新選擇檔案。',
+        localFontUnsupported: '目前瀏覽器不支援本機字體匯入。',
+        savedFontMissing: '這個字體缺少可讀取資料，請重新匯入。',
     },
     en: {
         ...TEXT_ZH_CN,
@@ -342,6 +391,9 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         resetDefault: 'Reset default',
         shareCard: 'Share Card',
         font: 'Font',
+        savedFonts: 'Imported fonts',
+        savedFontsPlaceholder: 'Choose imported font',
+        noSavedFonts: 'No imported fonts yet',
         fontSize: 'Font size',
         fontImport: 'Font URL or @import',
         fontHelp: 'Paste a ZeoSeven result.css URL, or a full @import CSS snippet, then click Import font. When recognized, the font name is filled in and the image refreshes.',
@@ -351,6 +403,7 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         characterName: 'Character name',
         date: 'Date',
         importFont: 'Import font',
+        importLocalFont: 'Import local font',
         redrawPreview: 'Refresh preview',
         exportPng: 'Export PNG',
         filtersAll: 'All',
@@ -391,6 +444,12 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         openNotes: 'Open Tavern Notes',
         captureSelected: 'Capture selected',
         captureSelectedTitle: 'Capture selected chat text',
+        launcherMode: 'Launcher',
+        toolbarButtons: 'Toolbar',
+        floatingBall: 'Floating ball',
+        switchLauncherMode: 'Switch Tavern Notes launcher mode',
+        toolbarLauncherShown: 'Switched to toolbar launcher.',
+        floatingLauncherShown: 'Switched to floating launcher.',
         scrollUp: 'Page up',
         scrollDown: 'Page down',
         showPageButtons: 'Show side page buttons',
@@ -442,6 +501,13 @@ Click Preview & save or Save as to create a theme file.`,
         currentTavernTheme: 'Current Tavern theme',
         mergedThemeName: 'Merged Tavern theme - {name}',
         confirmDeleteNote: 'Delete this note?\n\n{preview}{ellipsis}',
+        pasteFontFirst: 'Paste a font URL or @import code first.',
+        importedFont: 'Imported font: {name}',
+        importedFontCode: 'Font code imported. Please check the font name.',
+        localFontImported: 'Imported local font: {name}',
+        localFontSessionOnly: 'This font file is large, so it was imported for this page only. Choose it again next time.',
+        localFontUnsupported: 'This browser does not support local font import.',
+        savedFontMissing: 'This font has no readable data. Please import it again.',
     },
     ko: {
         ...TEXT_ZH_CN,
@@ -477,6 +543,9 @@ Click Preview & save or Save as to create a theme file.`,
         resetDefault: '기본값 복원',
         shareCard: '공유 카드',
         font: '글꼴',
+        savedFonts: '가져온 글꼴',
+        savedFontsPlaceholder: '가져온 글꼴 선택',
+        noSavedFonts: '아직 가져온 글꼴이 없습니다',
         fontSize: '글자 크기',
         fontImport: '글꼴 주소 또는 @import',
         fontHelp: 'ZeoSeven result.css 주소나 전체 @import CSS를 붙여 넣은 뒤 글꼴 가져오기를 누르세요. 인식되면 글꼴 이름이 자동으로 채워지고 이미지가 새로고침됩니다.',
@@ -486,6 +555,7 @@ Click Preview & save or Save as to create a theme file.`,
         characterName: '캐릭터 이름',
         date: '날짜',
         importFont: '글꼴 가져오기',
+        importLocalFont: '로컬 글꼴 가져오기',
         redrawPreview: '미리보기 새로고침',
         exportPng: 'PNG 내보내기',
         filtersAll: '전체',
@@ -526,6 +596,12 @@ Click Preview & save or Save as to create a theme file.`,
         openNotes: '술집 노트 열기',
         captureSelected: '선택 발췌',
         captureSelectedTitle: '선택한 채팅 글 발췌',
+        launcherMode: '실행 버튼',
+        toolbarButtons: '도구막대',
+        floatingBall: '플로팅 버튼',
+        switchLauncherMode: '술집 노트 실행 방식 전환',
+        toolbarLauncherShown: '도구막대 실행 버튼으로 전환했습니다.',
+        floatingLauncherShown: '플로팅 버튼으로 전환했습니다.',
         scrollUp: '한 페이지 위로',
         scrollDown: '한 페이지 아래로',
         showPageButtons: '측면 페이지 버튼 보이기',
@@ -577,6 +653,13 @@ assets는 제목 아이콘, 입력창 아이콘, 발췌 아이콘, 배경 이미
         currentTavernTheme: '현재 술집 테마',
         mergedThemeName: '병합한 술집 테마 - {name}',
         confirmDeleteNote: '이 노트를 삭제할까요?\n\n{preview}{ellipsis}',
+        pasteFontFirst: '먼저 글꼴 주소나 @import 코드를 붙여 넣으세요.',
+        importedFont: '글꼴을 가져왔습니다: {name}',
+        importedFontCode: '글꼴 코드를 가져왔습니다. 글꼴 이름을 확인하세요.',
+        localFontImported: '로컬 글꼴을 가져왔습니다: {name}',
+        localFontSessionOnly: '글꼴 파일이 커서 이 페이지에서만 임시로 가져왔습니다. 다음에는 파일을 다시 선택해야 합니다.',
+        localFontUnsupported: '현재 브라우저는 로컬 글꼴 가져오기를 지원하지 않습니다.',
+        savedFontMissing: '이 글꼴에는 읽을 수 있는 데이터가 없습니다. 다시 가져오세요.',
     },
 };
 
@@ -794,6 +877,7 @@ function setStatus(message) {
 function saveLocalSettings() {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
         language: state.language,
+        launcherMode: state.launcherMode,
         showPageDownButton: state.showPageDownButton,
         scrollButtonsTop: state.scrollButtonsTop,
         currentUserName: state.currentUserName,
@@ -806,6 +890,8 @@ function saveLanguageSetting(language) {
     saveLocalSettings();
     updatePageDownSettingButton();
     updateScrollButtonLabels();
+    updateLauncherModeButton();
+    updateFloatingLauncher();
     notify(t('languageSaved'), 'success');
 }
 
@@ -1342,6 +1428,9 @@ function buildPanel() {
                     <div class="tn-subtitle">${htmlEscape(t('subtitle'))}</div>
                 </div>
                 <div class="tn-window-actions">
+                    <button id="tavern-notes-launcher-mode" class="tn-soft-button tn-window-soft-button" title="${htmlEscape(t('switchLauncherMode'))}" aria-label="${htmlEscape(t('switchLauncherMode'))}">
+                        <i class="fa-solid fa-circle-dot"></i><span>${htmlEscape(t(state.launcherMode === 'floating' ? 'floatingBall' : 'toolbarButtons'))}</span>
+                    </button>
                     <label class="tn-language-select" title="${htmlEscape(t('language'))}">
                         <i class="fa-solid fa-language"></i>
                         <select id="tavern-notes-language">
@@ -1360,10 +1449,10 @@ function buildPanel() {
                         <i class="fa-solid fa-up-down"></i><span>${htmlEscape(t('paging'))}</span>
                     </button>
                     <button id="tavern-notes-refresh" class="tn-icon-button" title="${htmlEscape(t('refreshNotes'))}" aria-label="${htmlEscape(t('refreshNotes'))}">
-                        <i class="fa-solid fa-rotate-right"></i>
+                        <i class="fa-solid fa-rotate-right"></i><span>${htmlEscape(t('refreshNotes'))}</span>
                     </button>
                     <button id="tavern-notes-export" class="tn-icon-button" title="${htmlEscape(t('exportNotes'))}" aria-label="${htmlEscape(t('exportNotes'))}">
-                        <i class="fa-solid fa-download"></i>
+                        <i class="fa-solid fa-download"></i><span>${htmlEscape(t('exportNotes'))}</span>
                     </button>
                 </div>
             </header>
@@ -1461,6 +1550,8 @@ function buildPanel() {
                         </div>
                         <label class="tn-share-label">${htmlEscape(t('font'))}</label>
                         <input id="tavern-notes-share-font" class="tn-theme-input" type="text" placeholder='例如 STDongGuanTi, 思源宋体, serif' />
+                        <label class="tn-share-label">${htmlEscape(t('savedFonts'))}</label>
+                        <select id="tavern-notes-share-saved-fonts" class="tn-theme-input"></select>
                         <label class="tn-share-label">${htmlEscape(t('fontSize'))} <span id="tavern-notes-share-font-size-value">80%</span></label>
                         <input id="tavern-notes-share-font-size" type="range" min="65" max="110" step="5" value="80" />
                         <label class="tn-share-label">${htmlEscape(t('fontImport'))}</label>
@@ -1469,6 +1560,9 @@ function buildPanel() {
                             ${htmlEscape(t('fontHelp'))}
                             <a href="https://fonts.zeoseven.com/" target="_blank" rel="noopener noreferrer">${htmlEscape(t('findFonts'))}</a>
                         </div>
+                        <button id="tavern-notes-share-import-font" class="tn-export-choice tn-share-wide-action" type="button"><i class="fa-solid fa-font"></i><span>${htmlEscape(t('importFont'))}</span></button>
+                        <label class="tn-share-label">${htmlEscape(t('importLocalFont'))}</label>
+                        <button id="tavern-notes-share-import-local-font" class="tn-export-choice tn-share-wide-action" type="button"><i class="fa-solid fa-file-import"></i><span>${htmlEscape(t('importLocalFont'))}</span></button>
                         <label class="tn-share-label">${htmlEscape(t('background'))}</label>
                         <div class="tn-share-bg-row">
                             ${SHARE_CARD_BACKGROUNDS.map(color => `<button class="tn-share-bg" data-share-bg="${color}" type="button" style="--share-bg:${color}"></button>`).join('')}
@@ -1479,10 +1573,10 @@ function buildPanel() {
                             <label><input id="tavern-notes-share-show-date" type="checkbox" />${htmlEscape(t('date'))}</label>
                         </div>
                         <div class="tn-share-actions">
-                            <button id="tavern-notes-share-import-font" class="tn-export-choice" type="button"><i class="fa-solid fa-font"></i><span>${htmlEscape(t('importFont'))}</span></button>
                             <button id="tavern-notes-share-redraw" class="tn-export-choice" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>${htmlEscape(t('redrawPreview'))}</span></button>
                             <button id="tavern-notes-share-download" class="tn-export-choice" type="button"><i class="fa-solid fa-download"></i><span>${htmlEscape(t('exportPng'))}</span></button>
                         </div>
+                        <input id="tavern-notes-share-local-font-file" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" hidden />
                     </div>
                     <style id="tavern-notes-share-font-style"></style>
                 </div>
@@ -1498,6 +1592,7 @@ function buildPanel() {
 
 function bindEvents() {
     document.querySelector('#tavern-notes-language')?.addEventListener('change', event => saveLanguageSetting(event.target.value));
+    document.querySelector('#tavern-notes-launcher-mode')?.addEventListener('click', toggleLauncherMode);
     document.querySelector('#tavern-notes-theme')?.addEventListener('click', toggleThemeMenu);
     document.querySelector('.tn-theme-close')?.addEventListener('click', closeThemeMenu);
     document.querySelector('#tavern-notes-page-down-setting')?.addEventListener('click', togglePageDownButtonSetting);
@@ -1535,6 +1630,9 @@ function bindEvents() {
         button.addEventListener('click', () => updateShareCardSetting({ background: button.dataset.shareBg || '#f7f4ef' }));
     });
     document.querySelector('#tavern-notes-share-font')?.addEventListener('input', event => updateShareCardSetting({ fontFamily: event.target.value || 'system-ui' }));
+    document.querySelector('#tavern-notes-share-saved-fonts')?.addEventListener('change', event => {
+        applySavedShareFont(event.target.value).catch(error => notify(error.message, 'error'));
+    });
     document.querySelector('#tavern-notes-share-font-size')?.addEventListener('input', event => {
         updateShareCardSetting({ fontScale: Math.min(Math.max(Number(event.target.value || 80) / 100, 0.65), 1.1) });
     });
@@ -1548,6 +1646,10 @@ function bindEvents() {
     document.querySelector('#tavern-notes-share-show-character')?.addEventListener('change', event => updateShareCardSetting({ showCharacter: event.target.checked }));
     document.querySelector('#tavern-notes-share-show-date')?.addEventListener('change', event => updateShareCardSetting({ showDate: event.target.checked }));
     document.querySelector('#tavern-notes-share-import-font')?.addEventListener('click', () => importShareCardFont().catch(error => notify(error.message, 'error')));
+    document.querySelector('#tavern-notes-share-import-local-font')?.addEventListener('click', () => document.querySelector('#tavern-notes-share-local-font-file')?.click());
+    document.querySelector('#tavern-notes-share-local-font-file')?.addEventListener('change', event => {
+        importLocalShareCardFont(event).catch(error => notify(error.message, 'error'));
+    });
     document.querySelector('#tavern-notes-share-redraw')?.addEventListener('click', () => drawShareCard().catch(error => notify(error.message, 'error')));
     document.querySelector('#tavern-notes-share-download')?.addEventListener('click', () => downloadShareCard().catch(error => notify(error.message, 'error')));
     document.querySelectorAll('#tavern-notes-export-menu .tn-export-choice').forEach(button => {
@@ -1905,12 +2007,14 @@ function syncShareCardControls() {
         button.classList.toggle('active', button.dataset.shareBg === settings.background);
     });
     const font = document.querySelector('#tavern-notes-share-font');
+    const savedFonts = document.querySelector('#tavern-notes-share-saved-fonts');
     const fontSize = document.querySelector('#tavern-notes-share-font-size');
     const fontSizeValue = document.querySelector('#tavern-notes-share-font-size-value');
     const fontImport = document.querySelector('#tavern-notes-share-font-import');
     const showCharacter = document.querySelector('#tavern-notes-share-show-character');
     const showDate = document.querySelector('#tavern-notes-share-show-date');
     if (font) font.value = settings.fontFamily || '';
+    renderSavedShareFonts(savedFonts);
     const percent = Math.round(Math.min(Math.max(Number(settings.fontScale || 0.8), 0.65), 1.1) * 100);
     if (fontSize) fontSize.value = String(percent);
     if (fontSizeValue) fontSizeValue.textContent = `${percent}%`;
@@ -1918,6 +2022,77 @@ function syncShareCardControls() {
     if (showCharacter) showCharacter.checked = settings.showCharacter;
     if (showDate) showDate.checked = settings.showDate;
     applyShareFontImport();
+}
+
+function stripFontQuotes(value) {
+    return String(value || '').trim().replace(/^['"]|['"]$/g, '');
+}
+
+function quoteFontFamily(value) {
+    const clean = stripFontQuotes(value);
+    if (!clean) return '';
+    return `"${clean.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+}
+
+function getImportedFonts() {
+    state.shareCardSettings.importedFonts = sanitizeImportedFonts(state.shareCardSettings.importedFonts);
+    return state.shareCardSettings.importedFonts;
+}
+
+function renderSavedShareFonts(select) {
+    if (!select) return;
+    const fonts = getImportedFonts();
+    select.replaceChildren();
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = fonts.length ? t('savedFontsPlaceholder') : t('noSavedFonts');
+    select.append(placeholder);
+    fonts.forEach(font => {
+        const option = document.createElement('option');
+        option.value = font.id;
+        option.textContent = font.type === 'local' ? `${font.name} · local` : font.name;
+        select.append(option);
+    });
+    const currentName = stripFontQuotes(state.shareCardSettings.fontFamily);
+    const current = fonts.find(font => stripFontQuotes(font.name) === currentName);
+    select.value = current?.id || '';
+}
+
+function rememberImportedFont(entry) {
+    if (!entry?.name || (!entry.css && entry.type !== 'local')) return;
+    const id = entry.id || `${entry.type || 'css'}:${stripFontQuotes(entry.name)}:${Date.now()}`;
+    const next = {
+        id,
+        type: entry.type || 'css',
+        name: stripFontQuotes(entry.name),
+        css: entry.css || '',
+        dataUrl: entry.dataUrl || '',
+    };
+    const fonts = getImportedFonts()
+        .filter(font => font.id !== id && !(font.type === next.type && stripFontQuotes(font.name) === next.name));
+    state.shareCardSettings.importedFonts = [next, ...fonts].slice(0, 16);
+}
+
+async function applySavedShareFont(fontId) {
+    const font = getImportedFonts().find(item => item.id === fontId);
+    if (!font) return;
+    if (font.type === 'local') {
+        await loadLocalShareFont(font);
+        state.shareCardSettings = {
+            ...state.shareCardSettings,
+            fontFamily: quoteFontFamily(font.name),
+            fontImport: '',
+        };
+    } else {
+        state.shareCardSettings = {
+            ...state.shareCardSettings,
+            fontFamily: quoteFontFamily(font.name),
+            fontImport: font.css || '',
+        };
+    }
+    saveLocalSettings();
+    syncShareCardControls();
+    await drawShareCard();
 }
 
 function updateShareCardSetting(next) {
@@ -1933,11 +2108,12 @@ function updateShareCardSetting(next) {
 async function importShareCardFont() {
     const raw = String(state.shareCardSettings.fontImport || '').trim();
     if (!raw) {
-        notify('先粘贴字体地址或 @import 代码。', 'warning');
+        notify(t('pasteFontFirst'), 'warning');
         return;
     }
     const css = await buildShareFontCss(raw);
     const family = parseShareFontFamilyFromCss(css);
+    if (family) rememberImportedFont({ type: 'css', name: stripFontQuotes(family), css });
     state.shareCardSettings = {
         ...state.shareCardSettings,
         fontImport: css,
@@ -1946,7 +2122,102 @@ async function importShareCardFont() {
     saveLocalSettings();
     syncShareCardControls();
     await drawShareCard();
-    notify(family ? `已导入字体：${family.replaceAll('"', '')}` : '已导入字体代码，请确认字体名。', 'success');
+    notify(family ? t('importedFont', { name: stripFontQuotes(family) }) : t('importedFontCode'), 'success');
+}
+
+function readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error || new Error('File read failed.'));
+        reader.readAsDataURL(file);
+    });
+}
+
+function openFontDb() {
+    return new Promise((resolve, reject) => {
+        if (!window.indexedDB) {
+            reject(new Error(t('localFontUnsupported')));
+            return;
+        }
+        const request = indexedDB.open(FONT_DB_NAME, 1);
+        request.onupgradeneeded = () => {
+            request.result.createObjectStore(FONT_DB_STORE, { keyPath: 'id' });
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error || new Error('IndexedDB open failed.'));
+    });
+}
+
+async function putLocalFontData(id, dataUrl) {
+    const db = await openFontDb();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(FONT_DB_STORE, 'readwrite');
+        transaction.objectStore(FONT_DB_STORE).put({ id, dataUrl });
+        transaction.oncomplete = () => {
+            db.close();
+            resolve();
+        };
+        transaction.onerror = () => {
+            db.close();
+            reject(transaction.error || new Error('IndexedDB write failed.'));
+        };
+    });
+}
+
+async function getLocalFontData(id) {
+    const db = await openFontDb();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(FONT_DB_STORE, 'readonly');
+        const request = transaction.objectStore(FONT_DB_STORE).get(id);
+        request.onsuccess = () => resolve(request.result?.dataUrl || '');
+        request.onerror = () => reject(request.error || new Error('IndexedDB read failed.'));
+        transaction.oncomplete = () => db.close();
+    });
+}
+
+async function loadLocalShareFont(font) {
+    if (!window.FontFace || !document.fonts) throw new Error(t('localFontUnsupported'));
+    const dataUrl = font.dataUrl || await getLocalFontData(font.id);
+    if (!dataUrl) throw new Error(t('savedFontMissing'));
+    const family = stripFontQuotes(font.name);
+    const face = new FontFace(family, `url(${dataUrl})`);
+    await face.load();
+    document.fonts.add(face);
+}
+
+async function ensureSelectedLocalShareFontLoaded() {
+    const family = stripFontQuotes(state.shareCardSettings.fontFamily);
+    if (!family) return;
+    const font = getImportedFonts().find(item => item.type === 'local' && stripFontQuotes(item.name) === family && item.dataUrl);
+    if (font) await loadLocalShareFont(font);
+}
+
+async function importLocalShareCardFont(event) {
+    const input = event.target;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    const family = file.name.replace(/\.(ttf|otf|woff2?)$/i, '').trim() || 'Local Font';
+    const dataUrl = await readFileAsDataUrl(file);
+    const font = {
+        id: `local:${family}:${Date.now()}`,
+        type: 'local',
+        name: family,
+        dataUrl,
+    };
+    await loadLocalShareFont(font);
+    await putLocalFontData(font.id, dataUrl);
+    state.shareCardSettings = {
+        ...state.shareCardSettings,
+        fontFamily: quoteFontFamily(family),
+        fontImport: '',
+    };
+    rememberImportedFont({ ...font, dataUrl: '' });
+    saveLocalSettings();
+    syncShareCardControls();
+    await drawShareCard();
+    notify(t('localFontImported', { name: family }), 'success');
 }
 
 function applyShareFontImport() {
@@ -2353,6 +2624,7 @@ async function drawShareCard() {
     const note = state.shareCardNote;
     if (!canvas || !note) return;
 
+    await ensureSelectedLocalShareFontLoaded();
     applyShareFontImport();
     const font = shareCardFontStack();
     await waitForShareCardFonts(font);
@@ -2375,7 +2647,7 @@ async function drawShareCard() {
     const character = note.character?.name || '未命名角色';
     const content = String(note.content || '').trim();
     const userName = getShareCardUserName();
-    const readFont = '"Noto Serif SC", "Source Han Serif SC", "Songti SC", SimSun, serif';
+    const readFont = font;
     const fontScale = Math.min(Math.max(Number(settings.fontScale || 0.8), 0.65), 1.1);
     const s = size => Math.round(size * fontScale);
 
@@ -2500,6 +2772,9 @@ async function drawShareCard() {
 
     if (themeId === 'mobai') {
         const mobaiOffsetY = 38;
+        const contentY = 552;
+        const sourceY = 1088;
+        const footerY = 1132;
         ctx.save();
         drawShareTitle(ctx, character, left, 196 + mobaiOffsetY, {
             font: readFont,
@@ -2522,11 +2797,11 @@ async function drawShareCard() {
         ctx.textAlign = 'left';
         const contentRight = right - 70;
         const lines = wrapCanvasText(ctx, content, contentRight - left);
-        drawMultilineFit(ctx, lines, left, 430 + mobaiOffsetY, s(70), 1056);
+        drawMultilineFit(ctx, lines, left, contentY, s(70), 1042);
 
         ctx.fillStyle = muted;
         ctx.font = `400 ${s(29)}px ${readFont}`;
-        ctx.fillText(shareCardSourceLine(note, character), left, 1098 + mobaiOffsetY);
+        ctx.fillText(shareCardSourceLine(note, character), left, sourceY);
 
         drawShareCardFooter(ctx, {
             width,
@@ -2541,7 +2816,7 @@ async function drawShareCard() {
             lineColor,
             left,
             right,
-            footerY: 1160 + mobaiOffsetY,
+            footerY,
             showMeta: false,
         });
 
@@ -3074,6 +3349,8 @@ function updateThemeIcons(theme = state.theme) {
     updateIconElement(document.querySelector('.tn-brand-mark i'), assets.brandIcon);
     updateIconElement(document.querySelector('#tavern-notes-open i'), assets.openIcon, 'qr--button-icon');
     updateIconElement(document.querySelector('#tavern-notes-capture i'), assets.captureIcon, 'qr--button-icon');
+    updateIconElement(document.querySelector('#tavern-notes-floating-open i'), assets.openIcon);
+    updateIconElement(document.querySelector('#tavern-notes-floating-capture i'), assets.captureIcon);
 }
 
 async function loadTheme() {
@@ -3249,7 +3526,71 @@ function addScrollButtons() {
     updateScrollButtonsVisibility();
 }
 
+function updateLauncherModeButton() {
+    const button = document.querySelector('#tavern-notes-launcher-mode');
+    if (!button) return;
+    const label = state.launcherMode === 'floating' ? t('floatingBall') : t('toolbarButtons');
+    button.classList.toggle('active', state.launcherMode === 'floating');
+    button.title = t('switchLauncherMode');
+    button.setAttribute('aria-label', t('switchLauncherMode'));
+    const span = button.querySelector('span');
+    if (span) span.textContent = label;
+}
+
+function removeLauncherButtons() {
+    document.querySelector('#tavern-notes-open')?.remove();
+    document.querySelector('#tavern-notes-capture')?.remove();
+    document.querySelector('#tavern-notes-page-down')?.remove();
+}
+
+function updateFloatingLauncher() {
+    let launcher = document.querySelector('#tavern-notes-floating-launcher');
+    if (state.launcherMode !== 'floating') {
+        launcher?.remove();
+        return;
+    }
+    if (!launcher) {
+        launcher = document.createElement('div');
+        launcher.id = 'tavern-notes-floating-launcher';
+        launcher.innerHTML = `
+            <button id="tavern-notes-floating-open" class="tn-floating-button tn-floating-main" type="button" title="${htmlEscape(t('openNotes'))}" aria-label="${htmlEscape(t('openNotes'))}">
+                <i class="fa-solid fa-book-open"></i>
+            </button>
+            <button id="tavern-notes-floating-capture" class="tn-floating-button tn-floating-capture" type="button" title="${htmlEscape(t('captureSelectedTitle'))}" aria-label="${htmlEscape(t('captureSelectedTitle'))}">
+                <i class="fa-solid fa-highlighter"></i>
+            </button>
+        `;
+        document.body.append(launcher);
+        document.querySelector('#tavern-notes-floating-open')?.addEventListener('click', () => {
+            if (state.open) closePanel();
+            else openPanel();
+        });
+        document.querySelector('#tavern-notes-floating-capture')?.addEventListener('click', () => captureSelection().catch(error => notify(error.message, 'error')));
+    }
+    launcher.querySelector('#tavern-notes-floating-open')?.setAttribute('title', t('openNotes'));
+    launcher.querySelector('#tavern-notes-floating-open')?.setAttribute('aria-label', t('openNotes'));
+    launcher.querySelector('#tavern-notes-floating-capture')?.setAttribute('title', t('captureSelectedTitle'));
+    launcher.querySelector('#tavern-notes-floating-capture')?.setAttribute('aria-label', t('captureSelectedTitle'));
+    updateThemeIcons();
+}
+
+function toggleLauncherMode() {
+    state.launcherMode = state.launcherMode === 'floating' ? 'toolbar' : 'floating';
+    saveLocalSettings();
+    addInputToolbar();
+    updateFloatingLauncher();
+    updateLauncherModeButton();
+    notify(state.launcherMode === 'floating' ? t('floatingLauncherShown') : t('toolbarLauncherShown'), 'success');
+}
+
 function addInputToolbar() {
+    updateLauncherModeButton();
+    if (state.launcherMode === 'floating') {
+        removeLauncherButtons();
+        updateFloatingLauncher();
+        return;
+    }
+    updateFloatingLauncher();
     document.querySelector('#rightSendForm > #tavern-notes-open')?.remove();
     document.querySelector('#rightSendForm > #tavern-notes-capture')?.remove();
     document.querySelector('#rightSendForm > #tavern-notes-page-down')?.remove();
@@ -3329,6 +3670,7 @@ async function openPanel() {
     if (!panel) return;
     state.open = true;
     panel.classList.add('open');
+    updateFloatingLauncher();
     await refreshNotes();
 }
 
@@ -3337,6 +3679,7 @@ function closePanel() {
     if (!panel) return;
     state.open = false;
     panel.classList.remove('open');
+    updateFloatingLauncher();
 }
 
 async function init() {

@@ -1,5 +1,13 @@
 ﻿# Changelog
 
+## 1.0.11
+
+- Added a floating launcher mode for users who do not want Tavern Notes occupying the input toolbar.
+- Improved floating launcher positioning so it stays visible on narrow browser windows.
+- Made toolbar action buttons more consistent across responsive widths.
+- Added persistent local imported font storage for share-card generation.
+- Refined share-card layout details, including the Móbái-style vertical date/header treatment.
+
 ## 1.0.10
 
 - Added Simplified Chinese, Traditional Chinese, English, and Korean UI language support with a top-right language selector.

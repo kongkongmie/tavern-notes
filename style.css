@@ -29,6 +29,66 @@
     margin: 0 0.5em;
 }
 
+#tavern-notes-floating-launcher {
+    position: fixed;
+    right: max(10px, env(safe-area-inset-right));
+    top: min(calc(100dvh - 88px), calc(46dvh + 116px));
+    z-index: 30020;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    padding: 6px;
+    border-radius: 999px;
+    background: rgba(20, 24, 22, 0.035);
+    backdrop-filter: blur(4px);
+    opacity: 0.84;
+    transition: opacity 140ms ease, transform 140ms ease;
+    transform: translateY(-50%);
+    pointer-events: auto;
+}
+
+#tavern-notes-floating-launcher:hover {
+    opacity: 0.96;
+    transform: translateY(calc(-50% - 1px));
+}
+
+.tn-floating-button {
+    display: grid;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.5)) 72%, transparent);
+    border-radius: 999px;
+    color: color-mix(in srgb, var(--SmartThemeBodyColor, #f7f3ea) 88%, white 12%);
+    background:
+        radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.26), transparent 34%),
+        color-mix(in srgb, var(--SmartThemeBlurTintColor, rgba(28, 32, 30, 0.72)) 72%, transparent);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    transition: color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.tn-floating-button:hover {
+    color: color-mix(in srgb, var(--SmartThemeQuoteColor, #f4b51f) 78%, white 22%);
+    background:
+        radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.34), transparent 34%),
+        color-mix(in srgb, var(--SmartThemeBlurTintColor, rgba(28, 32, 30, 0.84)) 82%, var(--SmartThemeQuoteColor, #f4b51f) 18%);
+    transform: translateY(-1px);
+}
+
+.tn-floating-main {
+    width: 48px;
+    height: 48px;
+    font-size: 18px;
+}
+
+.tn-floating-capture {
+    width: 34px;
+    height: 34px;
+    font-size: 13px;
+    opacity: 0.82;
+}
+
 #tavern-notes-scroll-buttons {
     --tn-scroll-buttons-top: 46vh;
     position: fixed;
@@ -269,6 +329,11 @@
     z-index: 2;
 }
 
+.tn-window-soft-button {
+    min-height: 40px;
+    padding: 0 12px;
+}
+
 .tn-soft-button,
 .tn-icon-button {
     border: 0;
@@ -315,6 +380,11 @@
     white-space: nowrap;
 }
 
+.tn-icon-button span,
+.tn-page-button span {
+    display: inline;
+}
+
 .tn-language-select {
     min-height: 40px;
     padding: 0 12px;
@@ -354,6 +424,18 @@
     display: grid;
     place-items: center;
     font-size: 15px;
+}
+
+.tn-header-actions .tn-icon-button {
+    width: auto;
+    min-height: 40px;
+    padding: 0 15px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    white-space: nowrap;
 }
 
 .tn-search-row {
@@ -1366,6 +1448,12 @@
     font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
 }
 
+#tavern-notes-share-saved-fonts {
+    width: 100%;
+    min-height: 38px;
+    margin-bottom: 10px;
+}
+
 .tn-share-help {
     margin: -2px 0 12px;
     color: var(--tn-muted);
@@ -1419,7 +1507,7 @@
 
 .tn-share-actions {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
     margin-top: auto;
     padding-top: 8px;
@@ -1732,6 +1820,11 @@
         display: none;
     }
 
+    .tn-icon-button span,
+    .tn-page-button span {
+        display: none;
+    }
+
     .tn-icon-button {
         width: 36px;
         height: 36px;
@@ -1975,5 +2068,29 @@
 
     .tn-share-actions {
         grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (min-width: 641px) and (max-width: 980px) {
+    .tn-header-actions .tn-soft-button,
+    .tn-header-actions .tn-icon-button,
+    .tn-window-actions .tn-soft-button {
+        width: auto;
+        min-height: 40px;
+        padding: 0 15px;
+        gap: 8px;
+    }
+
+    .tn-header-actions .tn-soft-button span,
+    .tn-header-actions .tn-icon-button span,
+    .tn-window-actions .tn-soft-button span {
+        display: inline;
+    }
+
+    .tn-header-actions {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        justify-content: flex-start;
+        margin-top: 8px;
     }
 }
