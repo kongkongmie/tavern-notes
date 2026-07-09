@@ -30,21 +30,55 @@
 1. 前端扩展：显示按钮、面板和分享卡。
 2. 后端插件：负责把笔记保存为本地文件。
 
-推荐使用一键安装器。安装器会一次性安装前端扩展、后端插件，并开启必要配置。
+推荐先用 SillyTavern 自带的 Git 扩展安装器安装前端。这样以后酒馆可以提示更新，不需要每次重新下载压缩包。
 
-### Windows / PC 推荐：单文件黑窗安装
+### 推荐：在酒馆里粘贴 Git 地址安装
+
+1. 打开 SillyTavern 顶部的“扩展”面板。
+2. 进入“安装扩展 / Install extension”。
+3. 粘贴这个 GitHub 地址：
+
+```text
+https://github.com/kongkongmie/tavern-notes
+```
+
+4. 安装完成后，再运行一次后端安装器。
+
+后端安装器只需要首次安装时运行一次，用来安装 `server-plugin/tavern-notes` 并开启 `enableServerPlugins`。
+
+Windows：
+
+```text
+SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-server-plugin.bat
+```
+
+安卓 Termux / Linux / Mac / 云服务器：
+
+```bash
+node SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-server-plugin.js
+```
+
+看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
+
+以后前端扩展可以跟随 SillyTavern 的扩展更新提示更新。后端插件通常不需要更新；如果某个版本明确写了“需要更新后端插件”，再重新运行一次后端安装器即可。
+
+### 不方便用 Git 时：单文件安装器
+
+如果你的设备没有 Git，或者不会使用 SillyTavern 的扩展安装器，可以用这个备选方式。
+
+Windows / PC：
 
 1. 先让 SillyTavern 保持运行，也就是酒馆黑窗不要关。
 2. 下载 `Tavern-Notes-Installer.bat`。
 3. 双击运行。
 
-这个安装器会自动联网下载最新版酒馆笔记，然后完成安装。
+这个安装器会自动联网下载最新版酒馆笔记，然后完成前端和后端安装。
 
 如果没有识别成功，它才会要求你输入 SillyTavern 根目录路径。
 
 看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
 
-### 备选：下载完整压缩包安装
+### 离线包安装
 
 1. 到 GitHub Release 下载 `tavern-notes-v1.0.11.zip`。
 2. 解压压缩包。
@@ -60,7 +94,7 @@ Tavern-Notes-Installer.bat
 
 看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
 
-### 安卓 Termux / Linux / Mac / 云服务器
+### 安卓 Termux / Linux / Mac / 云服务器备选安装器
 
 推荐保持 SillyTavern 正在运行，然后在 Termux 或服务器终端里粘贴这一行：
 
@@ -82,30 +116,6 @@ sh install-tavern-notes.sh
 
 看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
 
-### 进阶：Git 地址安装前端
-
-如果你已经会使用 SillyTavern 的扩展安装器，也可以先粘贴 Git 地址安装前端扩展：
-
-```text
-https://github.com/kongkongmie/tavern-notes
-```
-
-然后再运行扩展目录里的后端安装器：
-
-Windows：
-
-```text
-SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-server-plugin.bat
-```
-
-安卓 Termux / Linux / Mac / 云服务器：
-
-```bash
-node SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-server-plugin.js
-```
-
-看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
-
 ### 安装器会做什么？
 
 安装器会自动完成这些事：
@@ -120,7 +130,23 @@ node SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-serv
 
 安装器不会删除你的笔记数据。
 
-### 3. 检查是否成功
+## 更新方式
+
+如果你是通过 SillyTavern 的“安装扩展 / Install extension”粘贴 GitHub 地址安装的：
+
+- 前端扩展会跟随 SillyTavern 的扩展更新机制提示更新。
+- `manifest.json` 已开启 `auto_update`。
+- 正常小版本更新只需要在酒馆扩展面板里更新前端，不需要重新安装。
+
+如果你最初是通过 `.bat`、`.sh` 或 zip 安装器安装的：
+
+- 也可以直接在 SillyTavern 里用 GitHub 地址重新安装一次前端，之后就能走酒馆扩展更新。
+- 后端插件保留原来的即可。
+- 如果版本说明写了“需要更新后端插件”，再重新运行一次安装器。
+
+如果你只想手动覆盖更新，也可以继续使用 `Tavern-Notes-Installer.bat` 或 `install-online.sh`。它不会删除已有笔记。
+
+### 检查是否成功
 
 进入聊天页面后，输入栏附近会出现酒馆笔记按钮。
 
