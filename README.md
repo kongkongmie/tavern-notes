@@ -80,7 +80,7 @@ Windows / PC：
 
 ### 离线包安装
 
-1. 到 GitHub Release 下载 `tavern-notes-v1.0.11.zip`。
+1. 到 GitHub Release 下载 `tavern-notes-v1.0.12.zip`。
 2. 解压压缩包。
 3. Windows 用户直接双击最外层的：
 
@@ -136,6 +136,7 @@ sh install-tavern-notes.sh
 
 - 前端扩展会跟随 SillyTavern 的扩展更新机制提示更新。
 - `manifest.json` 已开启 `auto_update`。
+- 酒馆笔记也会在启动后检查 GitHub 最新版本；发现新版本时会提示你更新。
 - 正常小版本更新只需要在酒馆扩展面板里更新前端，不需要重新安装。
 
 如果你最初是通过 `.bat`、`.sh` 或 zip 安装器安装的：
@@ -208,7 +209,7 @@ body { font-family: "STDongGuanTi"; }
 酒馆笔记包含 SillyTavern Server Plugin。
 Server Plugin 不是沙盒环境，理论上可以访问本机文件系统。请只安装你信任来源的版本。
 
-酒馆笔记 v1.0.11 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
+酒馆笔记 v1.0.12 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
 
 ## 仓库
 
@@ -218,7 +219,7 @@ https://github.com/kongkongmie/tavern-notes
 
 ## 版本
 
-v1.0.11
+v1.0.12
 
 - 增加一键安装器，自动安装前端扩展、后端插件，并开启 `enableServerPlugins`。
 - Windows 下会优先从正在运行的 SillyTavern 黑窗识别酒馆目录。

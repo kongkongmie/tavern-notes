@@ -13,6 +13,9 @@
 
 const API_BASE = '/api/plugins/tavern-notes';
 const SETTINGS_KEY = 'tavern-notes-settings';
+const UPDATE_NOTICE_KEY = 'tavern-notes-update-notice';
+const EXTENSION_VERSION = '1.0.12';
+const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/manifest.json';
 const FONT_DB_NAME = 'tavern-notes-fonts';
 const FONT_DB_STORE = 'fonts';
 
@@ -182,6 +185,8 @@ const TEXT_ZH_CN = {
     shownNotes: '已显示 {shown} 条，当前筛选共 {total} 条',
     connected: '已连接：{user}，V{version}，总记录约 {count} 条',
     backendDisconnected: '后端未连接：{message}',
+    updateAvailableTitle: '酒馆笔记有新版本',
+    updateAvailable: '检测到 v{version}。请在 SillyTavern 扩展面板里更新；如果当初用黑窗安装，也可以重新运行安装器。',
     openNotes: '打开酒馆笔记',
     captureSelected: '摘录选中',
     captureSelectedTitle: '摘录选中的聊天文字',
@@ -294,6 +299,8 @@ const TEXTS = {
         copied: '已複製。',
         filled: '已進入輸入框。',
         openNotes: '打開酒館筆記',
+        updateAvailableTitle: '酒館筆記有新版本',
+        updateAvailable: '偵測到 v{version}。請在 SillyTavern 擴充面板裡更新；如果當初用黑窗安裝，也可以重新執行安裝器。',
         launcherMode: '入口',
         toolbarButtons: '工具列',
         floatingBall: '懸浮球',
@@ -441,6 +448,8 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         shownNotes: 'Showing {shown}; {total} in current filter',
         connected: 'Connected: {user}, V{version}, about {count} total notes',
         backendDisconnected: 'Backend disconnected: {message}',
+        updateAvailableTitle: 'Tavern Notes update available',
+        updateAvailable: 'Version {version} is available. Update it in the SillyTavern extensions panel, or rerun the installer if you originally used the installer.',
         openNotes: 'Open Tavern Notes',
         captureSelected: 'Capture selected',
         captureSelectedTitle: 'Capture selected chat text',
@@ -593,6 +602,8 @@ Click Preview & save or Save as to create a theme file.`,
         shownNotes: '{shown}개 표시 중, 현재 필터 전체 {total}개',
         connected: '연결됨: {user}, V{version}, 전체 약 {count}개',
         backendDisconnected: '백엔드 연결 안 됨: {message}',
+        updateAvailableTitle: 'Tavern Notes 업데이트 가능',
+        updateAvailable: 'v{version} 버전이 있습니다. SillyTavern 확장 패널에서 업데이트하거나, 설치기로 설치했다면 설치기를 다시 실행하세요.',
         openNotes: '술집 노트 열기',
         captureSelected: '선택 발췌',
         captureSelectedTitle: '선택한 채팅 글 발췌',
@@ -872,6 +883,65 @@ function setStatus(message) {
     document.querySelectorAll('.tavern-notes-status').forEach(el => {
         el.textContent = message;
     });
+}
+
+function compareVersions(left, right) {
+    const a = String(left || '').split(/[.-]/).map(part => Number.parseInt(part, 10) || 0);
+    const b = String(right || '').split(/[.-]/).map(part => Number.parseInt(part, 10) || 0);
+    const length = Math.max(a.length, b.length, 3);
+    for (let i = 0; i < length; i++) {
+        const diff = (a[i] || 0) - (b[i] || 0);
+        if (diff !== 0) return diff;
+    }
+    return 0;
+}
+
+async function getInstalledVersion() {
+    try {
+        const response = await fetch(`/scripts/extensions/third-party/tavern-notes/manifest.json?t=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) return EXTENSION_VERSION;
+        const manifest = await response.json();
+        return manifest.version || EXTENSION_VERSION;
+    } catch {
+        return EXTENSION_VERSION;
+    }
+}
+
+function shouldNotifyUpdate(version) {
+    const today = new Date().toDateString();
+    try {
+        const last = JSON.parse(localStorage.getItem(UPDATE_NOTICE_KEY) || '{}') || {};
+        if (last.version === version && last.date === today) return false;
+    } catch {
+        // Ignore malformed notice cache.
+    }
+    localStorage.setItem(UPDATE_NOTICE_KEY, JSON.stringify({ version, date: today }));
+    return true;
+}
+
+async function checkForTavernNotesUpdate() {
+    try {
+        const [installedVersion, remoteResponse] = await Promise.all([
+            getInstalledVersion(),
+            fetch(`${REMOTE_MANIFEST_URL}?t=${Date.now()}`, { cache: 'no-store' }),
+        ]);
+        if (!remoteResponse.ok) return;
+        const remoteManifest = await remoteResponse.json();
+        const remoteVersion = remoteManifest.version;
+        if (!remoteVersion || compareVersions(remoteVersion, installedVersion) <= 0) return;
+        if (!shouldNotifyUpdate(remoteVersion)) return;
+
+        const message = t('updateAvailable', { version: remoteVersion });
+        const title = t('updateAvailableTitle');
+        const toastrApi = globalThis.toastr;
+        if (toastrApi) {
+            toastrApi.info(message, title, { timeOut: 12000, extendedTimeOut: 16000 });
+        } else {
+            setStatus(`${title}: ${message}`);
+        }
+    } catch (error) {
+        console.debug('[Tavern Notes] Update check skipped:', error);
+    }
 }
 
 function saveLocalSettings() {
@@ -3688,6 +3758,7 @@ async function init() {
     addInputToolbar();
     addScrollButtons();
     watchQuickReplyBar();
+    setTimeout(() => checkForTavernNotesUpdate(), 5000);
 
     try {
         const status = await api('/status');

@@ -1,5 +1,10 @@
 ﻿# Changelog
 
+## 1.0.12
+
+- Added a built-in update reminder that checks the latest GitHub manifest and notifies users when a newer Tavern Notes version is available.
+- The reminder works for both Git-installed users and installer-installed users, and limits repeated reminders for the same version.
+
 ## 1.0.11
 
 - Added a floating launcher mode for users who do not want Tavern Notes occupying the input toolbar.
