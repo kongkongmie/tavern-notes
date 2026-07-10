@@ -81,7 +81,7 @@ Windows / PC：
 
 ### 离线包安装
 
-1. 到 GitHub Release 下载 `tavern-notes-v1.0.14.zip`。
+1. 到 GitHub Release 下载 `tavern-notes-v1.0.15.zip`。
 2. 解压压缩包。
 3. Windows 用户直接双击最外层的：
 
@@ -228,7 +228,7 @@ https://github.com/kongkongmie/tavern-notes
 
 ## 版本
 
-v1.0.14
+v1.0.15
 
 - 增加一键安装器，自动安装前端扩展、后端插件，并开启 `enableServerPlugins`。
 - Windows 下会优先从正在运行的 SillyTavern 黑窗识别酒馆目录。

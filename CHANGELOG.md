@@ -1,5 +1,9 @@
 ﻿# Changelog
 
+## 1.0.15
+
+- Fixed the post-install backend guide on mobile so the full dialog starts inside the visible viewport and can scroll normally.
+
 ## 1.0.14
 
 - Added automatic local daily backup after note changes.
