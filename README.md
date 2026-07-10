@@ -19,6 +19,7 @@
 - 笔记操作：输入、复制、分享、删除。
 - 分享卡：把摘抄或输入做成图片，支持主题、背景色、字体名、网络字体 CSS。
 - 导出笔记：JSON 备份格式，TXT 清爽阅读格式。
+- 自动备份：新增或删除笔记后，会在本地覆盖保存一份最新备份。
 - 主题：默认主题、主题导入导出、主题文件夹。
 - 多语言：简体中文、繁体中文、English、한국어，可跟随酒馆语言。
 - 手机辅助：可选侧边上下翻页按钮。
@@ -80,7 +81,7 @@ Windows / PC：
 
 ### 离线包安装
 
-1. 到 GitHub Release 下载 `tavern-notes-v1.0.13.zip`。
+1. 到 GitHub Release 下载 `tavern-notes-v1.0.14.zip`。
 2. 解压压缩包。
 3. Windows 用户直接双击最外层的：
 
@@ -182,6 +183,14 @@ SillyTavern/data/default-user/tavern-notes/
 SillyTavern/data/li/tavern-notes/
 ```
 
+自动备份文件固定覆盖写入：
+
+```text
+SillyTavern/data/<当前用户>/tavern-notes/backups/tavern-notes-daily-backup.json
+```
+
+新增或删除笔记后会自动更新这份备份。它只保存在本地，不会上传。
+
 ## 分享卡字体
 
 分享卡支持两种字体方式：
@@ -209,7 +218,7 @@ body { font-family: "STDongGuanTi"; }
 酒馆笔记包含 SillyTavern Server Plugin。
 Server Plugin 不是沙盒环境，理论上可以访问本机文件系统。请只安装你信任来源的版本。
 
-酒馆笔记 v1.0.13 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
+酒馆笔记 v1.0.14 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
 
 ## 仓库
 
@@ -219,7 +228,7 @@ https://github.com/kongkongmie/tavern-notes
 
 ## 版本
 
-v1.0.13
+v1.0.14
 
 - 增加一键安装器，自动安装前端扩展、后端插件，并开启 `enableServerPlugins`。
 - Windows 下会优先从正在运行的 SillyTavern 黑窗识别酒馆目录。

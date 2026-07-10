@@ -1,5 +1,12 @@
 ﻿# Changelog
 
+## 1.0.14
+
+- Added automatic local daily backup after note changes.
+- The backup is written to `data/<user>/tavern-notes/backups/tavern-notes-daily-backup.json` and is overwritten with the latest state.
+- Improved backend connection and missing-plugin error messages, including automatic guidance when the backend is not installed.
+- This version requires rerunning the backend installer to enable automatic backups.
+
 ## 1.0.13
 
 - Added a beginner-friendly post-install guide that appears after installing from the SillyTavern extension installer.

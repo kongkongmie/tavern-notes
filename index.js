@@ -14,7 +14,7 @@
 const API_BASE = '/api/plugins/tavern-notes';
 const SETTINGS_KEY = 'tavern-notes-settings';
 const UPDATE_NOTICE_KEY = 'tavern-notes-update-notice';
-const EXTENSION_VERSION = '1.0.13';
+const EXTENSION_VERSION = '1.0.14';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/manifest.json';
 const FONT_DB_NAME = 'tavern-notes-fonts';
 const FONT_DB_STORE = 'fonts';
@@ -196,6 +196,10 @@ const TEXT_ZH_CN = {
     copyWindowsPath: '复制 Windows 路径',
     copyShellCommand: '复制终端命令',
     copiedInstallCommand: '已复制后端安装命令。',
+    backendNetworkHelp: '酒馆笔记后端没有响应。请确认 SillyTavern 已重启，server plugin 已安装到 plugins/tavern-notes，并且 config.yaml 已开启 enableServerPlugins。',
+    backendMissingHelp: '找不到酒馆笔记后端。通常是还没运行后端安装器，或运行后没有重启 SillyTavern。',
+    backendRequestHelp: '酒馆笔记请求失败：{message}',
+    backupFailedHelp: '笔记已写入失败前停止：自动备份没有完成。请检查 SillyTavern 是否有本地文件写入权限。',
     openNotes: '打开酒馆笔记',
     captureSelected: '摘录选中',
     captureSelectedTitle: '摘录选中的聊天文字',
@@ -317,6 +321,10 @@ const TEXTS = {
         copyWindowsPath: '複製 Windows 路徑',
         copyShellCommand: '複製終端命令',
         copiedInstallCommand: '已複製後端安裝命令。',
+        backendNetworkHelp: '酒館筆記後端沒有回應。請確認 SillyTavern 已重啟、server plugin 已安裝到 plugins/tavern-notes，且 config.yaml 已開啟 enableServerPlugins。',
+        backendMissingHelp: '找不到酒館筆記後端。通常是還沒執行後端安裝器，或執行後沒有重啟 SillyTavern。',
+        backendRequestHelp: '酒館筆記請求失敗：{message}',
+        backupFailedHelp: '筆記在寫入前停止：自動備份沒有完成。請檢查 SillyTavern 是否有本機檔案寫入權限。',
         launcherMode: '入口',
         toolbarButtons: '工具列',
         floatingBall: '懸浮球',
@@ -473,6 +481,10 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         copyWindowsPath: 'Copy Windows path',
         copyShellCommand: 'Copy terminal command',
         copiedInstallCommand: 'Backend install command copied.',
+        backendNetworkHelp: 'Tavern Notes backend did not respond. Restart SillyTavern, make sure the server plugin is installed in plugins/tavern-notes, and enableServerPlugins is enabled in config.yaml.',
+        backendMissingHelp: 'Tavern Notes backend was not found. Usually the backend installer has not been run, or SillyTavern was not restarted afterward.',
+        backendRequestHelp: 'Tavern Notes request failed: {message}',
+        backupFailedHelp: 'The note was stopped before completion because automatic backup failed. Check that SillyTavern can write local files.',
         openNotes: 'Open Tavern Notes',
         captureSelected: 'Capture selected',
         captureSelectedTitle: 'Capture selected chat text',
@@ -634,6 +646,10 @@ Click Preview & save or Save as to create a theme file.`,
         copyWindowsPath: 'Windows 경로 복사',
         copyShellCommand: '터미널 명령 복사',
         copiedInstallCommand: '백엔드 설치 명령을 복사했습니다.',
+        backendNetworkHelp: 'Tavern Notes 백엔드가 응답하지 않습니다. SillyTavern을 다시 시작했고, server plugin이 plugins/tavern-notes에 설치되어 있으며, config.yaml의 enableServerPlugins가 켜져 있는지 확인하세요.',
+        backendMissingHelp: 'Tavern Notes 백엔드를 찾을 수 없습니다. 보통 백엔드 설치기를 아직 실행하지 않았거나, 실행 후 SillyTavern을 다시 시작하지 않은 경우입니다.',
+        backendRequestHelp: 'Tavern Notes 요청 실패: {message}',
+        backupFailedHelp: '자동 백업이 완료되지 않아 노트 저장을 중단했습니다. SillyTavern에 로컬 파일 쓰기 권한이 있는지 확인하세요.',
         openNotes: '술집 노트 열기',
         captureSelected: '선택 발췌',
         captureSelectedTitle: '선택한 채팅 글 발췌',
@@ -887,14 +903,25 @@ async function api(path, options = {}) {
             },
         });
     } catch (error) {
-        throw new Error(`无法连接酒馆笔记后端。请确认 server plugin 已安装到 plugins/tavern-notes，且 config.yaml 已开启 enableServerPlugins。原始错误：${error.message}`);
+        const friendly = new Error(`${t('backendNetworkHelp')}\n\n${error.message}`);
+        friendly.code = 'backend_unreachable';
+        throw friendly;
     }
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data.ok === false) {
         if (response.status === 404) {
-            throw new Error('找不到酒馆笔记后端。请安装 server-plugin/tavern-notes 并重启 SillyTavern。');
+            const friendly = new Error(t('backendMissingHelp'));
+            friendly.code = 'backend_missing';
+            throw friendly;
         }
-        throw new Error(data.error || `酒馆笔记请求失败：${response.status}`);
+        const raw = data.error || `${response.status} ${response.statusText || ''}`.trim();
+        const message = raw.includes('自动备份失败')
+            ? `${t('backupFailedHelp')}\n\n${raw}`
+            : t('backendRequestHelp', { message: raw });
+        const friendly = new Error(message);
+        friendly.code = 'backend_request_failed';
+        friendly.status = response.status;
+        throw friendly;
     }
     return data;
 }
@@ -3858,6 +3885,9 @@ async function init() {
         setStatus(t('connected', { user: status.user, version: status.version || '1.0.0', count: status.totalNotes || 0 }));
     } catch (error) {
         notify(t('backendDisconnected', { message: error.message }), 'error');
+        if (['backend_missing', 'backend_unreachable'].includes(error.code)) {
+            showBackendInstallGuide();
+        }
     }
 
     eventSource.on(event_types.MESSAGE_SENT, messageId => {

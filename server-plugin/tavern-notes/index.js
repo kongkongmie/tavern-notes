@@ -3,11 +3,13 @@ const path = require('node:path');
 const childProcess = require('node:child_process');
 
 const STORE_DIR = 'tavern-notes';
-const PLUGIN_VERSION = '1.0.0';
+const PLUGIN_VERSION = '1.0.14';
 const INDEX_FILE = 'index.json';
 const THEME_FILE = 'theme.json';
 const THEME_ACTIVE_FILE = 'theme-active.json';
 const THEMES_DIR = 'themes';
+const BACKUP_DIR = 'backups';
+const DAILY_BACKUP_FILE = 'tavern-notes-daily-backup.json';
 const SHARD_PREFIX = 'notes-';
 const SHARD_SUFFIX = '.jsonl';
 const MAX_SHARD_LINES = 1000;
@@ -42,7 +44,7 @@ function getStorePath(request) {
     fs.mkdirSync(storePath, { recursive: true });
     fs.mkdirSync(path.join(storePath, 'exports'), { recursive: true });
     fs.mkdirSync(path.join(storePath, 'cards'), { recursive: true });
-    fs.mkdirSync(path.join(storePath, 'backups'), { recursive: true });
+    fs.mkdirSync(path.join(storePath, BACKUP_DIR), { recursive: true });
     fs.mkdirSync(path.join(storePath, THEMES_DIR), { recursive: true });
     return storePath;
 }
@@ -61,6 +63,10 @@ function getThemesPath(storePath) {
 
 function getThemeActivePath(storePath) {
     return path.join(storePath, THEME_ACTIVE_FILE);
+}
+
+function getDailyBackupPath(storePath) {
+    return path.join(storePath, BACKUP_DIR, DAILY_BACKUP_FILE);
 }
 
 function openFolder(folderPath) {
@@ -660,6 +666,34 @@ function readAllNotes(storePath, index, filters = {}) {
     return results;
 }
 
+function writeDailyBackup(storePath, index, userHandle) {
+    try {
+        const notes = readAllNotes(storePath, index);
+        const backup = {
+            ok: true,
+            format: 'tavern-notes-daily-backup',
+            version: 1,
+            backedUpAt: nowIso(),
+            user: userHandle || 'default-user',
+            totalNotes: notes.length,
+            notes,
+        };
+        const backupPath = getDailyBackupPath(storePath);
+        const tempPath = `${backupPath}.tmp`;
+        fs.writeFileSync(tempPath, JSON.stringify(backup, null, 2), 'utf8');
+        fs.renameSync(tempPath, backupPath);
+        return {
+            path: backupPath,
+            totalNotes: notes.length,
+            backedUpAt: backup.backedUpAt,
+        };
+    } catch (error) {
+        const wrapped = new Error(`自动备份失败：${error.message}`);
+        wrapped.status = 500;
+        throw wrapped;
+    }
+}
+
 function groupNotesByCharacterForText(notes) {
     const groups = new Map();
     for (const note of notes) {
@@ -787,7 +821,8 @@ async function init(router) {
             const index = loadIndex(storePath, request.user.profile?.handle);
             const note = normalizeNote(request.body || {}, index);
             appendNote(storePath, index, note);
-            response.json({ ok: true, note: noteSummary(note) });
+            const backup = writeDailyBackup(storePath, index, request.user.profile?.handle);
+            response.json({ ok: true, note: noteSummary(note), backup });
         } catch (error) {
             response.status(error.status || 500).json({ ok: false, error: error.message });
         }
@@ -802,7 +837,8 @@ async function init(router) {
             index.deletedIds = Array.from(new Set([...(index.deletedIds || []), id])).slice(-5000);
             index.latest = (index.latest || []).filter(note => note.id !== id);
             saveIndex(storePath, index);
-            response.json({ ok: true });
+            const backup = writeDailyBackup(storePath, index, request.user.profile?.handle);
+            response.json({ ok: true, backup });
         } catch (error) {
             response.status(error.status || 500).json({ ok: false, error: error.message });
         }

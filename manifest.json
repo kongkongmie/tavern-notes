@@ -6,7 +6,7 @@
     "js": "index.js",
     "css": "style.css",
     "author": "KKM & Codex",
-    "version": "1.0.13",
+    "version": "1.0.14",
     "homePage": "https://github.com/kongkongmie/tavern-notes",
     "auto_update": true,
     "hooks": {
