@@ -14,7 +14,7 @@
 const API_BASE = '/api/plugins/tavern-notes';
 const SETTINGS_KEY = 'tavern-notes-settings';
 const UPDATE_NOTICE_KEY = 'tavern-notes-update-notice';
-const EXTENSION_VERSION = '1.0.15';
+const EXTENSION_VERSION = '1.0.16';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/manifest.json';
 const FONT_DB_NAME = 'tavern-notes-fonts';
 const FONT_DB_STORE = 'fonts';
@@ -76,6 +76,7 @@ const state = {
     themeDraft: false,
     exportScope: 'all',
     launcherMode: savedLauncherMode,
+    autoCaptureUserInput: localSettings.autoCaptureUserInput !== false,
     showPageDownButton: localSettings.showPageDownButton !== false,
     scrollButtonsTop: Number(localSettings.scrollButtonsTop || 46),
     shareCardNote: null,
@@ -209,6 +210,12 @@ const TEXT_ZH_CN = {
     switchLauncherMode: '切换酒馆笔记入口显示方式',
     toolbarLauncherShown: '已切换为工具栏入口。',
     floatingLauncherShown: '已切换为悬浮球入口。',
+    autoCaptureUserInput: '记录输入',
+    autoCaptureUserInputTitle: '自动记录发送出去的 User 输入',
+    autoCaptureUserInputOn: '已开启自动记录 User 输入。',
+    autoCaptureUserInputOff: '已关闭自动记录 User 输入。',
+    noNotesHintNoUserInput: '选中聊天文字后点“摘录选中”会保存摘抄。',
+    noCharacterNotesHintNoUserInput: '摘录聊天文字后，这里会按角色汇总。',
     scrollUp: '向上翻一页',
     scrollDown: '向下翻一页',
     showPageButtons: '显示侧边上下翻页按钮',
@@ -331,6 +338,12 @@ const TEXTS = {
         switchLauncherMode: '切換酒館筆記入口顯示方式',
         toolbarLauncherShown: '已切換為工具列入口。',
         floatingLauncherShown: '已切換為懸浮球入口。',
+        autoCaptureUserInput: '記錄輸入',
+        autoCaptureUserInputTitle: '自動記錄送出的 User 輸入',
+        autoCaptureUserInputOn: '已開啟自動記錄 User 輸入。',
+        autoCaptureUserInputOff: '已關閉自動記錄 User 輸入。',
+        noNotesHintNoUserInput: '選中聊天文字後點「摘錄選中」會保存摘抄。',
+        noCharacterNotesHintNoUserInput: '摘錄聊天文字後，這裡會按角色彙總。',
         fromTavernNotes: '來自酒館筆記',
         brandForShare: '酒館筆記',
         excerptedAt: '摘錄於',
@@ -494,6 +507,12 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         switchLauncherMode: 'Switch Tavern Notes launcher mode',
         toolbarLauncherShown: 'Switched to toolbar launcher.',
         floatingLauncherShown: 'Switched to floating launcher.',
+        autoCaptureUserInput: 'Record input',
+        autoCaptureUserInputTitle: 'Automatically record sent User inputs',
+        autoCaptureUserInputOn: 'Automatic User input recording is on.',
+        autoCaptureUserInputOff: 'Automatic User input recording is off.',
+        noNotesHintNoUserInput: 'Select chat text, then click Capture selected to save an excerpt.',
+        noCharacterNotesHintNoUserInput: 'Captured excerpts will be grouped by character here.',
         scrollUp: 'Page up',
         scrollDown: 'Page down',
         showPageButtons: 'Show side page buttons',
@@ -659,6 +678,12 @@ Click Preview & save or Save as to create a theme file.`,
         switchLauncherMode: '술집 노트 실행 방식 전환',
         toolbarLauncherShown: '도구막대 실행 버튼으로 전환했습니다.',
         floatingLauncherShown: '플로팅 버튼으로 전환했습니다.',
+        autoCaptureUserInput: '입력 기록',
+        autoCaptureUserInputTitle: '보낸 User 입력을 자동 기록',
+        autoCaptureUserInputOn: 'User 입력 자동 기록을 켰습니다.',
+        autoCaptureUserInputOff: 'User 입력 자동 기록을 껐습니다.',
+        noNotesHintNoUserInput: '채팅 글을 선택한 뒤 “선택 발췌”를 눌러 발췌를 저장하세요.',
+        noCharacterNotesHintNoUserInput: '발췌한 채팅 글은 캐릭터별로 여기에 정리됩니다.',
         scrollUp: '한 페이지 위로',
         scrollDown: '한 페이지 아래로',
         showPageButtons: '측면 페이지 버튼 보이기',
@@ -1066,6 +1091,7 @@ function saveLocalSettings() {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
         language: state.language,
         launcherMode: state.launcherMode,
+        autoCaptureUserInput: state.autoCaptureUserInput,
         showPageDownButton: state.showPageDownButton,
         scrollButtonsTop: state.scrollButtonsTop,
         currentUserName: state.currentUserName,
@@ -1077,6 +1103,7 @@ function saveLanguageSetting(language) {
     state.language = ['auto', 'zh-CN', 'zh-TW', 'en', 'ko'].includes(language) ? language : 'auto';
     saveLocalSettings();
     updatePageDownSettingButton();
+    updateAutoCaptureUserInputButton();
     updateScrollButtonLabels();
     updateLauncherModeButton();
     updateFloatingLauncher();
@@ -1099,6 +1126,33 @@ function togglePageDownButtonSetting() {
     updateScrollButtonsVisibility();
     updateScrollButtonLabels();
     notify(state.showPageDownButton ? t('pageButtonsShown') : t('pageButtonsHidden'), 'success');
+}
+
+function getVisibleFilters() {
+    return FILTERS.filter(filter => state.autoCaptureUserInput || filter.id !== 'user_input');
+}
+
+function updateAutoCaptureUserInputButton() {
+    const button = document.querySelector('#tavern-notes-auto-user-input');
+    if (!button) return;
+    button.classList.toggle('active', state.autoCaptureUserInput);
+    const label = t('autoCaptureUserInputTitle');
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.querySelector('span')?.replaceChildren(document.createTextNode(t('autoCaptureUserInput')));
+}
+
+function toggleAutoCaptureUserInput() {
+    state.autoCaptureUserInput = !state.autoCaptureUserInput;
+    if (!state.autoCaptureUserInput && state.filter === 'user_input') {
+        state.filter = 'all';
+        state.page = 1;
+    }
+    saveLocalSettings();
+    updateAutoCaptureUserInputButton();
+    renderFilterTabs();
+    refreshNotes();
+    notify(state.autoCaptureUserInput ? t('autoCaptureUserInputOn') : t('autoCaptureUserInputOff'), 'success');
 }
 
 function htmlEscape(value) {
@@ -1166,6 +1220,7 @@ function getListPath() {
     if (state.query.trim()) params.set('q', state.query.trim());
     const currentCharacter = getCurrentCharacter();
     if (currentCharacter.id !== null) params.set('currentCharacterId', String(currentCharacter.id));
+    if (!state.autoCaptureUserInput) params.set('includeUserInput', 'false');
     if (state.filter === 'user_input') params.set('type', 'user_input');
     if (state.filter === 'excerpt') params.set('type', 'excerpt');
     if (state.characterFilter) {
@@ -1181,10 +1236,15 @@ function getListPath() {
 function getCharactersPath() {
     const params = new URLSearchParams();
     if (state.query.trim()) params.set('q', state.query.trim());
+    if (!state.autoCaptureUserInput) params.set('includeUserInput', 'false');
     return `/characters?${params.toString()}`;
 }
 
 async function refreshNotes() {
+    if (!state.autoCaptureUserInput && state.filter === 'user_input') {
+        state.filter = 'all';
+        state.page = 1;
+    }
     try {
         const [data, characterData] = await Promise.all([
             api(getListPath()),
@@ -1301,17 +1361,19 @@ function renderCharacterOverview() {
     const restCharacters = state.characters.filter(character => getCharacterKey(character) !== currentKey);
 
     if (!state.characters.length && !current.name) {
+        const emptyHint = state.autoCaptureUserInput ? t('noCharacterNotesHint') : t('noCharacterNotesHintNoUserInput');
         return `
             <div class="tn-empty">
                 <div class="tn-empty-orb"><i class="fa-solid fa-user"></i></div>
                 <div class="tn-empty-title">${htmlEscape(t('noCharacterNotes'))}</div>
-                <small>${htmlEscape(t('noCharacterNotesHint'))}</small>
+                <small>${htmlEscape(emptyHint)}</small>
             </div>
         `;
     }
 
     const renderCard = (character, isCurrent = false) => {
         const avatar = getCharacterAvatar(character);
+        const userInputPart = state.autoCaptureUserInput ? ` · ${htmlEscape(t('userInput'))} ${htmlEscape(character.userInput)}` : '';
         return `
             <button class="tn-character-card ${isCurrent ? 'tn-character-current' : ''}" type="button"
                 data-character-id="${htmlEscape(character.id ?? '')}"
@@ -1323,7 +1385,7 @@ function renderCharacterOverview() {
                 </span>
                 <span class="tn-character-info">
                     <b>${htmlEscape(character.name || t('unnamedCharacter'))}${isCurrent ? `<em>${htmlEscape(t('currentCharacter'))}</em>` : ''}</b>
-                    <small>${htmlEscape(character.total)} · ${htmlEscape(t('fillInput'))} ${htmlEscape(character.userInput)} · ${htmlEscape(t('excerpt'))} ${htmlEscape(character.excerpt)}</small>
+                    <small>${htmlEscape(character.total)}${userInputPart} · ${htmlEscape(t('excerpt'))} ${htmlEscape(character.excerpt)}</small>
                 </span>
                 <i class="fa-solid fa-chevron-right"></i>
             </button>
@@ -1369,11 +1431,12 @@ function renderCharacterScope() {
 
 function renderNoteArticles() {
     if (!state.notes.length) {
+        const emptyHint = state.autoCaptureUserInput ? t('noNotesHint') : t('noNotesHintNoUserInput');
         return `
             <div class="tn-empty">
                 <div class="tn-empty-orb"><i class="fa-regular fa-note-sticky"></i></div>
                 <div class="tn-empty-title">${htmlEscape(t('noNotes'))}</div>
-                <small>${htmlEscape(t('noNotesHint'))}</small>
+                <small>${htmlEscape(emptyHint)}</small>
             </div>
         `;
     }
@@ -1419,6 +1482,7 @@ function renderNotes() {
     const list = document.querySelector('#tavern-notes-list');
     if (!list) return;
 
+    renderFilterTabs();
     updateFilterCounts();
     updateCharacterScopeStyle();
     const isCharacterDirectory = state.filter === 'characters' && !state.characterFilter;
@@ -1452,6 +1516,22 @@ function updateFilterCounts() {
         const key = el.closest('.tn-filter')?.dataset.filter;
         el.textContent = countMap[key] === '' ? '' : String(countMap[key] ?? '');
     });
+}
+
+function renderFilterTabs() {
+    const nav = document.querySelector('.tn-filters');
+    if (!nav) return;
+    nav.innerHTML = getVisibleFilters().map(filter => `
+        <button class="tn-filter ${filter.id === state.filter ? 'active' : ''}" data-filter="${filter.id}">
+            <span class="tn-filter-icon"><i class="fa-solid ${filter.icon}"></i></span>
+            <span class="tn-filter-text">
+                <b>${htmlEscape(t(filter.label))}</b>
+                <small>${htmlEscape(t(filter.hint))}</small>
+            </span>
+            <span class="tn-filter-count"></span>
+        </button>
+    `).join('');
+    updateFilterCounts();
 }
 
 function findNoteGroupFromElement(element) {
@@ -1545,6 +1625,7 @@ function rememberSelection() {
 }
 
 async function captureUserMessage(messageId) {
+    if (!state.autoCaptureUserInput) return;
     const message = chat?.[messageId];
     if (!message || !message.is_user || !String(message.mes || '').trim()) return;
     const content = String(message.mes || '').trim();
@@ -1568,6 +1649,7 @@ async function captureUserMessage(messageId) {
 }
 
 function setActiveFilter(filter) {
+    if (!state.autoCaptureUserInput && filter === 'user_input') filter = 'all';
     state.filter = filter;
     if (filter === 'characters') state.characterFilter = null;
     state.page = 1;
@@ -1630,6 +1712,9 @@ function buildPanel() {
                     </button>
                 </div>
                 <div class="tn-header-actions">
+                    <button id="tavern-notes-auto-user-input" class="tn-soft-button ${state.autoCaptureUserInput ? 'active' : ''}" title="${htmlEscape(t('autoCaptureUserInputTitle'))}" aria-label="${htmlEscape(t('autoCaptureUserInputTitle'))}">
+                        <i class="fa-solid fa-keyboard"></i><span>${htmlEscape(t('autoCaptureUserInput'))}</span>
+                    </button>
                     <button id="tavern-notes-theme" class="tn-soft-button" title="${htmlEscape(t('openThemePanel'))}" aria-label="${htmlEscape(t('openThemePanel'))}">
                         <i class="fa-solid fa-palette"></i><span>${htmlEscape(t('theme'))}</span>
                     </button>
@@ -1650,7 +1735,7 @@ function buildPanel() {
             </div>
             <div class="tn-shell">
                 <nav class="tn-filters">
-                    ${FILTERS.map(filter => `
+                    ${getVisibleFilters().map(filter => `
                         <button class="tn-filter ${filter.id === 'all' ? 'active' : ''}" data-filter="${filter.id}">
                             <span class="tn-filter-icon"><i class="fa-solid ${filter.icon}"></i></span>
                             <span class="tn-filter-text">
@@ -1781,6 +1866,7 @@ function buildPanel() {
 function bindEvents() {
     document.querySelector('#tavern-notes-language')?.addEventListener('change', event => saveLanguageSetting(event.target.value));
     document.querySelector('#tavern-notes-launcher-mode')?.addEventListener('click', toggleLauncherMode);
+    document.querySelector('#tavern-notes-auto-user-input')?.addEventListener('click', toggleAutoCaptureUserInput);
     document.querySelector('#tavern-notes-theme')?.addEventListener('click', toggleThemeMenu);
     document.querySelector('.tn-theme-close')?.addEventListener('click', closeThemeMenu);
     document.querySelector('#tavern-notes-page-down-setting')?.addEventListener('click', togglePageDownButtonSetting);
@@ -1793,8 +1879,10 @@ function bindEvents() {
         clearTimeout(state.searchTimer);
         state.searchTimer = setTimeout(refreshNotes, 300);
     });
-    document.querySelectorAll('.tn-filter').forEach(tab => {
-        tab.addEventListener('click', () => setActiveFilter(tab.dataset.filter || 'all'));
+    document.querySelector('.tn-filters')?.addEventListener('click', event => {
+        const tab = event.target.closest?.('.tn-filter');
+        if (!tab) return;
+        setActiveFilter(tab.dataset.filter || 'all');
     });
     document.querySelector('#tavern-notes-list')?.addEventListener('click', handleNoteAction);
     document.querySelector('.tn-modal-close')?.addEventListener('click', closeFullNote);

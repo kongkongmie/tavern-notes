@@ -3,7 +3,7 @@ const path = require('node:path');
 const childProcess = require('node:child_process');
 
 const STORE_DIR = 'tavern-notes';
-const PLUGIN_VERSION = '1.0.14';
+const PLUGIN_VERSION = '1.0.16';
 const INDEX_FILE = 'index.json';
 const THEME_FILE = 'theme.json';
 const THEME_ACTIVE_FILE = 'theme-active.json';
@@ -525,6 +525,7 @@ function getDeletedSet(index) {
 }
 
 function matchesFilters(note, filters) {
+    if ((filters.includeUserInput === 'false' || filters.includeUserInput === false) && note.type === 'user_input') return false;
     if (filters.type && note.type !== filters.type) return false;
     if (filters.characterName && note.character?.name !== filters.characterName) return false;
     if (filters.characterId && String(note.character?.id ?? '') !== filters.characterId) return false;

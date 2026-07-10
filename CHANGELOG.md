@@ -1,5 +1,12 @@
 ﻿# Changelog
 
+## 1.0.16
+
+- Added an optional `Record input` toggle for users who do not want Tavern Notes to automatically save sent User inputs.
+- When input recording is disabled, User input notes are excluded from All notes, counts, character summaries, and the User input filter.
+- Existing User input notes are not deleted; turning the toggle back on makes them visible again.
+- This version updates backend filtering, so rerun the backend installer and restart SillyTavern after updating.
+
 ## 1.0.15
 
 - Fixed the post-install backend guide on mobile so the full dialog starts inside the visible viewport and can scroll normally.
@@ -101,5 +108,6 @@
 - Generate share-card PNG images with themes, backgrounds, local font names, and network font CSS.
 - Include a default theme system with theme import/export.
 - Include `server-plugin/tavern-notes` for local file storage.
+
 
 
