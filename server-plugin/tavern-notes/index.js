@@ -3,7 +3,7 @@ const path = require('node:path');
 const childProcess = require('node:child_process');
 
 const STORE_DIR = 'tavern-notes';
-const PLUGIN_VERSION = '1.0.16';
+const PLUGIN_VERSION = '1.0.17';
 const INDEX_FILE = 'index.json';
 const THEME_FILE = 'theme.json';
 const THEME_ACTIVE_FILE = 'theme-active.json';
@@ -189,6 +189,199 @@ function defaultTheme() {
     };
 }
 
+function appleGlassTheme(mode = 'day') {
+    const isNight = mode === 'night';
+    return {
+        format: 'tavern-notes-theme',
+        version: 1,
+        name: 'Apple Glass',
+        author: 'Tavern Notes',
+        variables: {
+            ...defaultTheme().variables,
+            '--tn-theme-flavor': 'apple',
+            '--tn-apple-mode': isNight ? 'night' : 'day',
+            '--tn-paper': isNight ? '#16181d' : '#f5f5f7',
+            '--tn-paper-2': isNight ? '#20232b' : '#ffffff',
+            '--tn-ink': isNight ? '#f5f5f7' : '#1d1d1f',
+            '--tn-muted': isNight ? '#a1a1a6' : '#6e6e73',
+            '--tn-line': isNight ? 'rgba(255, 255, 255, 0.14)' : 'rgba(0, 0, 0, 0.09)',
+            '--tn-gold': isNight ? '#64d2ff' : '#007aff',
+            '--tn-gold-2': isNight ? '#30d158' : '#34c759',
+            '--tn-shadow-dark': isNight ? 'rgba(0, 0, 0, 0.42)' : 'rgba(0, 0, 0, 0.12)',
+            '--tn-shadow-light': isNight ? 'rgba(255, 255, 255, 0.05)' : 'rgba(255, 255, 255, 0.72)',
+            '--tn-radius-panel': '26px',
+            '--tn-radius-card': '18px',
+            '--tn-font-family': '-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", sans-serif',
+            '--tn-panel-border': isNight ? 'rgba(255, 255, 255, 0.16)' : 'rgba(255, 255, 255, 0.72)',
+            '--tn-control-bg': isNight ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.64)',
+            '--tn-control-bg-hover': isNight ? 'rgba(255, 255, 255, 0.13)' : 'rgba(255, 255, 255, 0.88)',
+            '--tn-control-inset-bg': isNight ? 'rgba(255, 255, 255, 0.07)' : 'rgba(255, 255, 255, 0.72)',
+            '--tn-control-inset-shadow': isNight ? 'inset 0 0 0 1px rgba(255, 255, 255, 0.09)' : 'inset 0 0 0 1px rgba(255, 255, 255, 0.78)',
+            '--tn-card-bg': isNight ? 'rgba(255, 255, 255, 0.075)' : 'rgba(255, 255, 255, 0.58)',
+            '--tn-card-bg-active': isNight ? 'linear-gradient(135deg, rgba(100, 210, 255, 0.20), rgba(255, 255, 255, 0.08))' : 'linear-gradient(135deg, rgba(0, 122, 255, 0.12), rgba(255, 255, 255, 0.84))',
+            '--tn-card-active-shadow': isNight ? '0 0 0 1px rgba(100, 210, 255, 0.26), 0 12px 30px rgba(0, 0, 0, 0.28)' : '0 0 0 1px rgba(0, 122, 255, 0.18), 0 16px 36px rgba(0, 0, 0, 0.10)',
+            '--tn-icon-bg': isNight ? 'rgba(255, 255, 255, 0.10)' : 'rgba(255, 255, 255, 0.74)',
+            '--tn-action-bg': isNight ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.68)',
+            '--tn-overlay-bg': isNight ? 'rgba(22, 24, 29, 0.74)' : 'rgba(245, 245, 247, 0.72)',
+            '--tn-fade-bg': isNight ? 'linear-gradient(90deg, rgba(32, 35, 43, 0), rgba(32, 35, 43, 0.78) 34%, rgba(32, 35, 43, 0.96))' : 'linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.78) 34%, rgba(255, 255, 255, 0.96))',
+            '--tn-card-image': isNight
+                ? 'radial-gradient(circle at 12% 10%, rgba(100, 210, 255, 0.12), transparent 34%), radial-gradient(circle at 88% 4%, rgba(48, 209, 88, 0.08), transparent 30%)'
+                : 'radial-gradient(circle at 12% 10%, rgba(0, 122, 255, 0.10), transparent 34%), radial-gradient(circle at 88% 4%, rgba(52, 199, 89, 0.10), transparent 30%)',
+            '--tn-em': isNight ? '#c7c7cc' : '#86868b',
+            '--tn-underline': isNight ? '#64d2ff' : '#007aff',
+            '--tn-quote': isNight ? '#64d2ff' : '#007aff',
+            '--tn-text-shadow': 'transparent',
+            '--tn-panel-glow': isNight ? 'rgba(100, 210, 255, 0.18)' : 'rgba(0, 122, 255, 0.12)',
+            '--tn-scrollbar-thumb': isNight ? 'rgba(100, 210, 255, 0.64)' : 'rgba(0, 122, 255, 0.48)',
+            '--tn-scrollbar-track': isNight ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
+            '--tn-mini-button-bg': isNight ? 'rgba(255, 255, 255, 0.08)' : 'rgba(255, 255, 255, 0.68)',
+            '--tn-mini-button-shadow': '0 0 0 1px var(--tn-line), 0 8px 24px var(--tn-shadow-dark)',
+            '--tn-mini-button-hover-bg': isNight ? 'rgba(255, 255, 255, 0.14)' : 'rgba(255, 255, 255, 0.92)',
+            '--tn-mini-button-hover-shadow': '0 0 0 1px color-mix(in srgb, var(--tn-gold) 24%, var(--tn-line)), 0 10px 28px var(--tn-shadow-dark)',
+            '--tn-filter-hover-shadow': '0 0 0 1px color-mix(in srgb, var(--tn-gold) 24%, var(--tn-line)), 0 14px 34px var(--tn-shadow-dark)',
+            '--tn-filter-icon-border': isNight ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.82)',
+            '--tn-filter-icon-shadow': '0 0 0 1px var(--tn-line), 0 8px 20px var(--tn-shadow-dark)',
+            '--tn-inline-action-bg': 'transparent',
+            '--tn-inline-action-hover-bg': isNight ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 122, 255, 0.08)',
+            '--tn-inline-action-shadow': 'none',
+            '--tn-inline-action-hover-shadow': 'none',
+            '--tn-inline-icon-bg': isNight ? 'rgba(255, 255, 255, 0.10)' : 'rgba(255, 255, 255, 0.74)',
+            '--tn-inline-icon-hover-bg': isNight ? 'rgba(100, 210, 255, 0.16)' : 'rgba(0, 122, 255, 0.10)',
+            '--tn-inline-icon-shadow': '0 0 0 1px var(--tn-line)',
+            '--tn-note-bg': 'var(--tn-card-image), var(--tn-card-bg)',
+            '--tn-note-border': isNight ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(255, 255, 255, 0.72)',
+            '--tn-note-shadow': '0 18px 46px var(--tn-shadow-dark)',
+            '--tn-note-type-bg': isNight ? 'rgba(100, 210, 255, 0.16)' : 'rgba(0, 122, 255, 0.10)',
+            '--tn-note-type-color': isNight ? '#9cdcfe' : '#0066cc',
+            '--tn-note-type-user-bg': isNight ? 'rgba(100, 210, 255, 0.16)' : 'rgba(0, 122, 255, 0.10)',
+            '--tn-note-type-user-color': isNight ? '#9cdcfe' : '#0066cc',
+            '--tn-note-type-excerpt-bg': isNight ? 'rgba(48, 209, 88, 0.14)' : 'rgba(52, 199, 89, 0.11)',
+            '--tn-note-type-excerpt-color': isNight ? '#8ee99b' : '#1f7a35',
+            '--tn-note-accent-user': isNight ? '#64d2ff' : '#007aff',
+            '--tn-note-accent-excerpt': isNight ? '#30d158' : '#34c759',
+            '--tn-note-padding': '18px 20px',
+            '--tn-note-topline-bg': 'transparent',
+            '--tn-note-topline-border': '0',
+            '--tn-note-topline-padding': '0',
+            '--tn-note-topline-radius': '0',
+            '--tn-note-topline-margin': '0 0 12px',
+            '--tn-note-dot-display': 'none',
+            '--tn-filter-shadow': '0 12px 32px var(--tn-shadow-dark)',
+            '--tn-control-shadow': '0 10px 28px var(--tn-shadow-dark), inset 0 1px 0 rgba(255, 255, 255, 0.16)',
+            '--tn-inset-light': isNight ? 'rgba(255, 255, 255, 0.10)' : 'rgba(255, 255, 255, 0.82)',
+        },
+        assets: {
+            brandIcon: 'fa-note-sticky',
+            openIcon: 'fa-note-sticky',
+            captureIcon: 'fa-quote-left',
+            backgroundImage: '',
+            buttonImage: '',
+        },
+    };
+}
+
+function secretFilesTheme() {
+    return {
+        format: 'tavern-notes-theme',
+        version: 1,
+        name: 'Secret Files',
+        author: 'Tavern Notes',
+        variables: {
+            ...defaultTheme().variables,
+            '--tn-theme-flavor': 'archive',
+            '--tn-paper': '#d9d9d6',
+            '--tn-paper-2': '#eeeeeb',
+            '--tn-ink': '#151515',
+            '--tn-muted': '#6b6b67',
+            '--tn-line': '#3f3f3c',
+            '--tn-gold': '#111111',
+            '--tn-gold-2': '#8e8d42',
+            '--tn-shadow-dark': 'rgba(20, 20, 20, 0.22)',
+            '--tn-shadow-light': 'rgba(255, 255, 255, 0.7)',
+            '--tn-radius-panel': '6px',
+            '--tn-radius-card': '4px',
+            '--tn-font-family': '"Arial Narrow", "Helvetica Neue", Arial, sans-serif',
+            '--tn-panel-border': '#3f3f3c',
+            '--tn-control-bg': '#e8e8e4',
+            '--tn-control-bg-hover': '#f4f4f0',
+            '--tn-control-inset-bg': '#cfcfca',
+            '--tn-control-inset-shadow': 'inset 0 0 0 1px #555550',
+            '--tn-card-bg': '#ecece8',
+            '--tn-card-bg-active': '#111111',
+            '--tn-card-active-shadow': '0 0 0 2px #111111, 0 10px 24px rgba(0, 0, 0, 0.22)',
+            '--tn-icon-bg': '#111111',
+            '--tn-action-bg': '#e8e8e4',
+            '--tn-overlay-bg': 'rgba(217, 217, 214, 0.88)',
+            '--tn-fade-bg': 'linear-gradient(90deg, rgba(236, 236, 232, 0), #ecece8 32%, #ecece8)',
+            '--tn-card-image': 'linear-gradient(transparent, transparent)',
+            '--tn-em': '#5e5e5a',
+            '--tn-underline': '#111111',
+            '--tn-quote': '#111111',
+            '--tn-text-shadow': 'transparent',
+            '--tn-panel-glow': 'rgba(0, 0, 0, 0.12)',
+            '--tn-scrollbar-thumb': '#111111',
+            '--tn-scrollbar-track': 'rgba(0, 0, 0, 0.12)',
+            '--tn-mini-button-bg': '#ededeb',
+            '--tn-mini-button-shadow': '0 0 0 1px #2f2f2c, 0 3px 0 rgba(0, 0, 0, 0.12)',
+            '--tn-mini-button-hover-bg': '#ffffff',
+            '--tn-mini-button-hover-shadow': '0 0 0 1px #111111, 0 5px 0 rgba(0, 0, 0, 0.16)',
+            '--tn-filter-hover-shadow': '0 0 0 2px #111111, 0 8px 18px rgba(0, 0, 0, 0.18)',
+            '--tn-filter-icon-border': '#111111',
+            '--tn-filter-icon-shadow': 'none',
+            '--tn-inline-action-bg': 'transparent',
+            '--tn-inline-action-hover-bg': '#111111',
+            '--tn-inline-action-shadow': 'none',
+            '--tn-inline-action-hover-shadow': 'none',
+            '--tn-inline-icon-bg': '#f3f3ef',
+            '--tn-inline-icon-hover-bg': '#111111',
+            '--tn-inline-icon-shadow': '0 0 0 1px #111111',
+            '--tn-note-bg': '#eeeeea',
+            '--tn-note-border': '1.5px solid #30302d',
+            '--tn-note-shadow': '0 10px 0 -6px #c4c4bf, 0 18px 34px rgba(0, 0, 0, 0.16)',
+            '--tn-note-type-bg': '#111111',
+            '--tn-note-type-color': '#f2f2ee',
+            '--tn-note-type-user-bg': '#111111',
+            '--tn-note-type-user-color': '#f2f2ee',
+            '--tn-note-type-excerpt-bg': '#eeeeea',
+            '--tn-note-type-excerpt-color': '#111111',
+            '--tn-note-accent-user': '#111111',
+            '--tn-note-accent-excerpt': '#77764b',
+            '--tn-note-padding': '18px 18px 16px',
+            '--tn-note-topline-bg': 'transparent',
+            '--tn-note-topline-border': '0',
+            '--tn-note-topline-padding': '0',
+            '--tn-note-topline-radius': '0',
+            '--tn-note-topline-margin': '0 0 12px',
+            '--tn-note-dot-display': 'none',
+            '--tn-filter-shadow': '0 3px 0 rgba(0, 0, 0, 0.14)',
+            '--tn-control-shadow': '0 0 0 1.5px #30302d, 0 4px 0 rgba(0, 0, 0, 0.12)',
+            '--tn-inset-light': 'rgba(255, 255, 255, 0.72)',
+        },
+        assets: {
+            brandIcon: 'fa-folder-open',
+            openIcon: 'fa-folder-open',
+            captureIcon: 'fa-paperclip',
+            backgroundImage: '',
+            buttonImage: '',
+        },
+    };
+}
+
+const BUILT_IN_THEMES = {
+    'apple-glass': appleGlassTheme('day'),
+    'secret-files': secretFilesTheme(),
+};
+
+function normalizeBuiltInThemeId(id) {
+    const clean = String(id || '');
+    if (clean === 'apple-glass-day' || clean === 'apple-glass-night') return 'apple-glass';
+    return clean;
+}
+
+function isBuiltInThemeId(id) {
+    return Object.prototype.hasOwnProperty.call(BUILT_IN_THEMES, normalizeBuiltInThemeId(id));
+}
+
 function sanitizeTheme(input = {}) {
     const base = defaultTheme();
     const theme = {
@@ -270,14 +463,14 @@ function getActiveThemeId(storePath) {
     const activePath = getThemeActivePath(storePath);
     if (!fs.existsSync(activePath)) return 'default';
     try {
-        return sanitizeThemeId(JSON.parse(fs.readFileSync(activePath, 'utf8')).activeId || 'default');
+        return normalizeBuiltInThemeId(sanitizeThemeId(JSON.parse(fs.readFileSync(activePath, 'utf8')).activeId || 'default'));
     } catch {
         return 'default';
     }
 }
 
 function setActiveThemeId(storePath, id) {
-    fs.writeFileSync(getThemeActivePath(storePath), JSON.stringify({ activeId: sanitizeThemeId(id) }, null, 2), 'utf8');
+    fs.writeFileSync(getThemeActivePath(storePath), JSON.stringify({ activeId: normalizeBuiltInThemeId(sanitizeThemeId(id)) }, null, 2), 'utf8');
 }
 
 function themeSummary(id, theme) {
@@ -292,7 +485,10 @@ function themeSummary(id, theme) {
 
 function listThemes(storePath) {
     const themesPath = getThemesPath(storePath);
-    const themes = [{ id: 'default', ...themeSummary('default', defaultTheme()) }];
+    const themes = [
+        { id: 'default', ...themeSummary('default', defaultTheme()) },
+        ...Object.entries(BUILT_IN_THEMES).map(([id, theme]) => ({ id, ...themeSummary(id, theme) })),
+    ];
     for (const file of fs.readdirSync(themesPath)) {
         if (!file.endsWith('.json')) continue;
         const id = file.slice(0, -5);
@@ -306,8 +502,9 @@ function listThemes(storePath) {
 }
 
 function loadThemeById(storePath, id) {
-    const cleanId = sanitizeThemeId(id);
+    const cleanId = normalizeBuiltInThemeId(sanitizeThemeId(id));
     if (cleanId === 'default') return defaultTheme();
+    if (isBuiltInThemeId(cleanId)) return sanitizeTheme(BUILT_IN_THEMES[cleanId]);
     const filePath = getThemeFilePath(storePath, cleanId);
     if (!fs.existsSync(filePath)) {
         const error = new Error('Theme not found.');
@@ -328,9 +525,9 @@ function loadActiveTheme(storePath) {
 
 function saveThemeFile(storePath, theme, id) {
     const clean = sanitizeTheme(theme);
-    const cleanId = id ? sanitizeThemeId(id) : makeThemeId(clean.name);
-    if (cleanId === 'default') {
-        const error = new Error('Default theme cannot be overwritten.');
+    const cleanId = id ? normalizeBuiltInThemeId(sanitizeThemeId(id)) : makeThemeId(clean.name);
+    if (cleanId === 'default' || isBuiltInThemeId(cleanId)) {
+        const error = new Error('Built-in themes cannot be overwritten.');
         error.status = 400;
         throw error;
     }
@@ -950,7 +1147,8 @@ async function init(router) {
             const id = sanitizeThemeId(request.params.id);
             const theme = loadThemeById(storePath, id);
             setActiveThemeId(storePath, id);
-            response.json({ ok: true, id, theme, activeId: id, themes: listThemes(storePath) });
+            const activeId = getActiveThemeId(storePath);
+            response.json({ ok: true, id: activeId, theme, activeId, themes: listThemes(storePath) });
         } catch (error) {
             response.status(error.status || 500).json({ ok: false, error: error.message });
         }
@@ -960,7 +1158,7 @@ async function init(router) {
         try {
             const storePath = getStorePath(request);
             const id = sanitizeThemeId(request.params.id);
-            if (id === 'default') return response.status(400).json({ ok: false, error: 'Default theme cannot be deleted.' });
+            if (id === 'default' || isBuiltInThemeId(id)) return response.status(400).json({ ok: false, error: 'Built-in themes cannot be deleted.' });
             const filePath = getThemeFilePath(storePath, id);
             if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
             if (getActiveThemeId(storePath) === id) {

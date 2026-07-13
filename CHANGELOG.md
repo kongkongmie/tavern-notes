@@ -1,5 +1,16 @@
 ﻿# Changelog
 
+## 1.0.17
+
+- Added Apple Glass as a built-in theme, with day/night switching available from the main panel.
+- Added Secret Files as a built-in theme so new installs can select it immediately without importing theme JSON.
+- Added whole-message floor capture with a dedicated settings page and configurable body tag detection.
+- Added an optional floating selection capture button for selected text, including rendered HTML blocks and input fields.
+- Added fixed default launcher/capture icons that no longer change with custom themes.
+- Refined share-card controls, including unified font-size slider styling across built-in themes.
+- Removed redundant main-panel paging and refresh buttons while keeping internal list refresh behavior.
+- Fixed several UI consistency issues in floating launcher, theme panels, share-card panels, and Secret Files layout.
+
 ## 1.0.16
 
 - Added an optional `Record input` toggle for users who do not want Tavern Notes to automatically save sent User inputs.

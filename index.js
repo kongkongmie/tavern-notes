@@ -1,4 +1,4 @@
-﻿import {
+import {
     characters,
     chat,
     eventSource,
@@ -14,12 +14,46 @@
 const API_BASE = '/api/plugins/tavern-notes';
 const SETTINGS_KEY = 'tavern-notes-settings';
 const UPDATE_NOTICE_KEY = 'tavern-notes-update-notice';
-const EXTENSION_VERSION = '1.0.16';
+const EXTENSION_VERSION = '1.0.17';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/manifest.json';
 const FONT_DB_NAME = 'tavern-notes-fonts';
 const FONT_DB_STORE = 'fonts';
 const BACKEND_INSTALL_WINDOWS_PATH = 'SillyTavern\\public\\scripts\\extensions\\third-party\\tavern-notes\\install-server-plugin.bat';
 const BACKEND_INSTALL_SHELL_COMMAND = 'node SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-server-plugin.js';
+const DEFAULT_OPEN_ICON_URL = '/scripts/extensions/third-party/tavern-notes/assets/tavern-notes-open.png';
+const DEFAULT_CAPTURE_ICON_URL = '/scripts/extensions/third-party/tavern-notes/assets/tavern-notes-capture.png';
+const APPLE_THEME_ID = 'apple-glass';
+const LEGACY_APPLE_THEME_DAY_ID = 'apple-glass-day';
+const LEGACY_APPLE_THEME_NIGHT_ID = 'apple-glass-night';
+const LEGACY_FLOOR_CAPTURE_SELECTOR = '.comment, [data-tavern-notes-content], [data-note-content], .mes_text';
+const DEFAULT_FLOOR_CAPTURE_TAG = 'content';
+const DEFAULT_FLOOR_CAPTURE_SELECTOR = 'content, .content, [data-tavern-notes-content], [data-note-content], .comment, .mes_text';
+const FLOOR_CAPTURE_EXCLUDE_SELECTOR = [
+    '.tn-floor-capture',
+    '.mes_buttons',
+    '.extraMesButtons',
+    '.mes_edit_buttons',
+    '.swipe_left',
+    '.swipe_right',
+    '.swipes-counter',
+    '.mes_timer',
+    '.mesIDDisplay',
+    '.tokenCounterDisplay',
+    '.mes_reasoning',
+    '.mes_summary',
+    '.summary',
+    '[data-summary]',
+    'details',
+    'summary',
+    'pre',
+    'code',
+    '.hljs',
+    'script',
+    'style',
+    'textarea',
+    'button',
+    '[role="button"]',
+].join(',');
 
 function loadLocalSettings() {
     try {
@@ -66,6 +100,11 @@ const state = {
     capturedUserInputs: {},
     variantIndexByGroup: {},
     lastSelection: null,
+    selectionButtonTimer: null,
+    lastSelectionRoot: null,
+    selectionFrameObserver: null,
+    boundSelectionRoots: new WeakSet(),
+    floorCaptureObserver: null,
     searchTimer: null,
     qrBarObserver: null,
     theme: null,
@@ -77,8 +116,12 @@ const state = {
     exportScope: 'all',
     launcherMode: savedLauncherMode,
     autoCaptureUserInput: localSettings.autoCaptureUserInput !== false,
-    showPageDownButton: localSettings.showPageDownButton !== false,
-    scrollButtonsTop: Number(localSettings.scrollButtonsTop || 46),
+    showSelectionCaptureButton: localSettings.showSelectionCaptureButton !== false,
+    showFloorCaptureButton: localSettings.showFloorCaptureButton !== false,
+    floorCaptureSelector: !localSettings.floorCaptureSelector || localSettings.floorCaptureSelector === LEGACY_FLOOR_CAPTURE_SELECTOR
+        ? DEFAULT_FLOOR_CAPTURE_SELECTOR
+        : localSettings.floorCaptureSelector,
+    appleGlassMode: localSettings.appleGlassMode === 'night' ? 'night' : 'day',
     shareCardNote: null,
     shareCardSettings: {
         theme: savedShareTheme,
@@ -108,8 +151,6 @@ const TEXT_ZH_CN = {
     languageSaved: '语言已保存，刷新页面后生效。',
     subtitle: 'soft notes · character memory',
     theme: '主题',
-    paging: '翻页',
-    refreshNotes: '刷新笔记',
     exportNotes: '导出笔记',
     closeNotes: '关闭酒馆笔记',
     searchPlaceholder: '搜索笔记、角色、聊天...',
@@ -204,6 +245,32 @@ const TEXT_ZH_CN = {
     openNotes: '打开酒馆笔记',
     captureSelected: '摘录选中',
     captureSelectedTitle: '摘录选中的聊天文字',
+    captureFloor: '摘录整层',
+    captureFloorTitle: '摘录这一整层楼的文字',
+    captureFloorEmpty: '没有找到这一层楼的正文。',
+    floorCaptureEntry: '整楼摘录',
+    floorCaptureEntryTitle: '是否开启整楼摘录功能，点击查看配置说明',
+    floorCaptureSettingsTitle: '整楼摘录设置',
+    floorCaptureSettingsIntro: '这个功能会在每层楼右上角加一个“摘录整层”按钮。普通聊天不用配置，打开开关就能用。',
+    floorCaptureStepsTitle: '怎么用',
+    floorCaptureSteps: '1. 打开“是否开启整楼摘录功能”。\n2. 回到聊天页面。\n3. 在想保存的那层楼右上角点“摘录整层”。',
+    floorCaptureContentTitle: '正文标签名是什么',
+    floorCaptureContentHelp: '如果一层楼里有摘要、状态栏、按钮或代码块，就让模板作者把真正正文包在一个标签里。比如 <content>正文</content>，标签名就是 content。',
+    floorCaptureTroubleTitle: '如果摘录结果不对',
+    floorCaptureTroubleHelp: '问模板作者：正文是被哪个标签包住的？把那个标签名填进“修改正文标签”。例如 <story>正文</story> 就填 story。保存后重新点“摘录整层”。',
+    floorCaptureButton: '是否开启整楼摘录功能',
+    floorCaptureButtonTitle: '是否开启每层楼右上角的“摘录整层”按钮',
+    floorCaptureButtonOn: '已开启整层摘录按钮。',
+    floorCaptureButtonOff: '已关闭整层摘录按钮。',
+    floorCaptureSelectorLabel: '正文标签名',
+    floorCaptureSelectorPlaceholder: 'content',
+    floorCaptureSelectorHelp: '只填标签名，不要填尖括号。比如正文写在 <story>正文</story> 里，就填 story。',
+    floorCaptureSelectorSaved: '正文标签已保存。',
+    floorCaptureSelectorCurrentDefault: '当前会优先摘取 <content> 标签里的正文。',
+    floorCaptureSelectorCurrentCustom: '当前会优先摘取 <{tag}> 标签里的正文。',
+    floorCaptureExampleTitle: '推荐写法',
+    floorCaptureExample: '<content>这里写真正要摘录的正文。</content>',
+    floorCaptureAdvanced: '修改正文标签',
     launcherMode: '入口',
     toolbarButtons: '工具栏',
     floatingBall: '悬浮球',
@@ -214,19 +281,16 @@ const TEXT_ZH_CN = {
     autoCaptureUserInputTitle: '自动记录发送出去的 User 输入',
     autoCaptureUserInputOn: '已开启自动记录 User 输入。',
     autoCaptureUserInputOff: '已关闭自动记录 User 输入。',
+    selectionCaptureButton: '选区按钮',
+    selectionCaptureButtonTitle: '选中文字后显示浮动摘录按钮',
+    selectionCaptureButtonOn: '已开启选区浮动摘录按钮。',
+    selectionCaptureButtonOff: '已关闭选区浮动摘录按钮。',
     noNotesHintNoUserInput: '选中聊天文字后点“摘录选中”会保存摘抄。',
     noCharacterNotesHintNoUserInput: '摘录聊天文字后，这里会按角色汇总。',
-    scrollUp: '向上翻一页',
-    scrollDown: '向下翻一页',
-    showPageButtons: '显示侧边上下翻页按钮',
-    hidePageButtons: '隐藏侧边上下翻页按钮',
-    pageButtonsShown: '已显示侧边上下翻页按钮。',
-    pageButtonsHidden: '已隐藏侧边上下翻页按钮。',
     fromTavernNotes: '来自酒馆笔记',
     brandForShare: '酒馆笔记',
     excerptedAt: '摘录于',
     openThemePanel: '打开主题面板：切换、导入、导出或编辑酒馆笔记主题',
-    togglePageButtons: '显示或隐藏侧边上下翻页按钮',
     close: '关闭',
     closeThemePanel: '关闭主题面板',
     switchTheme: '切换主题',
@@ -234,6 +298,12 @@ const TEXT_ZH_CN = {
     exportCurrentTheme: '导出当前主题',
     openThemeFolder: '打开主题文件夹',
     deleteTheme: '删除主题',
+    builtInThemeCannotDelete: '内置主题不能删除。',
+    appleThemeMode: '日夜',
+    appleThemeModeTitle: '切换 Apple Glass 日夜主题',
+    appleThemeDay: '切换到 Apple 日间',
+    appleThemeNight: '切换到 Apple 夜间',
+    appleThemeEnabled: '已切换 Apple Glass 主题。',
     previewTheme: '预览：{name}',
     tempMergedTheme: '临时融合：{name}',
     unnamedTheme: '未命名主题',
@@ -247,7 +317,7 @@ const TEXT_ZH_CN = {
 主题 JSON 由 variables 和 assets 两部分组成。
 
 variables 控制颜色、圆角、字体、卡片、按钮和笔记样式。
-assets 控制标题图标、输入栏图标、摘录图标和背景图。
+assets 控制标题图标和背景图；输入栏与摘录按钮使用固定默认图标。
 
 融合当前酒馆主题会读取 SillyTavern 的主题变量，并生成一个临时预览。
 只有点击“预览并保存”或“另存为”才会生成主题文件。`,
@@ -287,8 +357,6 @@ const TEXTS = {
         languageSaved: '語言已保存，重新整理頁面後生效。',
         appName: '酒館筆記',
         theme: '主題',
-        paging: '翻頁',
-        refreshNotes: '重新讀取筆記',
         exportNotes: '匯出筆記',
         closeNotes: '關閉酒館筆記',
         searchPlaceholder: '搜尋筆記、角色、聊天...',
@@ -332,6 +400,32 @@ const TEXTS = {
         backendMissingHelp: '找不到酒館筆記後端。通常是還沒執行後端安裝器，或執行後沒有重啟 SillyTavern。',
         backendRequestHelp: '酒館筆記請求失敗：{message}',
         backupFailedHelp: '筆記在寫入前停止：自動備份沒有完成。請檢查 SillyTavern 是否有本機檔案寫入權限。',
+        captureFloor: '摘錄整層',
+        captureFloorTitle: '摘錄這一整層樓的文字',
+        captureFloorEmpty: '沒有找到這一層樓的正文。',
+        floorCaptureEntry: '整樓摘錄',
+        floorCaptureEntryTitle: '是否開啟整樓摘錄功能，點擊查看配置說明',
+        floorCaptureSettingsTitle: '整樓摘錄設定',
+        floorCaptureSettingsIntro: '這個功能會在每層樓右上角加一個「摘錄整層」按鈕。普通聊天不用配置，打開開關就能用。',
+        floorCaptureStepsTitle: '怎麼用',
+        floorCaptureSteps: '1. 打開「是否開啟整樓摘錄功能」。\n2. 回到聊天頁面。\n3. 在想保存的那層樓右上角點「摘錄整層」。',
+        floorCaptureContentTitle: '如果訊息裡有摘要、狀態列或裝飾程式碼',
+        floorCaptureContentHelp: '如果一層樓裡除了正文，還有摘要、屬性列、按鈕、程式碼區，最好讓模板作者把真正正文包在 content 標籤裡。這樣酒館筆記會優先只摘 content 裡面的文字。',
+        floorCaptureTroubleTitle: '如果摘錄結果不對',
+        floorCaptureTroubleHelp: '先看正文外面包著什麼標籤：如果是 <story>正文</story>，進階設定填 story；如果是 <div class="story">正文</div>，進階設定填 .story。改完後重新點「摘錄整層」。',
+        floorCaptureButton: '是否開啟整樓摘錄功能',
+        floorCaptureButtonTitle: '是否開啟每層樓右上角的「摘錄整層」按鈕',
+        floorCaptureButtonOn: '已開啟整層摘錄按鈕。',
+        floorCaptureButtonOff: '已關閉整層摘錄按鈕。',
+        floorCaptureSelectorLabel: '正文標籤名',
+        floorCaptureSelectorPlaceholder: 'content',
+        floorCaptureSelectorHelp: '只填標籤名，不要填尖括號。比如正文寫在 <story>正文</story> 裡，就填 story。',
+        floorCaptureSelectorSaved: '正文標籤已保存。',
+        floorCaptureSelectorCurrentDefault: '目前會優先摘取 <content> 標籤裡的正文。',
+        floorCaptureSelectorCurrentCustom: '目前會優先摘取 <{tag}> 標籤裡的正文。',
+        floorCaptureExampleTitle: '推薦寫法',
+        floorCaptureExample: '<content>這裡寫真正要摘錄的正文。</content>',
+        floorCaptureAdvanced: '修改正文標籤',
         launcherMode: '入口',
         toolbarButtons: '工具列',
         floatingBall: '懸浮球',
@@ -342,24 +436,29 @@ const TEXTS = {
         autoCaptureUserInputTitle: '自動記錄送出的 User 輸入',
         autoCaptureUserInputOn: '已開啟自動記錄 User 輸入。',
         autoCaptureUserInputOff: '已關閉自動記錄 User 輸入。',
+        selectionCaptureButton: '選區按鈕',
+        selectionCaptureButtonTitle: '選中文字後顯示浮動摘錄按鈕',
+        selectionCaptureButtonOn: '已開啟選區浮動摘錄按鈕。',
+        selectionCaptureButtonOff: '已關閉選區浮動摘錄按鈕。',
         noNotesHintNoUserInput: '選中聊天文字後點「摘錄選中」會保存摘抄。',
         noCharacterNotesHintNoUserInput: '摘錄聊天文字後，這裡會按角色彙總。',
         fromTavernNotes: '來自酒館筆記',
         brandForShare: '酒館筆記',
         excerptedAt: '摘錄於',
         openThemePanel: '打開主題面板：切換、匯入、匯出或編輯酒館筆記主題',
-        togglePageButtons: '顯示或隱藏側邊上下翻頁按鈕',
         close: '關閉',
-        showPageButtons: '顯示側邊上下翻頁按鈕',
-        hidePageButtons: '隱藏側邊上下翻頁按鈕',
-        pageButtonsShown: '已顯示側邊上下翻頁按鈕。',
-        pageButtonsHidden: '已隱藏側邊上下翻頁按鈕。',
         closeThemePanel: '關閉主題面板',
         switchTheme: '切換主題',
         importTheme: '匯入主題',
         exportCurrentTheme: '匯出目前主題',
         openThemeFolder: '打開主題資料夾',
         deleteTheme: '刪除主題',
+        builtInThemeCannotDelete: '內建主題不能刪除。',
+        appleThemeMode: '日夜',
+        appleThemeModeTitle: '切換 Apple Glass 日夜主題',
+        appleThemeDay: '切換到 Apple 日間',
+        appleThemeNight: '切換到 Apple 夜間',
+        appleThemeEnabled: '已切換 Apple Glass 主題。',
         previewTheme: '預覽：{name}',
         tempMergedTheme: '臨時融合：{name}',
         unnamedTheme: '未命名主題',
@@ -371,7 +470,7 @@ const TEXTS = {
         themeGuideContent: `主題 JSON 由 variables 和 assets 兩部分組成。
 
 variables 控制顏色、圓角、字體、卡片、按鈕和筆記樣式。
-assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
+assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預設圖示。
 
 融合目前酒館主題會讀取 SillyTavern 的主題變數，並產生一個臨時預覽。
 只有點擊「預覽並儲存」或「另存為」才會產生主題檔案。`,
@@ -408,8 +507,6 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         languageSaved: 'Language saved. Refresh the page to apply it.',
         appName: 'Tavern Notes',
         theme: 'Theme',
-        paging: 'Paging',
-        refreshNotes: 'Refresh notes',
         exportNotes: 'Export notes',
         closeNotes: 'Close Tavern Notes',
         searchPlaceholder: 'Search notes, characters, chats...',
@@ -501,6 +598,32 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         openNotes: 'Open Tavern Notes',
         captureSelected: 'Capture selected',
         captureSelectedTitle: 'Capture selected chat text',
+        captureFloor: 'Capture floor',
+        captureFloorTitle: 'Capture this whole message',
+        captureFloorEmpty: 'No message text found in this floor.',
+        floorCaptureEntry: 'Floor capture',
+        floorCaptureEntryTitle: 'Enable or configure whole-message floor capture',
+        floorCaptureSettingsTitle: 'Floor capture settings',
+        floorCaptureSettingsIntro: 'This adds a Capture floor button to each message. Normal chats need no setup; just turn it on.',
+        floorCaptureStepsTitle: 'How to use',
+        floorCaptureSteps: '1. Turn on floor capture.\n2. Return to the chat.\n3. Click Capture floor on the message you want to save.',
+        floorCaptureContentTitle: 'If a message has summaries, status text, or decorative code',
+        floorCaptureContentHelp: 'If one message contains body text plus summaries, status rows, buttons, or code blocks, ask the template author to wrap the real body text in a content tag. Tavern Notes will capture that first.',
+        floorCaptureTroubleTitle: 'If the capture is wrong',
+        floorCaptureTroubleHelp: 'Check what wraps the body text. For <story>text</story>, enter story in Advanced settings. For <div class="story">text</div>, enter .story. Then try Capture floor again.',
+        floorCaptureButton: 'Enable floor capture',
+        floorCaptureButtonTitle: 'Enable the Capture floor button on each message',
+        floorCaptureButtonOn: 'Floor capture buttons are on.',
+        floorCaptureButtonOff: 'Floor capture buttons are off.',
+        floorCaptureSelectorLabel: 'Body tag name',
+        floorCaptureSelectorPlaceholder: 'content',
+        floorCaptureSelectorHelp: 'Enter only the tag name, without angle brackets. If the body is in <story>text</story>, enter story.',
+        floorCaptureSelectorSaved: 'Body tag saved.',
+        floorCaptureSelectorCurrentDefault: 'Currently captures <content> first.',
+        floorCaptureSelectorCurrentCustom: 'Currently captures <{tag}> first.',
+        floorCaptureExampleTitle: 'Recommended markup',
+        floorCaptureExample: '<content>Write the body text to capture here.</content>',
+        floorCaptureAdvanced: 'Change body tag',
         launcherMode: 'Launcher',
         toolbarButtons: 'Toolbar',
         floatingBall: 'Floating ball',
@@ -511,19 +634,16 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         autoCaptureUserInputTitle: 'Automatically record sent User inputs',
         autoCaptureUserInputOn: 'Automatic User input recording is on.',
         autoCaptureUserInputOff: 'Automatic User input recording is off.',
+        selectionCaptureButton: 'Selection button',
+        selectionCaptureButtonTitle: 'Show a floating capture button after selecting text',
+        selectionCaptureButtonOn: 'Floating selection capture button is on.',
+        selectionCaptureButtonOff: 'Floating selection capture button is off.',
         noNotesHintNoUserInput: 'Select chat text, then click Capture selected to save an excerpt.',
         noCharacterNotesHintNoUserInput: 'Captured excerpts will be grouped by character here.',
-        scrollUp: 'Page up',
-        scrollDown: 'Page down',
-        showPageButtons: 'Show side page buttons',
-        hidePageButtons: 'Hide side page buttons',
-        pageButtonsShown: 'Side page buttons shown.',
-        pageButtonsHidden: 'Side page buttons hidden.',
         fromTavernNotes: 'From Tavern Notes',
         brandForShare: 'Tavern Notes',
         excerptedAt: 'excerpted on',
         openThemePanel: 'Open the theme panel to switch, import, export, or edit Tavern Notes themes',
-        togglePageButtons: 'Show or hide the side page buttons',
         close: 'Close',
         closeThemePanel: 'Close theme panel',
         switchTheme: 'Switch theme',
@@ -531,6 +651,12 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         exportCurrentTheme: 'Export current theme',
         openThemeFolder: 'Open theme folder',
         deleteTheme: 'Delete theme',
+        builtInThemeCannotDelete: 'Built-in themes cannot be deleted.',
+        appleThemeMode: 'Day/Night',
+        appleThemeModeTitle: 'Toggle Apple Glass day/night theme',
+        appleThemeDay: 'Switch to Apple Day',
+        appleThemeNight: 'Switch to Apple Night',
+        appleThemeEnabled: 'Apple Glass theme switched.',
         previewTheme: 'Preview: {name}',
         tempMergedTheme: 'Temporary merge: {name}',
         unnamedTheme: 'Untitled theme',
@@ -542,7 +668,7 @@ assets 控制標題圖示、輸入列圖示、摘錄圖示和背景圖。
         themeGuideContent: `Theme JSON has two main sections: variables and assets.
 
 variables control colors, radius, fonts, cards, buttons, and note styles.
-assets control the header icon, input-bar icon, capture icon, and background image.
+assets control the header icon and background image; the input-bar and capture buttons use fixed default icons.
 
 Merge current Tavern theme reads SillyTavern theme variables and creates a temporary preview.
 Click Preview & save or Save as to create a theme file.`,
@@ -579,8 +705,6 @@ Click Preview & save or Save as to create a theme file.`,
         languageSaved: '언어가 저장되었습니다. 페이지를 새로고침하면 적용됩니다.',
         appName: '술집 노트',
         theme: '테마',
-        paging: '페이지',
-        refreshNotes: '노트 새로고침',
         exportNotes: '노트 내보내기',
         closeNotes: '술집 노트 닫기',
         searchPlaceholder: '노트, 캐릭터, 채팅 검색...',
@@ -672,6 +796,32 @@ Click Preview & save or Save as to create a theme file.`,
         openNotes: '술집 노트 열기',
         captureSelected: '선택 발췌',
         captureSelectedTitle: '선택한 채팅 글 발췌',
+        captureFloor: '전체 발췌',
+        captureFloorTitle: '이 메시지 전체를 발췌',
+        captureFloorEmpty: '이 메시지의 본문을 찾지 못했습니다.',
+        floorCaptureEntry: '전체 발췌',
+        floorCaptureEntryTitle: '전체 메시지 발췌 기능 켜기 및 설정',
+        floorCaptureSettingsTitle: '전체 발췌 설정',
+        floorCaptureSettingsIntro: '각 메시지에 전체 발췌 버튼을 추가합니다. 일반 채팅은 설정 없이 켜기만 하면 됩니다.',
+        floorCaptureStepsTitle: '사용 방법',
+        floorCaptureSteps: '1. 전체 발췌 기능을 켭니다.\n2. 채팅으로 돌아갑니다.\n3. 저장할 메시지의 전체 발췌 버튼을 누릅니다.',
+        floorCaptureContentTitle: '본문 태그 이름이란?',
+        floorCaptureContentHelp: '한 메시지에 요약, 상태 줄, 버튼, 코드 블록이 있으면 실제 본문을 하나의 태그로 감싸 달라고 템플릿 작성자에게 요청하세요. 예: <content>본문</content>이면 태그 이름은 content입니다.',
+        floorCaptureTroubleTitle: '발췌 결과가 이상할 때',
+        floorCaptureTroubleHelp: '템플릿 작성자에게 본문을 감싼 태그 이름을 물어보세요. 그 태그 이름을 “본문 태그 변경”에 입력합니다. 예: <story>본문</story>이면 story를 입력하고 저장한 뒤 다시 전체 발췌를 누릅니다.',
+        floorCaptureButton: '전체 발췌 기능 켜기',
+        floorCaptureButtonTitle: '각 메시지의 전체 발췌 버튼 켜기',
+        floorCaptureButtonOn: '전체 발췌 버튼을 켰습니다.',
+        floorCaptureButtonOff: '전체 발췌 버튼을 껐습니다.',
+        floorCaptureSelectorLabel: '본문 태그 이름',
+        floorCaptureSelectorPlaceholder: 'content',
+        floorCaptureSelectorHelp: '꺾쇠괄호 없이 태그 이름만 입력하세요. 본문이 <story>본문</story> 안에 있으면 story를 입력합니다.',
+        floorCaptureSelectorSaved: '본문 태그를 저장했습니다.',
+        floorCaptureSelectorCurrentDefault: '현재 <content> 태그를 우선 발췌합니다.',
+        floorCaptureSelectorCurrentCustom: '현재 <{tag}> 태그를 우선 발췌합니다.',
+        floorCaptureExampleTitle: '권장 형식',
+        floorCaptureExample: '<content>발췌할 실제 본문을 여기에 씁니다.</content>',
+        floorCaptureAdvanced: '본문 태그 변경',
         launcherMode: '실행 버튼',
         toolbarButtons: '도구막대',
         floatingBall: '플로팅 버튼',
@@ -684,17 +834,10 @@ Click Preview & save or Save as to create a theme file.`,
         autoCaptureUserInputOff: 'User 입력 자동 기록을 껐습니다.',
         noNotesHintNoUserInput: '채팅 글을 선택한 뒤 “선택 발췌”를 눌러 발췌를 저장하세요.',
         noCharacterNotesHintNoUserInput: '발췌한 채팅 글은 캐릭터별로 여기에 정리됩니다.',
-        scrollUp: '한 페이지 위로',
-        scrollDown: '한 페이지 아래로',
-        showPageButtons: '측면 페이지 버튼 보이기',
-        hidePageButtons: '측면 페이지 버튼 숨기기',
-        pageButtonsShown: '측면 페이지 버튼을 표시했습니다.',
-        pageButtonsHidden: '측면 페이지 버튼을 숨겼습니다.',
         fromTavernNotes: '술집 노트에서',
         brandForShare: '술집 노트',
         excerptedAt: '발췌일',
         openThemePanel: '테마 패널 열기: 술집 노트 테마를 전환, 가져오기, 내보내기, 편집합니다',
-        togglePageButtons: '측면 페이지 버튼 보이기/숨기기',
         close: '닫기',
         closeThemePanel: '테마 패널 닫기',
         switchTheme: '테마 전환',
@@ -713,7 +856,7 @@ Click Preview & save or Save as to create a theme file.`,
         themeGuideContent: `테마 JSON은 variables와 assets 두 부분으로 구성됩니다.
 
 variables는 색상, 둥근 모서리, 글꼴, 카드, 버튼, 노트 스타일을 제어합니다.
-assets는 제목 아이콘, 입력창 아이콘, 발췌 아이콘, 배경 이미지를 제어합니다.
+assets는 제목 아이콘과 배경 이미지를 제어합니다. 입력창과 발췌 버튼은 고정 기본 아이콘을 사용합니다.
 
 현재 술집 테마 병합은 SillyTavern 테마 변수를 읽어 임시 미리보기를 만듭니다.
 미리보기 후 저장 또는 다른 이름으로 저장을 눌러야 테마 파일이 생성됩니다.`,
@@ -871,6 +1014,102 @@ const SHARE_CARD_THEMES = [
 
 const SHARE_CARD_BACKGROUNDS = ['#eef7f2', '#f4f0e5', '#fff4ec', '#edf2ff', '#f2e4b8', '#ffffff', '#1f1f1f', '#203b2a', '#182235', '#3a2330'];
 
+const APPLE_GLASS_DAY_VARIABLES = {
+    '--tn-apple-mode': 'day',
+    '--tn-paper': '#f5f5f7',
+    '--tn-paper-2': '#ffffff',
+    '--tn-ink': '#1d1d1f',
+    '--tn-muted': '#6e6e73',
+    '--tn-line': 'rgba(0, 0, 0, 0.09)',
+    '--tn-gold': '#007aff',
+    '--tn-gold-2': '#34c759',
+    '--tn-shadow-dark': 'rgba(0, 0, 0, 0.12)',
+    '--tn-shadow-light': 'rgba(255, 255, 255, 0.72)',
+    '--tn-panel-border': 'rgba(255, 255, 255, 0.72)',
+    '--tn-control-bg': 'rgba(255, 255, 255, 0.64)',
+    '--tn-control-bg-hover': 'rgba(255, 255, 255, 0.88)',
+    '--tn-control-inset-bg': 'rgba(255, 255, 255, 0.72)',
+    '--tn-control-inset-shadow': 'inset 0 0 0 1px rgba(255, 255, 255, 0.78)',
+    '--tn-card-bg': 'rgba(255, 255, 255, 0.58)',
+    '--tn-card-bg-active': 'linear-gradient(135deg, rgba(0, 122, 255, 0.12), rgba(255, 255, 255, 0.84))',
+    '--tn-card-active-shadow': '0 0 0 1px rgba(0, 122, 255, 0.18), 0 16px 36px rgba(0, 0, 0, 0.10)',
+    '--tn-icon-bg': 'rgba(255, 255, 255, 0.74)',
+    '--tn-action-bg': 'rgba(255, 255, 255, 0.68)',
+    '--tn-overlay-bg': 'rgba(245, 245, 247, 0.72)',
+    '--tn-fade-bg': 'linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.78) 34%, rgba(255, 255, 255, 0.96))',
+    '--tn-card-image': 'radial-gradient(circle at 12% 10%, rgba(0, 122, 255, 0.10), transparent 34%), radial-gradient(circle at 88% 4%, rgba(52, 199, 89, 0.10), transparent 30%)',
+    '--tn-em': '#86868b',
+    '--tn-underline': '#007aff',
+    '--tn-quote': '#007aff',
+    '--tn-panel-glow': 'rgba(0, 122, 255, 0.12)',
+    '--tn-scrollbar-thumb': 'rgba(0, 122, 255, 0.48)',
+    '--tn-scrollbar-track': 'rgba(0, 0, 0, 0.05)',
+    '--tn-mini-button-bg': 'rgba(255, 255, 255, 0.68)',
+    '--tn-mini-button-hover-bg': 'rgba(255, 255, 255, 0.92)',
+    '--tn-filter-icon-border': 'rgba(255, 255, 255, 0.82)',
+    '--tn-inline-action-hover-bg': 'rgba(0, 122, 255, 0.08)',
+    '--tn-inline-icon-bg': 'rgba(255, 255, 255, 0.74)',
+    '--tn-inline-icon-hover-bg': 'rgba(0, 122, 255, 0.10)',
+    '--tn-note-border': '1px solid rgba(255, 255, 255, 0.72)',
+    '--tn-note-type-bg': 'rgba(0, 122, 255, 0.10)',
+    '--tn-note-type-color': '#0066cc',
+    '--tn-note-type-user-bg': 'rgba(0, 122, 255, 0.10)',
+    '--tn-note-type-user-color': '#0066cc',
+    '--tn-note-type-excerpt-bg': 'rgba(52, 199, 89, 0.11)',
+    '--tn-note-type-excerpt-color': '#1f7a35',
+    '--tn-note-accent-user': '#007aff',
+    '--tn-note-accent-excerpt': '#34c759',
+    '--tn-inset-light': 'rgba(255, 255, 255, 0.82)',
+};
+
+const APPLE_GLASS_NIGHT_VARIABLES = {
+    '--tn-apple-mode': 'night',
+    '--tn-paper': '#16181d',
+    '--tn-paper-2': '#20232b',
+    '--tn-ink': '#f5f5f7',
+    '--tn-muted': '#a1a1a6',
+    '--tn-line': 'rgba(255, 255, 255, 0.14)',
+    '--tn-gold': '#64d2ff',
+    '--tn-gold-2': '#30d158',
+    '--tn-shadow-dark': 'rgba(0, 0, 0, 0.42)',
+    '--tn-shadow-light': 'rgba(255, 255, 255, 0.05)',
+    '--tn-panel-border': 'rgba(255, 255, 255, 0.16)',
+    '--tn-control-bg': 'rgba(255, 255, 255, 0.08)',
+    '--tn-control-bg-hover': 'rgba(255, 255, 255, 0.13)',
+    '--tn-control-inset-bg': 'rgba(255, 255, 255, 0.07)',
+    '--tn-control-inset-shadow': 'inset 0 0 0 1px rgba(255, 255, 255, 0.09)',
+    '--tn-card-bg': 'rgba(255, 255, 255, 0.075)',
+    '--tn-card-bg-active': 'linear-gradient(135deg, rgba(100, 210, 255, 0.20), rgba(255, 255, 255, 0.08))',
+    '--tn-card-active-shadow': '0 0 0 1px rgba(100, 210, 255, 0.26), 0 12px 30px rgba(0, 0, 0, 0.28)',
+    '--tn-icon-bg': 'rgba(255, 255, 255, 0.10)',
+    '--tn-action-bg': 'rgba(255, 255, 255, 0.08)',
+    '--tn-overlay-bg': 'rgba(22, 24, 29, 0.74)',
+    '--tn-fade-bg': 'linear-gradient(90deg, rgba(32, 35, 43, 0), rgba(32, 35, 43, 0.78) 34%, rgba(32, 35, 43, 0.96))',
+    '--tn-card-image': 'radial-gradient(circle at 12% 10%, rgba(100, 210, 255, 0.12), transparent 34%), radial-gradient(circle at 88% 4%, rgba(48, 209, 88, 0.08), transparent 30%)',
+    '--tn-em': '#c7c7cc',
+    '--tn-underline': '#64d2ff',
+    '--tn-quote': '#64d2ff',
+    '--tn-panel-glow': 'rgba(100, 210, 255, 0.18)',
+    '--tn-scrollbar-thumb': 'rgba(100, 210, 255, 0.64)',
+    '--tn-scrollbar-track': 'rgba(255, 255, 255, 0.06)',
+    '--tn-mini-button-bg': 'rgba(255, 255, 255, 0.08)',
+    '--tn-mini-button-hover-bg': 'rgba(255, 255, 255, 0.14)',
+    '--tn-filter-icon-border': 'rgba(255, 255, 255, 0.12)',
+    '--tn-inline-action-hover-bg': 'rgba(255, 255, 255, 0.08)',
+    '--tn-inline-icon-bg': 'rgba(255, 255, 255, 0.10)',
+    '--tn-inline-icon-hover-bg': 'rgba(100, 210, 255, 0.16)',
+    '--tn-note-border': '1px solid rgba(255, 255, 255, 0.12)',
+    '--tn-note-type-bg': 'rgba(100, 210, 255, 0.16)',
+    '--tn-note-type-color': '#9cdcfe',
+    '--tn-note-type-user-bg': 'rgba(100, 210, 255, 0.16)',
+    '--tn-note-type-user-color': '#9cdcfe',
+    '--tn-note-type-excerpt-bg': 'rgba(48, 209, 88, 0.14)',
+    '--tn-note-type-excerpt-color': '#8ee99b',
+    '--tn-note-accent-user': '#64d2ff',
+    '--tn-note-accent-excerpt': '#30d158',
+    '--tn-inset-light': 'rgba(255, 255, 255, 0.10)',
+};
+
 const THEME_GUIDE = `主题文件说明
 
 主题 JSON 由 variables 和 assets 两部分组成。
@@ -885,8 +1124,7 @@ variables 分区：
 
 assets 分区：
 brandIcon 控制面板标题图标。
-openIcon 控制输入栏上的酒馆笔记图标。
-captureIcon 控制摘录按钮图标。
+输入栏上的酒馆笔记图标和摘录按钮图标为固定默认图标，不随主题变化。
 backgroundImage 可填空、url(...) 或 CSS 渐变。
 
 融合当前酒馆主题时读取的 SillyTavern 变量：
@@ -1092,8 +1330,10 @@ function saveLocalSettings() {
         language: state.language,
         launcherMode: state.launcherMode,
         autoCaptureUserInput: state.autoCaptureUserInput,
-        showPageDownButton: state.showPageDownButton,
-        scrollButtonsTop: state.scrollButtonsTop,
+        showSelectionCaptureButton: state.showSelectionCaptureButton,
+        showFloorCaptureButton: state.showFloorCaptureButton,
+        floorCaptureSelector: state.floorCaptureSelector,
+        appleGlassMode: state.appleGlassMode,
         currentUserName: state.currentUserName,
         shareCard: state.shareCardSettings,
     }));
@@ -1102,30 +1342,14 @@ function saveLocalSettings() {
 function saveLanguageSetting(language) {
     state.language = ['auto', 'zh-CN', 'zh-TW', 'en', 'ko'].includes(language) ? language : 'auto';
     saveLocalSettings();
-    updatePageDownSettingButton();
     updateAutoCaptureUserInputButton();
-    updateScrollButtonLabels();
+    updateSelectionCaptureButtonSetting();
+    updateFloorCaptureButtonSetting();
+    updateFloorCaptureSelectorInput();
+    updateAppleThemeModeButton();
     updateLauncherModeButton();
     updateFloatingLauncher();
     notify(t('languageSaved'), 'success');
-}
-
-function updatePageDownSettingButton() {
-    const button = document.querySelector('#tavern-notes-page-down-setting');
-    if (!button) return;
-    button.classList.toggle('active', state.showPageDownButton);
-    const label = state.showPageDownButton ? t('hidePageButtons') : t('showPageButtons');
-    button.title = label;
-    button.setAttribute('aria-label', label);
-}
-
-function togglePageDownButtonSetting() {
-    state.showPageDownButton = !state.showPageDownButton;
-    saveLocalSettings();
-    updatePageDownSettingButton();
-    updateScrollButtonsVisibility();
-    updateScrollButtonLabels();
-    notify(state.showPageDownButton ? t('pageButtonsShown') : t('pageButtonsHidden'), 'success');
 }
 
 function getVisibleFilters() {
@@ -1153,6 +1377,130 @@ function toggleAutoCaptureUserInput() {
     renderFilterTabs();
     refreshNotes();
     notify(state.autoCaptureUserInput ? t('autoCaptureUserInputOn') : t('autoCaptureUserInputOff'), 'success');
+}
+
+function updateSelectionCaptureButtonSetting() {
+    const button = document.querySelector('#tavern-notes-selection-capture-setting');
+    if (!button) return;
+    button.classList.toggle('active', state.showSelectionCaptureButton);
+    const label = t('selectionCaptureButtonTitle');
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.querySelector('span')?.replaceChildren(document.createTextNode(t('selectionCaptureButton')));
+}
+
+function toggleSelectionCaptureButtonSetting() {
+    state.showSelectionCaptureButton = !state.showSelectionCaptureButton;
+    saveLocalSettings();
+    updateSelectionCaptureButtonSetting();
+    if (!state.showSelectionCaptureButton) hideSelectionCaptureButton();
+    notify(state.showSelectionCaptureButton ? t('selectionCaptureButtonOn') : t('selectionCaptureButtonOff'), 'success');
+}
+
+function updateFloorCaptureButtonSetting() {
+    const button = document.querySelector('#tavern-notes-floor-capture-setting');
+    if (button) {
+        button.classList.toggle('active', state.showFloorCaptureButton);
+        const label = t('floorCaptureButtonTitle');
+        button.title = label;
+        button.setAttribute('aria-label', label);
+        button.querySelector('span')?.replaceChildren(document.createTextNode(t('floorCaptureButton')));
+    }
+    updateFloorCaptureEntryButton();
+}
+
+function updateFloorCaptureEntryButton() {
+    const button = document.querySelector('#tavern-notes-floor-capture-open');
+    if (!button) return;
+    button.classList.toggle('active', state.showFloorCaptureButton);
+    const label = t('floorCaptureEntryTitle');
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.querySelector('span')?.replaceChildren(document.createTextNode(t('floorCaptureEntry')));
+}
+
+function updateFloorCaptureSelectorInput() {
+    const input = document.querySelector('#tavern-notes-floor-capture-selector');
+    if (input) {
+        input.value = getFloorCaptureTagName();
+        input.placeholder = t('floorCaptureSelectorPlaceholder');
+    }
+    updateFloorCaptureSelectorSummary();
+}
+
+function selectorFromFloorCaptureTag(value) {
+    let tag = String(value || '').trim();
+    tag = tag.replace(/^<\s*/, '').replace(/\s*>$/, '').replace(/^\/+/, '').trim();
+    if (!tag) return DEFAULT_FLOOR_CAPTURE_SELECTOR;
+    if (/[,.[#\s>:]/.test(tag)) return tag;
+    return `${tag}, .${tag}, [data-tavern-notes-content], [data-note-content], .mes_text`;
+}
+
+function getFloorCaptureTagName() {
+    const selector = String(state.floorCaptureSelector || DEFAULT_FLOOR_CAPTURE_SELECTOR).trim();
+    if (selector === DEFAULT_FLOOR_CAPTURE_SELECTOR) return DEFAULT_FLOOR_CAPTURE_TAG;
+    const first = selector.split(',')[0]?.trim() || DEFAULT_FLOOR_CAPTURE_TAG;
+    if (first.startsWith('.')) return first.slice(1);
+    const match = first.match(/^([a-zA-Z][\w-]*)$/);
+    return match ? match[1] : first;
+}
+
+function updateFloorCaptureSelectorSummary() {
+    const summary = document.querySelector('#tavern-notes-floor-capture-selector-summary');
+    if (!summary) return;
+    const selector = String(state.floorCaptureSelector || DEFAULT_FLOOR_CAPTURE_SELECTOR).trim();
+    const isDefault = selector === DEFAULT_FLOOR_CAPTURE_SELECTOR;
+    summary.textContent = isDefault
+        ? t('floorCaptureSelectorCurrentDefault')
+        : t('floorCaptureSelectorCurrentCustom', { tag: getFloorCaptureTagName(), selector });
+}
+
+function removeFloorCaptureButtons() {
+    document.querySelectorAll('.tn-floor-capture').forEach(button => button.remove());
+}
+
+function stopFloorCaptureWatcher() {
+    state.floorCaptureObserver?.disconnect();
+    state.floorCaptureObserver = null;
+    removeFloorCaptureButtons();
+}
+
+function toggleFloorCaptureButtonSetting() {
+    state.showFloorCaptureButton = !state.showFloorCaptureButton;
+    saveLocalSettings();
+    updateFloorCaptureButtonSetting();
+    if (state.showFloorCaptureButton) {
+        watchChatMessages();
+    } else {
+        stopFloorCaptureWatcher();
+    }
+    notify(state.showFloorCaptureButton ? t('floorCaptureButtonOn') : t('floorCaptureButtonOff'), 'success');
+}
+
+function saveFloorCaptureSelector(value, silent = false) {
+    const next = selectorFromFloorCaptureTag(value);
+    state.floorCaptureSelector = next;
+    saveLocalSettings();
+    updateFloorCaptureSelectorInput();
+    if (state.showFloorCaptureButton) addFloorCaptureButtons();
+    document.querySelector('.tn-floor-capture-advanced')?.removeAttribute('open');
+    if (!silent) notify(t('floorCaptureSelectorSaved'), 'success');
+}
+
+function openFloorCaptureMenu() {
+    const menu = document.querySelector('#tavern-notes-floor-capture-menu');
+    if (!menu) return;
+    updateFloorCaptureButtonSetting();
+    updateFloorCaptureSelectorInput();
+    menu.classList.add('open');
+    menu.setAttribute('aria-hidden', 'false');
+}
+
+function closeFloorCaptureMenu() {
+    const menu = document.querySelector('#tavern-notes-floor-capture-menu');
+    if (!menu) return;
+    menu.classList.remove('open');
+    menu.setAttribute('aria-hidden', 'true');
 }
 
 function htmlEscape(value) {
@@ -1445,13 +1793,14 @@ function renderNoteArticles() {
         const activeNote = getActiveVariant(note);
         const created = activeNote.createdAt ? new Date(activeNote.createdAt).toLocaleString() : '';
         const messageId = activeNote.chat?.messageId ?? note.chat?.messageId ?? '-';
+        const chatName = activeNote.chat?.name || note.chat?.name || '';
         return `
-            <article class="tn-note tn-note-${htmlEscape(noteTypeClass(note.type))}" data-note-id="${htmlEscape(note.id)}">
+            <article class="tn-note tn-note-${htmlEscape(noteTypeClass(note.type))}" data-note-id="${htmlEscape(note.id)}" data-chat-name="${htmlEscape(chatName)}">
                 ${renderVariantControls(note)}
                 <div class="tn-note-topline">
                     <span class="tn-note-type">${htmlEscape(noteTypeLabel(note.type))}</span>
                     <span class="tn-note-character">${htmlEscape(note.character?.name || t('unnamedCharacter'))}</span>
-                    <span class="tn-note-muted">${htmlEscape(activeNote.chat?.name || note.chat?.name || '')}</span>
+                    <span class="tn-note-muted">${htmlEscape(chatName)}</span>
                     <span class="tn-note-muted">#${htmlEscape(messageId)}</span>
                     <span class="tn-note-time">${htmlEscape(created)}</span>
                 </div>
@@ -1570,12 +1919,12 @@ async function saveNote(payload) {
 }
 
 async function captureSelection() {
-    const selection = window.getSelection();
-    const currentText = selection?.toString()?.trim();
+    const currentSnapshot = getCurrentSelectionSnapshot();
     const cached = state.lastSelection;
     const canUseCached = cached?.text && Date.now() - cached.time < 10 * 60 * 1000;
-    const selected = currentText || (canUseCached ? cached.text : '');
-    const messageId = currentText ? getSelectionMessageId(selection) : cached?.messageId;
+    const selected = currentSnapshot?.text || (canUseCached ? cached.text : '');
+    const messageId = currentSnapshot ? currentSnapshot.messageId : cached?.messageId;
+    const source = currentSnapshot?.source || cached?.source || 'selected_text';
 
     if (!selected) {
         notify(t('selectTextFirst'));
@@ -1591,7 +1940,107 @@ async function captureSelection() {
             name: getChatName(),
             messageId,
         },
-        source: 'selected_text',
+        source,
+    });
+    notify(t('captured'), 'success');
+    dismissSelectionCaptureButton();
+}
+
+function getMessageIdFromElement(messageElement) {
+    const raw = messageElement?.getAttribute?.('mesid') || messageElement?.dataset?.mesid;
+    if (raw === undefined || raw === null || raw === '') return null;
+    const numeric = Number(raw);
+    return Number.isFinite(numeric) ? numeric : raw;
+}
+
+function htmlToPlainText(value) {
+    const element = document.createElement('div');
+    element.innerHTML = String(value || '');
+    return element.innerText || element.textContent || '';
+}
+
+function normalizeCapturedFloorText(value) {
+    return String(value || '')
+        .replace(/\u00a0/g, ' ')
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean)
+        .join('\n')
+        .trim();
+}
+
+function getFloorCaptureSelectors() {
+    const selectors = String(state.floorCaptureSelector || DEFAULT_FLOOR_CAPTURE_SELECTOR)
+        .split(',')
+        .map(selector => selector.trim())
+        .filter(Boolean);
+    return selectors.length ? selectors : DEFAULT_FLOOR_CAPTURE_SELECTOR.split(',').map(selector => selector.trim());
+}
+
+function getCleanElementText(element) {
+    if (!element) return '';
+    if (element.matches?.(FLOOR_CAPTURE_EXCLUDE_SELECTOR)) return '';
+    const clone = element.cloneNode(true);
+    clone.querySelectorAll?.(FLOOR_CAPTURE_EXCLUDE_SELECTOR).forEach(child => child.remove());
+    clone.querySelectorAll?.('[hidden], [aria-hidden="true"], .displayNone, .hidden').forEach(child => child.remove());
+    return normalizeCapturedFloorText(clone.innerText || clone.textContent || '');
+}
+
+function queryFloorContentCandidates(messageElement) {
+    for (const selector of getFloorCaptureSelectors()) {
+        let matches = [];
+        try {
+            matches = Array.from(messageElement.querySelectorAll?.(selector) || []);
+        } catch {
+            continue;
+        }
+        const texts = matches
+            .map(getCleanElementText)
+            .filter(Boolean);
+        if (texts.length) return texts;
+    }
+    return [];
+}
+
+function getMessageTextFromElement(messageElement) {
+    if (!messageElement) return '';
+    const candidates = queryFloorContentCandidates(messageElement);
+    if (candidates.length) return candidates.join('\n\n');
+    const fallback = messageElement.querySelector?.('.mes_text') || messageElement.querySelector?.('.mes_block') || messageElement;
+    return getCleanElementText(fallback);
+}
+
+function getMessageCharacterForCapture(messageId) {
+    const current = getCurrentCharacter();
+    const message = chat?.[messageId];
+    if (!message || message.is_user) return current;
+    return {
+        ...current,
+        name: message.name || current.name,
+    };
+}
+
+async function captureMessageFloor(messageElement) {
+    const messageId = getMessageIdFromElement(messageElement);
+    const message = messageId !== null ? chat?.[messageId] : null;
+    const content = getMessageTextFromElement(messageElement)
+        || htmlToPlainText(message?.mes || '').trim();
+
+    if (!content) {
+        notify(t('captureFloorEmpty'), 'warning');
+        return;
+    }
+
+    await saveNote({
+        type: 'excerpt',
+        content,
+        character: getMessageCharacterForCapture(messageId),
+        chat: {
+            id: getChatName(),
+            name: getChatName(),
+            messageId,
+        },
+        source: 'message_floor',
     });
     notify(t('captured'), 'success');
 }
@@ -1614,14 +2063,253 @@ function getSelectionMessageId(selection = window.getSelection()) {
 }
 
 function rememberSelection() {
-    const selection = window.getSelection();
-    const text = selection?.toString()?.trim();
-    if (!text) return;
+    if (!state.showSelectionCaptureButton) return;
+    const snapshot = getCurrentSelectionSnapshot();
+    if (!snapshot?.text) {
+        hideSelectionCaptureButton();
+        return;
+    }
     state.lastSelection = {
-        text,
-        messageId: getSelectionMessageId(selection),
+        ...snapshot,
         time: Date.now(),
     };
+    scheduleSelectionCaptureButton();
+}
+
+function selectionIsInsideIgnoredElement(selection = window.getSelection()) {
+    if (!selection || selection.rangeCount === 0) return true;
+    const nodes = [selection.anchorNode, selection.focusNode];
+    return nodes.some(startNode => {
+        let node = startNode;
+        while (node && node !== document.body) {
+            const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+            if (element?.closest?.('#tavern-notes-panel, #tavern-notes-selection-capture, select')) {
+                return true;
+            }
+            node = node.parentNode;
+        }
+        return false;
+    });
+}
+
+function getActiveInputSelection() {
+    return getInputSelectionFromElement(document.activeElement);
+}
+
+function getInputSelectionFromElement(element, frameRect = null) {
+    const tagName = String(element?.tagName || '').toUpperCase();
+    if (!['INPUT', 'TEXTAREA'].includes(tagName)) return null;
+    if (element.closest('#tavern-notes-panel, #tavern-notes-selection-capture')) return null;
+    if (typeof element.selectionStart !== 'number' || typeof element.selectionEnd !== 'number') return null;
+    const start = Math.min(element.selectionStart, element.selectionEnd);
+    const end = Math.max(element.selectionStart, element.selectionEnd);
+    const text = String(element.value || '').slice(start, end).trim();
+    if (!text) return null;
+    const rect = offsetRect(element.getBoundingClientRect(), frameRect);
+    return {
+        text,
+        messageId: null,
+        source: element === getInputBox() || element.closest('#send_form') ? 'input_selection' : 'selected_text',
+        rect,
+    };
+}
+
+function offsetRect(rect, offset = null) {
+    if (!rect || !offset) return rect;
+    return {
+        left: rect.left + offset.left,
+        right: rect.right + offset.left,
+        top: rect.top + offset.top,
+        bottom: rect.bottom + offset.top,
+        width: rect.width,
+        height: rect.height,
+    };
+}
+
+function getSelectionRect(selection = window.getSelection(), offset = null) {
+    if (!selection || selection.rangeCount === 0) return null;
+    const range = selection.getRangeAt(selection.rangeCount - 1);
+    const rects = Array.from(range.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0);
+    return offsetRect(rects.at(-1) || range.getBoundingClientRect(), offset);
+}
+
+function getRootSelection(root) {
+    try {
+        if (!root) return null;
+        if (typeof root.getSelection === 'function') return root.getSelection();
+        if (root.defaultView?.getSelection) return root.defaultView.getSelection();
+        if (root.ownerDocument?.defaultView?.getSelection) return root.ownerDocument.defaultView.getSelection();
+    } catch {
+        return null;
+    }
+    return null;
+}
+
+function getSelectionSnapshotFromSelection(selection, offset = null) {
+    const text = selection?.toString()?.trim();
+    if (!text || selectionIsInsideIgnoredElement(selection)) return null;
+    return {
+        text,
+        messageId: getSelectionMessageId(selection),
+        source: 'selected_text',
+        rect: getSelectionRect(selection, offset),
+    };
+}
+
+function getFrameSelectionSnapshot(frame) {
+    try {
+        const frameRect = frame.getBoundingClientRect();
+        const doc = frame.contentDocument;
+        const win = frame.contentWindow;
+        const inputSelection = getInputSelectionFromElement(doc?.activeElement, frameRect);
+        if (inputSelection) return inputSelection;
+        return getSelectionSnapshotFromSelection(win?.getSelection?.(), frameRect);
+    } catch {
+        return null;
+    }
+}
+
+function getCurrentSelectionSnapshot() {
+    const inputSelection = getActiveInputSelection();
+    if (inputSelection) return inputSelection;
+
+    const roots = [
+        state.lastSelectionRoot,
+        document,
+        window,
+    ].filter(Boolean);
+    for (const root of roots) {
+        const snapshot = getSelectionSnapshotFromSelection(getRootSelection(root));
+        if (snapshot) return snapshot;
+    }
+
+    for (const frame of document.querySelectorAll('iframe')) {
+        const snapshot = getFrameSelectionSnapshot(frame);
+        if (snapshot) return snapshot;
+    }
+    return null;
+}
+
+function ensureSelectionCaptureButton() {
+    let button = document.querySelector('#tavern-notes-selection-capture');
+    if (button) return button;
+    button = document.createElement('button');
+    button.id = 'tavern-notes-selection-capture';
+    button.className = 'tn-selection-capture';
+    button.type = 'button';
+    button.innerHTML = `<i class="fa-solid fa-highlighter"></i><span>${htmlEscape(t('captureSelected'))}</span>`;
+    button.addEventListener('mousedown', event => event.preventDefault());
+    button.addEventListener('click', event => {
+        event.preventDefault();
+        captureSelection().catch(error => notify(error.message, 'error'));
+        dismissSelectionCaptureButton();
+    });
+    document.body.append(button);
+    return button;
+}
+
+function hideSelectionCaptureButton() {
+    document.querySelector('#tavern-notes-selection-capture')?.classList.remove('show');
+}
+
+function dismissSelectionCaptureButton() {
+    state.lastSelection = null;
+    clearTimeout(state.selectionButtonTimer);
+    hideSelectionCaptureButton();
+    try {
+        window.getSelection()?.removeAllRanges();
+    } catch {
+        // Some embedded selections cannot be cleared from the parent page.
+    }
+    setTimeout(hideSelectionCaptureButton, 120);
+}
+
+function updateSelectionCaptureButton() {
+    if (!state.showSelectionCaptureButton) {
+        hideSelectionCaptureButton();
+        return;
+    }
+    const snapshot = getCurrentSelectionSnapshot();
+    if (!snapshot?.text) {
+        hideSelectionCaptureButton();
+        return;
+    }
+    const rect = snapshot.rect;
+    if (!rect || (!rect.width && !rect.height)) {
+        hideSelectionCaptureButton();
+        return;
+    }
+    const button = ensureSelectionCaptureButton();
+    button.title = t('captureSelectedTitle');
+    button.setAttribute('aria-label', t('captureSelectedTitle'));
+    button.querySelector('span')?.replaceChildren(document.createTextNode(t('captureSelected')));
+
+    const margin = 8;
+    const buttonWidth = button.offsetWidth || 92;
+    const buttonHeight = button.offsetHeight || 34;
+    const left = Math.min(
+        Math.max(rect.right + margin, margin),
+        window.innerWidth - buttonWidth - margin,
+    );
+    const top = Math.min(
+        Math.max(rect.bottom + margin, margin),
+        window.innerHeight - buttonHeight - margin,
+    );
+    button.style.left = `${left}px`;
+    button.style.top = `${top}px`;
+    button.classList.add('show');
+}
+
+function scheduleSelectionCaptureButton(event = null) {
+    if (!state.showSelectionCaptureButton) {
+        hideSelectionCaptureButton();
+        return;
+    }
+    const root = event?.target?.getRootNode?.();
+    if (root) state.lastSelectionRoot = root;
+    clearTimeout(state.selectionButtonTimer);
+    state.selectionButtonTimer = setTimeout(updateSelectionCaptureButton, 80);
+}
+
+function bindSelectionListeners(root) {
+    if (!root || state.boundSelectionRoots.has(root)) return;
+    state.boundSelectionRoots.add(root);
+    root.addEventListener('selectionchange', rememberSelection);
+    root.addEventListener('mouseup', scheduleSelectionCaptureButton);
+    root.addEventListener('keyup', scheduleSelectionCaptureButton);
+    root.addEventListener('select', scheduleSelectionCaptureButton, true);
+    root.addEventListener('touchend', scheduleSelectionCaptureButton, { passive: true });
+}
+
+function bindIframeSelectionListeners() {
+    for (const frame of document.querySelectorAll('iframe')) {
+        try {
+            if (frame.contentDocument) bindSelectionListeners(frame.contentDocument);
+        } catch {
+            // Cross-origin frames cannot be inspected; skip quietly.
+        }
+    }
+}
+
+function bindShadowSelectionListeners(root = document) {
+    const elements = root.querySelectorAll?.('*') || [];
+    for (const element of elements) {
+        if (!element.shadowRoot) continue;
+        bindSelectionListeners(element.shadowRoot);
+        bindShadowSelectionListeners(element.shadowRoot);
+    }
+}
+
+function watchSelectionFrames() {
+    bindSelectionListeners(document);
+    bindIframeSelectionListeners();
+    bindShadowSelectionListeners();
+    if (state.selectionFrameObserver) return;
+    state.selectionFrameObserver = new MutationObserver(() => {
+        bindIframeSelectionListeners();
+        bindShadowSelectionListeners();
+    });
+    state.selectionFrameObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 async function captureUserMessage(messageId) {
@@ -1712,17 +2400,20 @@ function buildPanel() {
                     </button>
                 </div>
                 <div class="tn-header-actions">
+                    <button id="tavern-notes-apple-mode-main" class="tn-soft-button tn-hidden" title="${htmlEscape(t('appleThemeModeTitle'))}" aria-label="${htmlEscape(t('appleThemeModeTitle'))}">
+                        <i class="fa-solid fa-moon"></i><span>${htmlEscape(t('appleThemeNight'))}</span>
+                    </button>
                     <button id="tavern-notes-auto-user-input" class="tn-soft-button ${state.autoCaptureUserInput ? 'active' : ''}" title="${htmlEscape(t('autoCaptureUserInputTitle'))}" aria-label="${htmlEscape(t('autoCaptureUserInputTitle'))}">
                         <i class="fa-solid fa-keyboard"></i><span>${htmlEscape(t('autoCaptureUserInput'))}</span>
                     </button>
+                    <button id="tavern-notes-selection-capture-setting" class="tn-soft-button ${state.showSelectionCaptureButton ? 'active' : ''}" title="${htmlEscape(t('selectionCaptureButtonTitle'))}" aria-label="${htmlEscape(t('selectionCaptureButtonTitle'))}">
+                        <i class="fa-solid fa-highlighter"></i><span>${htmlEscape(t('selectionCaptureButton'))}</span>
+                    </button>
+                    <button id="tavern-notes-floor-capture-open" class="tn-soft-button ${state.showFloorCaptureButton ? 'active' : ''}" title="${htmlEscape(t('floorCaptureEntryTitle'))}" aria-label="${htmlEscape(t('floorCaptureEntryTitle'))}">
+                        <i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('floorCaptureEntry'))}</span>
+                    </button>
                     <button id="tavern-notes-theme" class="tn-soft-button" title="${htmlEscape(t('openThemePanel'))}" aria-label="${htmlEscape(t('openThemePanel'))}">
                         <i class="fa-solid fa-palette"></i><span>${htmlEscape(t('theme'))}</span>
-                    </button>
-                    <button id="tavern-notes-page-down-setting" class="tn-soft-button" title="${htmlEscape(t('togglePageButtons'))}" aria-label="${htmlEscape(t('togglePageButtons'))}">
-                        <i class="fa-solid fa-up-down"></i><span>${htmlEscape(t('paging'))}</span>
-                    </button>
-                    <button id="tavern-notes-refresh" class="tn-icon-button" title="${htmlEscape(t('refreshNotes'))}" aria-label="${htmlEscape(t('refreshNotes'))}">
-                        <i class="fa-solid fa-rotate-right"></i><span>${htmlEscape(t('refreshNotes'))}</span>
                     </button>
                     <button id="tavern-notes-export" class="tn-icon-button" title="${htmlEscape(t('exportNotes'))}" aria-label="${htmlEscape(t('exportNotes'))}">
                         <i class="fa-solid fa-download"></i><span>${htmlEscape(t('exportNotes'))}</span>
@@ -1780,6 +2471,38 @@ function buildPanel() {
                     <button class="tn-export-choice" data-format="json" title="JSON"><i class="fa-solid fa-file-code"></i><span>${htmlEscape(t('exportJson'))}</span></button>
                     <button class="tn-export-choice" data-format="txt" title="TXT"><i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('exportTxt'))}</span></button>
                     <button class="tn-export-choice" data-format="both" title="JSON + TXT"><i class="fa-solid fa-layer-group"></i><span>${htmlEscape(t('exportBoth'))}</span></button>
+                </div>
+            </div>
+            <div id="tavern-notes-floor-capture-menu" aria-hidden="true">
+                <div class="tn-floor-capture-card">
+                    <button class="tn-icon-button tn-floor-capture-close" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>
+                    <div class="tn-export-title">${htmlEscape(t('floorCaptureSettingsTitle'))}</div>
+                    <p class="tn-floor-capture-intro">${htmlEscape(t('floorCaptureSettingsIntro'))}</p>
+                    <button id="tavern-notes-floor-capture-setting" class="tn-soft-button tn-floor-capture-toggle ${state.showFloorCaptureButton ? 'active' : ''}" title="${htmlEscape(t('floorCaptureButtonTitle'))}" aria-label="${htmlEscape(t('floorCaptureButtonTitle'))}">
+                        <i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('floorCaptureButton'))}</span>
+                    </button>
+                    <div class="tn-floor-capture-help">
+                        <b>${htmlEscape(t('floorCaptureStepsTitle'))}</b>
+                        <small>${htmlEscape(t('floorCaptureSteps'))}</small>
+                    </div>
+                    <div class="tn-floor-capture-help">
+                        <b>${htmlEscape(t('floorCaptureContentTitle'))}</b>
+                        <small>${htmlEscape(t('floorCaptureContentHelp'))}</small>
+                        <code>${htmlEscape(t('floorCaptureExample'))}</code>
+                    </div>
+                    <div class="tn-floor-capture-help">
+                        <b>${htmlEscape(t('floorCaptureTroubleTitle'))}</b>
+                        <small>${htmlEscape(t('floorCaptureTroubleHelp'))}</small>
+                    </div>
+                    <details class="tn-floor-capture-advanced">
+                        <summary>${htmlEscape(t('floorCaptureAdvanced'))}</summary>
+                        <div id="tavern-notes-floor-capture-selector-summary" class="tn-floor-capture-selector-summary"></div>
+                        <label class="tn-floor-selector-row" title="${htmlEscape(t('floorCaptureSelectorHelp'))}">
+                            <span>${htmlEscape(t('floorCaptureSelectorLabel'))}</span>
+                            <input id="tavern-notes-floor-capture-selector" class="text_pole" type="text" value="${htmlEscape(getFloorCaptureTagName())}" placeholder="${htmlEscape(t('floorCaptureSelectorPlaceholder'))}" />
+                        </label>
+                        <small>${htmlEscape(t('floorCaptureSelectorHelp'))}</small>
+                    </details>
                 </div>
             </div>
             <div id="tavern-notes-theme-menu" aria-hidden="true">
@@ -1858,20 +2581,27 @@ function buildPanel() {
     `);
 
     addInputToolbar();
-    addScrollButtons();
     addExtensionsMenuEntry();
+    updateSelectionCaptureButtonSetting();
+    updateFloorCaptureButtonSetting();
+    updateFloorCaptureSelectorInput();
     bindEvents();
 }
 
 function bindEvents() {
     document.querySelector('#tavern-notes-language')?.addEventListener('change', event => saveLanguageSetting(event.target.value));
     document.querySelector('#tavern-notes-launcher-mode')?.addEventListener('click', toggleLauncherMode);
+    document.querySelector('#tavern-notes-apple-mode-main')?.addEventListener('click', () => {
+        toggleAppleThemeMode().catch(error => notify(error.message, 'error'));
+    });
     document.querySelector('#tavern-notes-auto-user-input')?.addEventListener('click', toggleAutoCaptureUserInput);
+    document.querySelector('#tavern-notes-selection-capture-setting')?.addEventListener('click', toggleSelectionCaptureButtonSetting);
+    document.querySelector('#tavern-notes-floor-capture-open')?.addEventListener('click', openFloorCaptureMenu);
+    document.querySelector('#tavern-notes-floor-capture-setting')?.addEventListener('click', toggleFloorCaptureButtonSetting);
     document.querySelector('#tavern-notes-theme')?.addEventListener('click', toggleThemeMenu);
+    document.querySelector('.tn-floor-capture-close')?.addEventListener('click', closeFloorCaptureMenu);
     document.querySelector('.tn-theme-close')?.addEventListener('click', closeThemeMenu);
-    document.querySelector('#tavern-notes-page-down-setting')?.addEventListener('click', togglePageDownButtonSetting);
     document.querySelector('.tn-close')?.addEventListener('click', closePanel);
-    document.querySelector('#tavern-notes-refresh')?.addEventListener('click', refreshNotes);
     document.querySelector('#tavern-notes-export')?.addEventListener('click', toggleExportMenu);
     document.querySelector('#tavern-notes-search')?.addEventListener('input', event => {
         state.query = event.target.value;
@@ -1879,6 +2609,7 @@ function bindEvents() {
         clearTimeout(state.searchTimer);
         state.searchTimer = setTimeout(refreshNotes, 300);
     });
+    document.querySelector('#tavern-notes-floor-capture-selector')?.addEventListener('change', event => saveFloorCaptureSelector(event.target.value));
     document.querySelector('.tn-filters')?.addEventListener('click', event => {
         const tab = event.target.closest?.('.tn-filter');
         if (!tab) return;
@@ -1891,6 +2622,9 @@ function bindEvents() {
     });
     document.querySelector('#tavern-notes-export-menu')?.addEventListener('click', event => {
         if (event.target.id === 'tavern-notes-export-menu') closeExportMenu();
+    });
+    document.querySelector('#tavern-notes-floor-capture-menu')?.addEventListener('click', event => {
+        if (event.target.id === 'tavern-notes-floor-capture-menu') closeFloorCaptureMenu();
     });
     document.querySelector('#tavern-notes-theme-menu')?.addEventListener('click', event => {
         if (event.target.id === 'tavern-notes-theme-menu') closeThemeMenu();
@@ -2740,7 +3474,7 @@ function drawVerticalText(ctx, text, x, y, lineHeight, options = {}) {
     const baseFont = ctx.font;
     let offset = 0;
     chars.forEach(char => {
-        const isDot = char === '·' || char === '・' || char === '。';
+        const isDot = char === '·' || char === '?' || char === '。';
         if (isDot) {
             ctx.save();
             ctx.font = baseFont.replace(/(\d+(?:\.\d+)?)px/, (_, size) => `${Math.max(10, Math.round(Number(size) * 0.48))}px`);
@@ -3204,8 +3938,31 @@ function normalizeTheme(theme) {
     };
 }
 
+function normalizeAppleThemeId(id = state.activeThemeId) {
+    if (id === LEGACY_APPLE_THEME_DAY_ID || id === LEGACY_APPLE_THEME_NIGHT_ID) return APPLE_THEME_ID;
+    return id;
+}
+
+function themeIsApple(theme = state.theme) {
+    return normalizeAppleThemeId(state.activeThemeId) === APPLE_THEME_ID
+        || String(theme?.variables?.['--tn-theme-flavor'] || '').toLowerCase() === 'apple';
+}
+
+function applyAppleGlassMode(theme) {
+    if (!themeIsApple(theme)) return theme;
+    const mode = state.appleGlassMode === 'night' ? 'night' : 'day';
+    const variables = mode === 'night' ? APPLE_GLASS_NIGHT_VARIABLES : APPLE_GLASS_DAY_VARIABLES;
+    return {
+        ...theme,
+        variables: {
+            ...theme.variables,
+            ...variables,
+        },
+    };
+}
+
 function paintTheme(theme) {
-    const clean = normalizeTheme(theme);
+    const clean = applyAppleGlassMode(normalizeTheme(theme));
     const panel = document.querySelector('#tavern-notes-panel');
     if (panel) {
         Object.entries(clean.variables).forEach(([key, value]) => {
@@ -3223,6 +3980,7 @@ function paintTheme(theme) {
         }
     }
     updateThemeIcons(clean);
+    updateAppleThemeModeButton();
     return clean;
 }
 
@@ -3263,7 +4021,41 @@ function renderThemeSelect() {
         option.textContent = theme.author ? `${theme.name} · ${theme.author}` : theme.name;
         return option;
     }));
-    select.value = state.activeThemeId || 'default';
+    select.value = normalizeAppleThemeId(state.activeThemeId) || 'default';
+    updateAppleThemeModeButton();
+}
+
+function isAppleThemeId(id = state.activeThemeId) {
+    return normalizeAppleThemeId(id) === APPLE_THEME_ID;
+}
+
+function updateAppleThemeModeButton() {
+    const buttons = [
+        document.querySelector('#tavern-notes-apple-mode-main'),
+    ].filter(Boolean);
+    if (!buttons.length) return;
+    const isApple = isAppleThemeId();
+    const isNight = state.appleGlassMode === 'night';
+    for (const button of buttons) {
+        button.classList.toggle('tn-hidden', !isApple);
+        button.classList.toggle('active', isApple);
+        button.title = t('appleThemeModeTitle');
+        button.setAttribute('aria-label', t('appleThemeModeTitle'));
+        button.querySelector('i')?.classList.toggle('fa-sun', isNight);
+        button.querySelector('i')?.classList.toggle('fa-moon', !isNight);
+        button.querySelector('span')?.replaceChildren(document.createTextNode(isNight ? t('appleThemeDay') : t('appleThemeNight')));
+    }
+}
+
+async function toggleAppleThemeMode() {
+    if (!isAppleThemeId()) {
+        await activateTheme(APPLE_THEME_ID);
+        return;
+    }
+    state.appleGlassMode = state.appleGlassMode === 'night' ? 'day' : 'night';
+    saveLocalSettings();
+    applyTheme(state.theme || DEFAULT_THEME, { commit: true, syncEditor: true, labelKey: 'currentTheme' });
+    notify(t('appleThemeEnabled'), 'success');
 }
 
 function syncThemeEditor(theme = state.theme || DEFAULT_THEME) {
@@ -3583,7 +4375,7 @@ function askThemeName(theme, actionLabel) {
 
 async function saveThemeFromEditor(themeFromEditor = null) {
     const theme = themeFromEditor || getThemeFromEditor();
-    const shouldSaveAs = state.themeDraft || !state.activeThemeId || state.activeThemeId === 'default';
+    const shouldSaveAs = state.themeDraft || !state.activeThemeId || state.activeThemeId === 'default' || isAppleThemeId(state.activeThemeId);
     const name = askThemeName(theme, shouldSaveAs ? t('saveAsAction') : t('saveAction'));
     if (!name) return;
     theme.name = name;
@@ -3620,13 +4412,30 @@ function updateIconElement(element, iconName, extraClass = '') {
     element.className = `fa-solid ${String(iconName).replace(/[^a-z0-9-]/gi, '')} ${extraClass}`.trim();
 }
 
+function renderDefaultIcon(src, extraClass = '') {
+    return `<img class="tavern-notes-default-icon ${extraClass}" src="${htmlEscape(src)}" alt="" aria-hidden="true" draggable="false" />`;
+}
+
+function setDefaultIcon(target, src, extraClass = '') {
+    const element = typeof target === 'string' ? document.querySelector(target) : target;
+    if (!element) return;
+    const current = element.querySelector('.tavern-notes-default-icon');
+    if (current) {
+        current.src = src;
+        current.className = `tavern-notes-default-icon ${extraClass}`.trim();
+        return;
+    }
+    element.querySelector('i')?.remove();
+    element.insertAdjacentHTML('afterbegin', renderDefaultIcon(src, extraClass));
+}
+
 function updateThemeIcons(theme = state.theme) {
     const assets = normalizeTheme(theme).assets;
     updateIconElement(document.querySelector('.tn-brand-mark i'), assets.brandIcon);
-    updateIconElement(document.querySelector('#tavern-notes-open i'), assets.openIcon, 'qr--button-icon');
-    updateIconElement(document.querySelector('#tavern-notes-capture i'), assets.captureIcon, 'qr--button-icon');
-    updateIconElement(document.querySelector('#tavern-notes-floating-open i'), assets.openIcon);
-    updateIconElement(document.querySelector('#tavern-notes-floating-capture i'), assets.captureIcon);
+    setDefaultIcon('#tavern-notes-open', DEFAULT_OPEN_ICON_URL, 'qr--button-icon');
+    setDefaultIcon('#tavern-notes-capture', DEFAULT_CAPTURE_ICON_URL, 'qr--button-icon');
+    setDefaultIcon('#tavern-notes-floating-open', DEFAULT_OPEN_ICON_URL);
+    setDefaultIcon('#tavern-notes-floating-capture', DEFAULT_CAPTURE_ICON_URL);
 }
 
 async function loadTheme() {
@@ -3635,7 +4444,7 @@ async function loadTheme() {
     } catch {
         try {
             const data = await api('/theme');
-            state.activeThemeId = data.activeId || 'default';
+            state.activeThemeId = normalizeAppleThemeId(data.activeId || 'default');
             state.themeDraft = false;
             applyTheme(data.theme || DEFAULT_THEME);
             renderThemeSelect();
@@ -3649,7 +4458,7 @@ async function loadTheme() {
 async function refreshThemeList() {
     const data = await api('/themes');
     state.themes = data.themes || [];
-    state.activeThemeId = data.activeId || 'default';
+    state.activeThemeId = normalizeAppleThemeId(data.activeId || 'default');
     state.themeDraft = false;
     renderThemeSelect();
     applyTheme(data.activeTheme || DEFAULT_THEME);
@@ -3658,7 +4467,7 @@ async function refreshThemeList() {
 async function activateTheme(id) {
     const data = await api(`/themes/${encodeURIComponent(id || 'default')}/activate`, { method: 'POST' });
     state.themes = data.themes || state.themes;
-    state.activeThemeId = data.activeId || data.id || id || 'default';
+    state.activeThemeId = normalizeAppleThemeId(data.activeId || data.id || id || 'default');
     state.themeDraft = false;
     renderThemeSelect();
     applyTheme(data.theme || DEFAULT_THEME);
@@ -3669,10 +4478,10 @@ async function saveTheme(theme, id = state.activeThemeId) {
     const clean = normalizeTheme(theme);
     const data = await api('/themes', {
         method: 'POST',
-        body: JSON.stringify({ theme: clean, id: id === 'default' ? null : id, activate: true }),
+        body: JSON.stringify({ theme: clean, id: id === 'default' || isAppleThemeId(id) ? null : id, activate: true }),
     });
     state.themes = data.themes || state.themes;
-    state.activeThemeId = data.activeId || data.id || state.activeThemeId || 'default';
+    state.activeThemeId = normalizeAppleThemeId(data.activeId || data.id || state.activeThemeId || 'default');
     state.themeDraft = false;
     renderThemeSelect();
     applyTheme(data.theme || clean);
@@ -3706,100 +4515,19 @@ async function openThemeFolder() {
 
 async function deleteSelectedTheme() {
     const id = document.querySelector('#tavern-notes-theme-select')?.value || state.activeThemeId;
-    if (!id || id === 'default') {
-        notify(t('defaultThemeCannotDelete'), 'warning');
+    if (!id || id === 'default' || isAppleThemeId(id)) {
+        notify(id === 'default' ? t('defaultThemeCannotDelete') : t('builtInThemeCannotDelete'), 'warning');
         return;
     }
     const selected = state.themes.find(theme => theme.id === id);
     if (!window.confirm(t('confirmDeleteTheme', { name: selected?.name || id }))) return;
     const data = await api(`/themes/${encodeURIComponent(id)}`, { method: 'DELETE' });
     state.themes = data.themes || [];
-    state.activeThemeId = data.activeId || 'default';
+    state.activeThemeId = normalizeAppleThemeId(data.activeId || 'default');
     state.themeDraft = false;
     renderThemeSelect();
     applyTheme(data.theme || state.theme || DEFAULT_THEME);
     notify(t('deletedTheme'), 'success');
-}
-
-function getChatScroller() {
-    const chatMessages = document.querySelector('#chat .mes')?.parentElement;
-    const candidates = [
-        document.querySelector('#chat'),
-        document.querySelector('#chat_container'),
-        chatMessages,
-        document.scrollingElement,
-    ].filter(Boolean);
-
-    return candidates.find(element => element.scrollHeight > element.clientHeight + 20) || document.scrollingElement;
-}
-
-function scrollChatPage(direction = 1) {
-    const scroller = getChatScroller();
-    if (!scroller) return;
-    const distance = Math.max(Math.floor(scroller.clientHeight * 0.86), 360) * direction;
-    scroller.scrollBy({ top: distance, behavior: 'smooth' });
-}
-
-function updateScrollButtonsVisibility() {
-    const rail = document.querySelector('#tavern-notes-scroll-buttons');
-    if (!rail) return;
-    rail.classList.toggle('tn-hidden', !state.showPageDownButton);
-    rail.style.setProperty('--tn-scroll-buttons-top', `${Math.min(Math.max(state.scrollButtonsTop, 12), 82)}vh`);
-}
-
-function updateScrollButtonLabels() {
-    document.querySelectorAll('#tavern-notes-scroll-buttons .tn-scroll-page-button').forEach(button => {
-        const label = Number(button.dataset.scrollDir || 1) < 0 ? t('scrollUp') : t('scrollDown');
-        button.title = label;
-        button.setAttribute('aria-label', label);
-    });
-}
-
-function addScrollButtons() {
-    let rail = document.querySelector('#tavern-notes-scroll-buttons');
-    if (!rail) {
-        rail = document.createElement('div');
-        rail.id = 'tavern-notes-scroll-buttons';
-        rail.innerHTML = `
-            <button class="tn-scroll-page-button" data-scroll-dir="-1" title="${htmlEscape(t('scrollUp'))}" aria-label="${htmlEscape(t('scrollUp'))}"><i class="fa-solid fa-chevron-up"></i></button>
-            <button class="tn-scroll-page-button" data-scroll-dir="1" title="${htmlEscape(t('scrollDown'))}" aria-label="${htmlEscape(t('scrollDown'))}"><i class="fa-solid fa-chevron-down"></i></button>
-        `;
-        document.body.append(rail);
-        rail.querySelectorAll('.tn-scroll-page-button').forEach(button => {
-            button.addEventListener('click', event => {
-                event.stopPropagation();
-                scrollChatPage(Number(button.dataset.scrollDir || 1));
-            });
-        });
-
-        let dragging = false;
-        let startY = 0;
-        let startTop = 0;
-        rail.addEventListener('pointerdown', event => {
-            if (event.target.closest('button')) return;
-            dragging = true;
-            startY = event.clientY;
-            startTop = state.scrollButtonsTop;
-            rail.setPointerCapture?.(event.pointerId);
-        });
-        rail.addEventListener('pointermove', event => {
-            if (!dragging) return;
-            const delta = ((event.clientY - startY) / Math.max(window.innerHeight, 1)) * 100;
-            state.scrollButtonsTop = Math.min(Math.max(startTop + delta, 12), 82);
-            updateScrollButtonsVisibility();
-        });
-        rail.addEventListener('pointerup', event => {
-            if (!dragging) return;
-            dragging = false;
-            rail.releasePointerCapture?.(event.pointerId);
-            saveLocalSettings();
-        });
-        rail.addEventListener('pointercancel', () => {
-            dragging = false;
-        });
-    }
-    updateScrollButtonLabels();
-    updateScrollButtonsVisibility();
 }
 
 function updateLauncherModeButton() {
@@ -3816,7 +4544,45 @@ function updateLauncherModeButton() {
 function removeLauncherButtons() {
     document.querySelector('#tavern-notes-open')?.remove();
     document.querySelector('#tavern-notes-capture')?.remove();
-    document.querySelector('#tavern-notes-page-down')?.remove();
+}
+
+function addFloorCaptureButtons(root = document) {
+    if (!state.showFloorCaptureButton) {
+        removeFloorCaptureButtons();
+        return;
+    }
+    const selector = root === document ? '#chat .mes[mesid], #chat .mes[data-mesid]' : '.mes[mesid], .mes[data-mesid]';
+    root.querySelectorAll?.(selector).forEach(messageElement => {
+        if (messageElement.querySelector(':scope > .tn-floor-capture')) return;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'tn-floor-capture';
+        button.title = t('captureFloorTitle');
+        button.setAttribute('aria-label', t('captureFloorTitle'));
+        button.innerHTML = `<i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('captureFloor'))}</span>`;
+        button.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            captureMessageFloor(messageElement).catch(error => notify(error.message, 'error'));
+        });
+        messageElement.append(button);
+    });
+}
+
+function watchChatMessages() {
+    if (!state.showFloorCaptureButton) {
+        stopFloorCaptureWatcher();
+        return;
+    }
+    addFloorCaptureButtons();
+    if (state.floorCaptureObserver) return;
+    const chatContainer = document.querySelector('#chat');
+    if (!chatContainer) {
+        setTimeout(watchChatMessages, 800);
+        return;
+    }
+    state.floorCaptureObserver = new MutationObserver(() => addFloorCaptureButtons(chatContainer));
+    state.floorCaptureObserver.observe(chatContainer, { childList: true, subtree: true });
 }
 
 function updateFloatingLauncher() {
@@ -3830,10 +4596,10 @@ function updateFloatingLauncher() {
         launcher.id = 'tavern-notes-floating-launcher';
         launcher.innerHTML = `
             <button id="tavern-notes-floating-open" class="tn-floating-button tn-floating-main" type="button" title="${htmlEscape(t('openNotes'))}" aria-label="${htmlEscape(t('openNotes'))}">
-                <i class="fa-solid fa-book-open"></i>
+                ${renderDefaultIcon(DEFAULT_OPEN_ICON_URL)}
             </button>
             <button id="tavern-notes-floating-capture" class="tn-floating-button tn-floating-capture" type="button" title="${htmlEscape(t('captureSelectedTitle'))}" aria-label="${htmlEscape(t('captureSelectedTitle'))}">
-                <i class="fa-solid fa-highlighter"></i>
+                ${renderDefaultIcon(DEFAULT_CAPTURE_ICON_URL)}
             </button>
         `;
         document.body.append(launcher);
@@ -3869,7 +4635,6 @@ function addInputToolbar() {
     updateFloatingLauncher();
     document.querySelector('#rightSendForm > #tavern-notes-open')?.remove();
     document.querySelector('#rightSendForm > #tavern-notes-capture')?.remove();
-    document.querySelector('#rightSendForm > #tavern-notes-page-down')?.remove();
 
     const qrBar = document.querySelector('#qr--bar');
     const target = document.querySelector('#qr--bar > .qr--buttons') || qrBar;
@@ -3881,31 +4646,28 @@ function addInputToolbar() {
     const existingOpen = document.querySelector('#tavern-notes-open');
     const existingCapture = document.querySelector('#tavern-notes-capture');
     if (existingOpen && existingCapture) {
-        updatePageDownSettingButton();
         return;
     }
 
     document.querySelector('#tavern-notes-open')?.remove();
     document.querySelector('#tavern-notes-capture')?.remove();
-    document.querySelector('#tavern-notes-page-down')?.remove();
 
     const openButton = document.createElement('div');
     openButton.id = 'tavern-notes-open';
     openButton.className = 'qr--button tavern-notes-qr-button interactable';
     openButton.title = t('openNotes');
     openButton.tabIndex = 0;
-    openButton.innerHTML = `<i class="fa-solid fa-book-open qr--button-icon"></i><span class="qr--hidden">${htmlEscape(t('appName'))}</span>`;
+    openButton.innerHTML = `${renderDefaultIcon(DEFAULT_OPEN_ICON_URL, 'qr--button-icon')}<span class="qr--hidden">${htmlEscape(t('appName'))}</span>`;
 
     const captureButton = document.createElement('div');
     captureButton.id = 'tavern-notes-capture';
     captureButton.className = 'qr--button tavern-notes-qr-button interactable';
     captureButton.title = t('captureSelectedTitle');
     captureButton.tabIndex = 0;
-    captureButton.innerHTML = `<i class="fa-solid fa-highlighter qr--button-icon"></i><span class="qr--hidden">${htmlEscape(t('captureSelected'))}</span>`;
+    captureButton.innerHTML = `${renderDefaultIcon(DEFAULT_CAPTURE_ICON_URL, 'qr--button-icon')}<span class="qr--hidden">${htmlEscape(t('captureSelected'))}</span>`;
 
     target.append(openButton, captureButton);
     updateThemeIcons();
-    updatePageDownSettingButton();
 
     openButton.addEventListener('click', openPanel);
     openButton.addEventListener('keydown', event => {
@@ -3962,8 +4724,8 @@ async function init() {
     buildPanel();
     await loadTheme();
     addInputToolbar();
-    addScrollButtons();
     watchQuickReplyBar();
+    watchChatMessages();
     setTimeout(() => checkForTavernNotesUpdate(), 5000);
 
     try {
@@ -3980,15 +4742,20 @@ async function init() {
 
     eventSource.on(event_types.MESSAGE_SENT, messageId => {
         setTimeout(() => captureUserMessage(messageId), 100);
+        setTimeout(addFloorCaptureButtons, 120);
     });
     eventSource.on(event_types.MESSAGE_EDITED, messageId => {
         setTimeout(() => captureUserMessage(messageId), 100);
+        setTimeout(addFloorCaptureButtons, 120);
     });
     eventSource.on(event_types.MESSAGE_UPDATED, messageId => {
         setTimeout(() => captureUserMessage(messageId), 100);
+        setTimeout(addFloorCaptureButtons, 120);
     });
 
-    document.addEventListener('selectionchange', rememberSelection);
+    watchSelectionFrames();
+    document.addEventListener('scroll', hideSelectionCaptureButton, true);
+    window.addEventListener('resize', hideSelectionCaptureButton);
 }
 
 eventSource.on(event_types.APP_READY, init);
