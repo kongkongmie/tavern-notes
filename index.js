@@ -15,7 +15,7 @@ import { extractFloorText } from './floor-capture.js';
 const API_BASE = '/api/plugins/tavern-notes';
 const SETTINGS_KEY = 'tavern-notes-settings';
 const UPDATE_NOTICE_KEY = 'tavern-notes-update-notice';
-const EXTENSION_VERSION = '1.0.18';
+const EXTENSION_VERSION = '1.0.19';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/manifest.json';
 const FONT_DB_NAME = 'tavern-notes-fonts';
 const FONT_DB_STORE = 'fonts';
