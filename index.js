@@ -3976,8 +3976,7 @@ function normalizeAppleThemeId(id = state.activeThemeId) {
 }
 
 function themeIsApple(theme = state.theme) {
-    return normalizeAppleThemeId(state.activeThemeId) === APPLE_THEME_ID
-        || String(theme?.variables?.['--tn-theme-flavor'] || '').toLowerCase() === 'apple';
+    return String(theme?.variables?.['--tn-theme-flavor'] || '').toLowerCase() === 'apple';
 }
 
 function applyAppleGlassMode(theme) {
