@@ -3,7 +3,7 @@ const path = require('node:path');
 const childProcess = require('node:child_process');
 
 const STORE_DIR = 'tavern-notes';
-const PLUGIN_VERSION = '1.0.17';
+const PLUGIN_VERSION = '1.0.18';
 const INDEX_FILE = 'index.json';
 const THEME_FILE = 'theme.json';
 const THEME_ACTIVE_FILE = 'theme-active.json';

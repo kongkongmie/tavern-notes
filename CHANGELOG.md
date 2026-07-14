@@ -1,5 +1,14 @@
 ﻿# Changelog
 
+## 1.0.18
+
+- Added JSON backup import so notes can migrate between Tavern Notes Full and Lite without sharing storage.
+- Added duplicate detection during import and imports large backups in smaller batches.
+- Increased the maximum content length of a single note from 20,000 to 200,000 characters for long whole-message excerpts.
+- Fixed whole-message capture returning only a collapsed summary such as `正文（8000+字）`; configured tags such as `<content>` are now recovered from the original message before visible-text fallback.
+- Kept configurable custom body tags working with the same extraction order.
+- This version updates the backend import and content-length handling, so rerun the backend installer and restart SillyTavern after updating.
+
 ## 1.0.17
 
 - Added Apple Glass as a built-in theme, with day/night switching available from the main panel.
