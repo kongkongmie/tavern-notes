@@ -165,6 +165,9 @@ const TEXT_ZH_CN = {
     exportJson: '可再次导入 JSON',
     exportTxt: '清爽 TXT 文本',
     exportBoth: '两个都导出',
+    importJson: '导入 JSON 备份',
+    importDone: '导入完成：新增 {imported} 条，跳过 {skipped} 条重复或空笔记。',
+    invalidBackup: '无法导入：请选择酒馆笔记导出的 JSON 备份。',
     themeFiles: '主题文件',
     currentTheme: '当前：{name}',
     themeName: '主题名称',
@@ -358,6 +361,9 @@ const TEXTS = {
         appName: '酒館筆記',
         theme: '主題',
         exportNotes: '匯出筆記',
+        importJson: '匯入 JSON 備份',
+        importDone: '匯入完成：新增 {imported} 條，略過 {skipped} 條重複或空白筆記。',
+        invalidBackup: '無法匯入：請選擇酒館筆記匯出的 JSON 備份。',
         closeNotes: '關閉酒館筆記',
         searchPlaceholder: '搜尋筆記、角色、聊天...',
         connecting: '正在連接酒館筆記...',
@@ -521,6 +527,9 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         exportJson: 'Re-importable JSON',
         exportTxt: 'Clean TXT',
         exportBoth: 'Export both',
+        importJson: 'Import JSON backup',
+        importDone: 'Import complete: {imported} added, {skipped} duplicates or empty notes skipped.',
+        invalidBackup: 'Import failed. Choose a JSON backup exported by Tavern Notes.',
         themeFiles: 'Theme Files',
         currentTheme: 'Current: {name}',
         themeName: 'Theme name',
@@ -719,6 +728,9 @@ Click Preview & save or Save as to create a theme file.`,
         exportJson: '다시 가져올 수 있는 JSON',
         exportTxt: '깔끔한 TXT',
         exportBoth: '둘 다 내보내기',
+        importJson: 'JSON 백업 가져오기',
+        importDone: '가져오기 완료: {imported}개 추가, 중복 또는 빈 노트 {skipped}개 건너뜀.',
+        invalidBackup: '가져올 수 없습니다. Tavern Notes에서 내보낸 JSON 백업을 선택하세요.',
         themeFiles: '테마 파일',
         currentTheme: '현재: {name}',
         themeName: '테마 이름',
@@ -2471,6 +2483,8 @@ function buildPanel() {
                     <button class="tn-export-choice" data-format="json" title="JSON"><i class="fa-solid fa-file-code"></i><span>${htmlEscape(t('exportJson'))}</span></button>
                     <button class="tn-export-choice" data-format="txt" title="TXT"><i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('exportTxt'))}</span></button>
                     <button class="tn-export-choice" data-format="both" title="JSON + TXT"><i class="fa-solid fa-layer-group"></i><span>${htmlEscape(t('exportBoth'))}</span></button>
+                    <button id="tavern-notes-import-json" class="tn-export-choice" type="button"><i class="fa-solid fa-file-import"></i><span>${htmlEscape(t('importJson'))}</span></button>
+                    <input id="tavern-notes-import-json-file" type="file" accept=".json,application/json" hidden />
                 </div>
             </div>
             <div id="tavern-notes-floor-capture-menu" aria-hidden="true">
@@ -2668,6 +2682,12 @@ function bindEvents() {
     document.querySelectorAll('#tavern-notes-export-menu .tn-export-scope-choice').forEach(button => {
         button.addEventListener('click', () => setExportScope(button.dataset.scope || 'all'));
     });
+    document.querySelector('#tavern-notes-import-json')?.addEventListener('click', () => {
+        document.querySelector('#tavern-notes-import-json-file')?.click();
+    });
+    document.querySelector('#tavern-notes-import-json-file')?.addEventListener('change', event => {
+        importNotesJson(event).catch(error => notify(error.message || t('invalidBackup'), 'error'));
+    });
     document.querySelector('#tavern-notes-prev')?.addEventListener('click', () => goToPage(state.page - 1));
     document.querySelector('#tavern-notes-next')?.addEventListener('click', () => goToPage(state.page + 1));
     document.querySelector('#tavern-notes-page-jump')?.addEventListener('click', jumpToInputPage);
@@ -2812,6 +2832,41 @@ function downloadTextFile(content, filename, type) {
     const url = URL.createObjectURL(blob);
     exportFile(url, filename);
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function importNotesJson(event) {
+    const input = event.currentTarget;
+    const file = input?.files?.[0];
+    if (input) input.value = '';
+    if (!file) return;
+    let payload;
+    try {
+        payload = JSON.parse(await file.text());
+    } catch {
+        throw new Error(t('invalidBackup'));
+    }
+    if (payload?.format !== 'tavern-notes-export' || !Array.isArray(payload.notes)) {
+        throw new Error(t('invalidBackup'));
+    }
+    let imported = 0;
+    let skipped = 0;
+    const chunkSize = 100;
+    for (let offset = 0; offset < payload.notes.length; offset += chunkSize) {
+        const data = await api('/import', {
+            method: 'POST',
+            body: JSON.stringify({
+                format: 'tavern-notes-export',
+                version: payload.version || 1,
+                notes: payload.notes.slice(offset, offset + chunkSize),
+            }),
+        });
+        imported += Number(data.imported || 0);
+        skipped += Number(data.skipped || 0);
+    }
+    state.page = 1;
+    await refreshNotes();
+    closeExportMenu();
+    notify(t('importDone', { imported, skipped }), 'success');
 }
 
 function toggleExportMenu() {

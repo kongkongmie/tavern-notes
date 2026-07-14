@@ -13,7 +13,7 @@ const DAILY_BACKUP_FILE = 'tavern-notes-daily-backup.json';
 const SHARD_PREFIX = 'notes-';
 const SHARD_SUFFIX = '.jsonl';
 const MAX_SHARD_LINES = 1000;
-const MAX_CONTENT_LENGTH = 20000;
+const MAX_CONTENT_LENGTH = 200000;
 const LATEST_CACHE_SIZE = 200;
 
 function nowIso() {
@@ -717,6 +717,43 @@ function appendNote(storePath, index, note) {
     saveIndex(storePath, index);
 }
 
+function noteImportSignature(note) {
+    return [
+        note?.type || '',
+        note?.content || '',
+        note?.character?.id ?? '',
+        note?.character?.name || '',
+        note?.chat?.id ?? '',
+        note?.chat?.messageId ?? '',
+        note?.createdAt || '',
+    ].join('\u0001');
+}
+
+function importNotes(storePath, index, payload) {
+    if (payload?.format !== 'tavern-notes-export' || !Array.isArray(payload.notes)) {
+        const error = new Error('Invalid Tavern Notes JSON backup.');
+        error.status = 400;
+        throw error;
+    }
+    const incoming = payload.notes.slice(0, 1000);
+    const signatures = new Set(readAllNotes(storePath, index).map(noteImportSignature));
+    let imported = 0;
+    let skipped = 0;
+    for (const raw of incoming) {
+        if (!String(raw?.content || '').trim() || signatures.has(noteImportSignature(raw))) {
+            skipped += 1;
+            continue;
+        }
+        const note = normalizeNote(raw, index);
+        if (raw.createdAt && !Number.isNaN(Date.parse(raw.createdAt))) note.createdAt = String(raw.createdAt);
+        if (raw.updatedAt && !Number.isNaN(Date.parse(raw.updatedAt))) note.updatedAt = String(raw.updatedAt);
+        appendNote(storePath, index, note);
+        signatures.add(noteImportSignature(note));
+        imported += 1;
+    }
+    return { imported, skipped, received: incoming.length };
+}
+
 function getDeletedSet(index) {
     return new Set(Array.isArray(index.deletedIds) ? index.deletedIds : []);
 }
@@ -1055,6 +1092,18 @@ async function init(router) {
                 user: request.user.profile?.handle || 'default-user',
                 notes,
             });
+        } catch (error) {
+            response.status(error.status || 500).json({ ok: false, error: error.message });
+        }
+    });
+
+    router.post('/import', (request, response) => {
+        try {
+            const storePath = getStorePath(request);
+            const index = loadIndex(storePath, request.user.profile?.handle);
+            const result = importNotes(storePath, index, request.body || {});
+            const backup = writeDailyBackup(storePath, index, request.user.profile?.handle);
+            response.json({ ok: true, ...result, backup });
         } catch (error) {
             response.status(error.status || 500).json({ ok: false, error: error.message });
         }
