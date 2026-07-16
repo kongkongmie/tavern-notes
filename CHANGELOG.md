@@ -1,12 +1,23 @@
 ﻿# Changelog
 
+## 1.0.20
+
+- Added editable note text and per-note tags, including removable tag chips and existing-tag suggestions.
+- Added tag search, filtering, recent/common tags, and a dedicated tag library that scales to large collections.
+- Added a guided empty state so tag controls remain discoverable before the first tag is created.
+- Added safe global tag deletion that removes a tag from matching notes without deleting any notes.
+- Preserved edited text and tags in JSON/TXT exports, imports, daily backups, search, counts, and character views.
+- Refined tag-library and edit-dialog layouts across built-in themes and prevented SillyTavern themes from recoloring editor controls.
+- Improved import/export wording, outdated-backend guidance, and Apple Glass theme-preview isolation.
+- This version adds backend editing and tag routes. Full users must update the backend plugin and restart SillyTavern once.
+
 ## 1.0.18
 
 - Added JSON backup import so notes can migrate between Tavern Notes Full and Lite without sharing storage.
 - Added duplicate detection during import and imports large backups in smaller batches.
 - Increased the maximum content length of a single note from 20,000 to 200,000 characters for long whole-message excerpts.
-- Fixed whole-message capture returning only a collapsed summary such as `正文（8000+字）`; configured tags such as `<content>` are now recovered from the original message before visible-text fallback.
-- Kept configurable custom body tags working with the same extraction order.
+- Fixed whole-message capture returning only a collapsed summary such as `正文（8000+字）`; the user-configured body tag (default: `content`) is now recovered from the original message before visible-text fallback.
+- When one message contains multiple matching body tags, their text is collected and merged in source order.
 - This version updates the backend import and content-length handling, so rerun the backend installer and restart SillyTavern after updating.
 
 ## 1.0.17

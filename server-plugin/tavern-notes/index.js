@@ -3,13 +3,14 @@ const path = require('node:path');
 const childProcess = require('node:child_process');
 
 const STORE_DIR = 'tavern-notes';
-const PLUGIN_VERSION = '1.0.18';
+const PLUGIN_VERSION = '1.0.20';
 const INDEX_FILE = 'index.json';
 const THEME_FILE = 'theme.json';
 const THEME_ACTIVE_FILE = 'theme-active.json';
 const THEMES_DIR = 'themes';
 const BACKUP_DIR = 'backups';
 const DAILY_BACKUP_FILE = 'tavern-notes-daily-backup.json';
+const NOTE_EDITS_FILE = 'note-edits.json';
 const SHARD_PREFIX = 'notes-';
 const SHARD_SUFFIX = '.jsonl';
 const MAX_SHARD_LINES = 1000;
@@ -67,6 +68,10 @@ function getThemeActivePath(storePath) {
 
 function getDailyBackupPath(storePath) {
     return path.join(storePath, BACKUP_DIR, DAILY_BACKUP_FILE);
+}
+
+function getNoteEditsPath(storePath) {
+    return path.join(storePath, NOTE_EDITS_FILE);
 }
 
 function openFolder(folderPath) {
@@ -593,6 +598,52 @@ function shardName(number) {
     return `${SHARD_PREFIX}${String(number).padStart(4, '0')}${SHARD_SUFFIX}`;
 }
 
+function normalizeTags(tags) {
+    const values = Array.isArray(tags) ? tags : String(tags || '').split(/[,，\n]/);
+    const unique = [];
+    for (const value of values) {
+        const tag = String(value || '').trim().replace(/^#+/, '').slice(0, 40);
+        if (!tag || unique.some(item => item.toLocaleLowerCase() === tag.toLocaleLowerCase())) continue;
+        unique.push(tag);
+        if (unique.length >= 20) break;
+    }
+    return unique;
+}
+
+function loadNoteEdits(storePath) {
+    const filePath = getNoteEditsPath(storePath);
+    if (!fs.existsSync(filePath)) return { version: 1, updatedAt: nowIso(), edits: {} };
+    try {
+        const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        return {
+            version: 1,
+            updatedAt: parsed.updatedAt || nowIso(),
+            edits: parsed.edits && typeof parsed.edits === 'object' ? parsed.edits : {},
+        };
+    } catch {
+        return { version: 1, updatedAt: nowIso(), edits: {} };
+    }
+}
+
+function saveNoteEdits(storePath, data) {
+    const filePath = getNoteEditsPath(storePath);
+    const tempPath = `${filePath}.tmp`;
+    const payload = { version: 1, updatedAt: nowIso(), edits: data.edits || {} };
+    fs.writeFileSync(tempPath, JSON.stringify(payload, null, 2), 'utf8');
+    fs.renameSync(tempPath, filePath);
+}
+
+function applyNoteEdit(note, edits) {
+    const edit = edits?.[note.id];
+    if (!edit) return note;
+    return {
+        ...note,
+        content: String(edit.content || note.content || '').slice(0, MAX_CONTENT_LENGTH),
+        tags: normalizeTags(edit.tags),
+        updatedAt: edit.updatedAt || note.updatedAt || note.createdAt,
+    };
+}
+
 function normalizeNote(input, index) {
     const content = String(input.content || '').trim();
     if (!content) {
@@ -619,7 +670,7 @@ function normalizeNote(input, index) {
             messageId: Number.isFinite(Number(input.chat?.messageId)) ? Number(input.chat.messageId) : null,
         },
         source: input.source || '',
-        tags: Array.isArray(input.tags) ? input.tags.map(String).slice(0, 20) : [],
+        tags: normalizeTags(input.tags),
     };
 }
 
@@ -630,6 +681,7 @@ function noteSummary(note) {
         type: note.type,
         content: note.content,
         createdAt: note.createdAt,
+        updatedAt: note.updatedAt || note.createdAt,
         character: note.character,
         chat: note.chat,
         source: note.source,
@@ -763,6 +815,7 @@ function matchesFilters(note, filters) {
     if (filters.type && note.type !== filters.type) return false;
     if (filters.characterName && note.character?.name !== filters.characterName) return false;
     if (filters.characterId && String(note.character?.id ?? '') !== filters.characterId) return false;
+    if (filters.tag && !(note.tags || []).some(tag => tag.toLocaleLowerCase() === String(filters.tag).toLocaleLowerCase())) return false;
     if (filters.q) {
         const haystack = `${note.content}\n${note.character?.name || ''}\n${note.chat?.name || ''}\n${(note.tags || []).join(' ')}`.toLowerCase();
         if (!haystack.includes(filters.q.toLowerCase())) return false;
@@ -774,6 +827,7 @@ function readNotes(storePath, index, filters) {
     const limit = Math.min(Math.max(Number(filters.limit) || 50, 1), 200);
     const offset = Math.max(Number(filters.offset) || 0, 0);
     const deleted = getDeletedSet(index);
+    const edits = loadNoteEdits(storePath).edits;
     const results = [];
 
     for (let shard = index.currentShard; shard >= 1; shard -= 1) {
@@ -784,7 +838,7 @@ function readNotes(storePath, index, filters) {
         for (const line of lines) {
             let note;
             try {
-                note = JSON.parse(line);
+                note = applyNoteEdit(JSON.parse(line), edits);
             } catch {
                 continue;
             }
@@ -798,6 +852,7 @@ function readNotes(storePath, index, filters) {
 
 function countNotes(storePath, index, filters) {
     const deleted = getDeletedSet(index);
+    const edits = loadNoteEdits(storePath).edits;
     const results = [];
 
     for (let shard = index.currentShard; shard >= 1; shard -= 1) {
@@ -808,7 +863,7 @@ function countNotes(storePath, index, filters) {
         for (const line of lines) {
             let note;
             try {
-                note = JSON.parse(line);
+                note = applyNoteEdit(JSON.parse(line), edits);
             } catch {
                 continue;
             }
@@ -879,6 +934,7 @@ function summarizeCharacters(storePath, index, filters = {}) {
 
 function readAllNotes(storePath, index, filters = {}) {
     const deleted = getDeletedSet(index);
+    const edits = loadNoteEdits(storePath).edits;
     const results = [];
 
     for (let shard = 1; shard <= index.currentShard; shard += 1) {
@@ -889,7 +945,7 @@ function readAllNotes(storePath, index, filters = {}) {
         for (const line of lines) {
             let note;
             try {
-                note = JSON.parse(line);
+                note = applyNoteEdit(JSON.parse(line), edits);
             } catch {
                 continue;
             }
@@ -899,6 +955,19 @@ function readAllNotes(storePath, index, filters = {}) {
     }
 
     return results;
+}
+
+function summarizeTags(storePath, index, filters = {}) {
+    const counts = new Map();
+    for (const note of readAllNotes(storePath, index, filters)) {
+        for (const tag of normalizeTags(note.tags)) {
+            const key = tag.toLocaleLowerCase();
+            const current = counts.get(key) || { name: tag, count: 0 };
+            current.count += 1;
+            counts.set(key, current);
+        }
+    }
+    return Array.from(counts.values()).sort((left, right) => right.count - left.count || left.name.localeCompare(right.name));
 }
 
 function writeDailyBackup(storePath, index, userHandle) {
@@ -955,8 +1024,10 @@ function formatNoteForText(note, index) {
     const chatName = note.chat?.name || '';
     const message = note.chat?.messageId === null || note.chat?.messageId === undefined ? '' : `#${note.chat.messageId}`;
     const source = [created, chatName, message].filter(Boolean).join(' · ');
+    const tags = normalizeTags(note.tags);
     return [
         `${index + 1}. ${note.content || ''}`,
+        tags.length ? `   #${tags.join(' #')}` : '',
         source ? `   ${source}` : '',
     ].filter(Boolean).join('\n');
 }
@@ -1050,6 +1121,57 @@ async function init(router) {
         }
     });
 
+    router.get('/tags', (request, response) => {
+        try {
+            const storePath = getStorePath(request);
+            const index = loadIndex(storePath, request.user.profile?.handle);
+            const filters = { ...(request.query || {}) };
+            delete filters.q;
+            delete filters.tag;
+            delete filters.limit;
+            delete filters.offset;
+            response.json({ ok: true, tags: summarizeTags(storePath, index, filters) });
+        } catch (error) {
+            response.status(error.status || 500).json({ ok: false, error: error.message });
+        }
+    });
+
+    router.delete('/tags/:tag', (request, response) => {
+        try {
+            const storePath = getStorePath(request);
+            const index = loadIndex(storePath, request.user.profile?.handle);
+            const tag = String(request.params.tag || '').trim();
+            if (!tag) return response.status(400).json({ ok: false, error: 'Missing tag.' });
+            const key = tag.toLocaleLowerCase();
+            const editData = loadNoteEdits(storePath);
+            const updatedAt = nowIso();
+            let updated = 0;
+
+            for (const note of readAllNotes(storePath, index)) {
+                const tags = normalizeTags(note.tags);
+                if (!tags.some(item => item.toLocaleLowerCase() === key)) continue;
+                editData.edits[note.id] = {
+                    content: note.content,
+                    tags: tags.filter(item => item.toLocaleLowerCase() !== key),
+                    updatedAt,
+                };
+                updated += 1;
+            }
+
+            if (updated) {
+                saveNoteEdits(storePath, editData);
+                index.latest = (index.latest || []).map(note => note.tags?.some(item => item.toLocaleLowerCase() === key)
+                    ? noteSummary(applyNoteEdit(note, editData.edits))
+                    : note);
+                saveIndex(storePath, index);
+            }
+            const backup = writeDailyBackup(storePath, index, request.user.profile?.handle);
+            response.json({ ok: true, tag, updated, backup });
+        } catch (error) {
+            response.status(error.status || 500).json({ ok: false, error: error.message });
+        }
+    });
+
     router.post('/notes', (request, response) => {
         try {
             const storePath = getStorePath(request);
@@ -1063,6 +1185,35 @@ async function init(router) {
         }
     });
 
+    router.patch('/notes/:id', (request, response) => {
+        try {
+            const storePath = getStorePath(request);
+            const index = loadIndex(storePath, request.user.profile?.handle);
+            const id = String(request.params.id || '');
+            const content = String(request.body?.content || '').trim();
+            if (!id) return response.status(400).json({ ok: false, error: 'Missing note id.' });
+            if (!content) return response.status(400).json({ ok: false, error: 'Note content is empty.' });
+            const existing = readAllNotes(storePath, index).find(note => note.id === id);
+            if (!existing) return response.status(404).json({ ok: false, error: 'Note not found.' });
+
+            const editData = loadNoteEdits(storePath);
+            const updatedAt = nowIso();
+            editData.edits[id] = {
+                content: content.slice(0, MAX_CONTENT_LENGTH),
+                tags: normalizeTags(request.body?.tags),
+                updatedAt,
+            };
+            saveNoteEdits(storePath, editData);
+            const updated = applyNoteEdit(existing, editData.edits);
+            index.latest = (index.latest || []).map(note => note.id === id ? noteSummary(updated) : note);
+            saveIndex(storePath, index);
+            const backup = writeDailyBackup(storePath, index, request.user.profile?.handle);
+            response.json({ ok: true, note: noteSummary(updated), backup });
+        } catch (error) {
+            response.status(error.status || 500).json({ ok: false, error: error.message });
+        }
+    });
+
     router.delete('/notes/:id', (request, response) => {
         try {
             const storePath = getStorePath(request);
@@ -1071,6 +1222,11 @@ async function init(router) {
             if (!id) return response.status(400).json({ ok: false, error: 'Missing note id.' });
             index.deletedIds = Array.from(new Set([...(index.deletedIds || []), id])).slice(-5000);
             index.latest = (index.latest || []).filter(note => note.id !== id);
+            const editData = loadNoteEdits(storePath);
+            if (editData.edits[id]) {
+                delete editData.edits[id];
+                saveNoteEdits(storePath, editData);
+            }
             saveIndex(storePath, index);
             const backup = writeDailyBackup(storePath, index, request.user.profile?.handle);
             response.json({ ok: true, backup });

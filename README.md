@@ -81,7 +81,7 @@ Windows / PC：
 
 ### 离线包安装
 
-1. 到 GitHub Release 下载 `tavern-notes-v1.0.18.zip`。
+1. 到 GitHub Release 下载 `tavern-notes-v1.0.20.zip`。
 2. 解压压缩包。
 3. Windows 用户直接双击最外层的：
 
@@ -218,7 +218,7 @@ body { font-family: "STDongGuanTi"; }
 酒馆笔记包含 SillyTavern Server Plugin。
 Server Plugin 不是沙盒环境，理论上可以访问本机文件系统。请只安装你信任来源的版本。
 
-酒馆笔记 v1.0.18 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
+酒馆笔记 v1.0.20 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
 
 ## 仓库
 
@@ -228,14 +228,13 @@ https://github.com/kongkongmie/tavern-notes
 
 ## 版本
 
-v1.0.18
+v1.0.20
 
-- 增加一键安装器，自动安装前端扩展、后端插件，并开启 `enableServerPlugins`。
-- Windows 下会优先从正在运行的 SillyTavern 黑窗识别酒馆目录。
-- Windows 支持下载单个 `Tavern-Notes-Installer.bat` 后双击在线安装。
-- 完整压缩包把 `Tavern-Notes-Installer.bat` 放在最外层，减少用户翻文件夹。
-- 安卓 Termux、Linux、Mac、云服务器支持一行命令在线安装，也支持完整包离线安装。
-- 保留 V1.0.0 的本地文件保存、多用户目录、角色分类、输入版本、导出和分享卡功能。
+- 支持直接编辑笔记正文，并为每条笔记添加、移除标签。
+- 支持按标签搜索和筛选，提供最近/常用标签及独立的全部标签页面。
+- 支持从所有相关笔记中安全移除某个标签，不会删除笔记。
+- 编辑后的正文和标签会保留在搜索、统计、导入导出及每日备份中。
+- Full 版更新后需要同步更新 Server Plugin，并重启一次 SillyTavern。
 
 
 
