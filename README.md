@@ -81,7 +81,7 @@ Windows / PC：
 
 ### 离线包安装
 
-1. 到 GitHub Release 下载 `tavern-notes-v1.0.20.zip`。
+1. 到 GitHub Release 下载 `tavern-notes-v1.0.21.zip`。
 2. 解压压缩包。
 3. Windows 用户直接双击最外层的：
 
@@ -218,7 +218,7 @@ body { font-family: "STDongGuanTi"; }
 酒馆笔记包含 SillyTavern Server Plugin。
 Server Plugin 不是沙盒环境，理论上可以访问本机文件系统。请只安装你信任来源的版本。
 
-酒馆笔记 v1.0.20 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
+酒馆笔记 v1.0.21 的后端只在当前 SillyTavern 用户目录下创建和读写 `tavern-notes` 文件夹，用于保存笔记、主题和导出文件。
 
 ## 仓库
 
@@ -227,6 +227,14 @@ https://github.com/kongkongmie/tavern-notes
 ```
 
 ## 版本
+
+v1.0.21
+
+- 修复手机端整页漂移、顶部栏被拖出屏幕的问题。
+- 修复浅色与深色主题下酒馆笔记入口图标不可见的问题。
+- 隔离分享卡网络字体样式，避免第三方 CSS 污染酒馆界面。
+- 补齐简中、繁中、英语、韩语的导出与分享卡提示。
+- 本次仅更新前端，不需要重新安装 Server Plugin。
 
 v1.0.20
 
