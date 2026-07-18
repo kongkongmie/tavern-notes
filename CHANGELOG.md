@@ -1,5 +1,13 @@
 ﻿# Changelog
 
+## 1.0.22
+
+- Added automatic collapsing for consecutive identical User inputs with preserved repeat counts.
+- Added searchable exact-match and prefix ignore-rule management for fixed Quick Reply commands.
+- Added a review-first historical duplicate cleanup that shows every affected entry before confirmation.
+- Limited cleanup confirmation to the groups shown in the preview and preserved repeat metadata through later edits.
+- Refined the cleanup panel across desktop, mobile, light, and archive themes.
+
 ## 1.0.21
 
 - Fixed mobile viewport drift that could move the top toolbar outside the visible screen.

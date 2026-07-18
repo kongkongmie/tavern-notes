@@ -102,11 +102,42 @@ function invoke(router, method, route, req) {
         assert.equal(afterTagDelete.totalNotes, 1);
         assert.deepEqual(afterTagDelete.notes[0].tags, ['scene']);
 
+        const userBase = { type: 'user_input', content: '/qr fixed', character: { id: 'char-1', name: 'Test Character' }, chat: { id: 'chat-1', name: 'Chat', messageId: 10 } };
+        const firstInput = invoke(router, 'POST', '/notes', request(root, { body: userBase }));
+        const repeatedInput = invoke(router, 'POST', '/notes', request(root, { body: { ...userBase, chat: { ...userBase.chat, messageId: 11 } } }));
+        assert.equal(firstInput.deduplicated, undefined);
+        assert.equal(repeatedInput.deduplicated, true);
+        assert.equal(repeatedInput.note.repeatCount, 2);
+        assert.equal(repeatedInput.note.latestMessageId, 11);
+        invoke(router, 'PATCH', '/notes/:id', request(root, { params: { id: repeatedInput.note.id }, body: { content: '/qr fixed', tags: ['repeat-tag'] } }));
+        invoke(router, 'DELETE', '/tags/:tag', request(root, { params: { tag: 'repeat-tag' } }));
+        const repeatAfterTagDelete = invoke(router, 'GET', '/notes', request(root, { query: { q: '/qr fixed' } }));
+        assert.equal(repeatAfterTagDelete.notes[0].repeatCount, 2);
+
+        invoke(router, 'POST', '/notes', request(root, { body: { ...userBase, content: 'break', chat: { ...userBase.chat, messageId: 12 } } }));
+        const afterBreak = invoke(router, 'POST', '/notes', request(root, { body: { ...userBase, chat: { ...userBase.chat, messageId: 13 } } }));
+        assert.notEqual(afterBreak.deduplicated, true);
+
+        invoke(router, 'POST', '/notes', request(root, { body: { ...userBase, content: 'legacy', collapseRepeated: false, chat: { ...userBase.chat, messageId: 14 } } }));
+        invoke(router, 'POST', '/notes', request(root, { body: { ...userBase, content: 'legacy', collapseRepeated: false, chat: { ...userBase.chat, messageId: 15 } } }));
+        invoke(router, 'POST', '/notes', request(root, { body: { ...userBase, content: 'legacy two', collapseRepeated: false, chat: { ...userBase.chat, messageId: 16 } } }));
+        invoke(router, 'POST', '/notes', request(root, { body: { ...userBase, content: 'legacy two', collapseRepeated: false, chat: { ...userBase.chat, messageId: 17 } } }));
+        const preview = invoke(router, 'GET', '/user-input-dedupe', request(root));
+        assert.equal(preview.duplicateNotes, 2);
+        const legacyPreview = preview.items.find(item => item.content === 'legacy');
+        assert.equal(legacyPreview.occurrences, 2);
+        const cleaned = invoke(router, 'POST', '/user-input-dedupe', request(root, { body: { ids: [legacyPreview.id] } }));
+        assert.equal(cleaned.duplicateNotes, 1);
+        const legacy = invoke(router, 'GET', '/notes', request(root, { query: { q: 'legacy' } }));
+        assert.equal(legacy.totalNotes, 3);
+        assert.equal(legacy.notes.find(note => note.content === 'legacy').repeatCount, 2);
+        assert.equal(legacy.notes.filter(note => note.content === 'legacy two').length, 2);
+
         invoke(router, 'DELETE', '/notes/:id', request(root, {
             params: { id: created.id },
         }));
         const afterDelete = invoke(router, 'GET', '/notes', request(root));
-        assert.equal(afterDelete.totalNotes, 0);
+        assert.equal(afterDelete.totalNotes, 6);
 
         console.log('Full note edit/tag smoke test passed.');
     } finally {

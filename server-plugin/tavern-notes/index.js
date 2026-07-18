@@ -3,7 +3,7 @@ const path = require('node:path');
 const childProcess = require('node:child_process');
 
 const STORE_DIR = 'tavern-notes';
-const PLUGIN_VERSION = '1.0.20';
+const PLUGIN_VERSION = '1.0.22';
 const INDEX_FILE = 'index.json';
 const THEME_FILE = 'theme.json';
 const THEME_ACTIVE_FILE = 'theme-active.json';
@@ -641,6 +641,9 @@ function applyNoteEdit(note, edits) {
         content: String(edit.content || note.content || '').slice(0, MAX_CONTENT_LENGTH),
         tags: normalizeTags(edit.tags),
         updatedAt: edit.updatedAt || note.updatedAt || note.createdAt,
+        repeatCount: Math.max(1, Number(edit.repeatCount || note.repeatCount || 1)),
+        lastRepeatedAt: edit.lastRepeatedAt || note.lastRepeatedAt || null,
+        latestMessageId: edit.latestMessageId ?? note.latestMessageId ?? note.chat?.messageId ?? null,
     };
 }
 
@@ -671,6 +674,9 @@ function normalizeNote(input, index) {
         },
         source: input.source || '',
         tags: normalizeTags(input.tags),
+        repeatCount: Math.max(1, Number(input.repeatCount || 1)),
+        lastRepeatedAt: input.lastRepeatedAt || null,
+        latestMessageId: input.latestMessageId ?? input.chat?.messageId ?? null,
     };
 }
 
@@ -686,7 +692,124 @@ function noteSummary(note) {
         chat: note.chat,
         source: note.source,
         tags: note.tags,
+        repeatCount: Math.max(1, Number(note.repeatCount || 1)),
+        lastRepeatedAt: note.lastRepeatedAt || null,
+        latestMessageId: note.latestMessageId ?? note.chat?.messageId ?? null,
     };
+}
+
+function normalizeRepeatContent(value) {
+    return String(value || '').trim().replace(/\r\n?/g, '\n');
+}
+
+function userInputContextKey(note) {
+    return [
+        note?.character?.id ?? '',
+        note?.character?.name ?? '',
+        note?.chat?.id ?? '',
+        note?.chat?.name ?? '',
+    ].map(value => String(value).replaceAll('|', '\\|')).join('|');
+}
+
+function writeRepeatEdit(storePath, index, note, repeatCount, lastRepeatedAt, latestMessageId) {
+    const editData = loadNoteEdits(storePath);
+    editData.edits[note.id] = {
+        ...(editData.edits[note.id] || {}),
+        content: note.content,
+        tags: normalizeTags(note.tags),
+        updatedAt: lastRepeatedAt,
+        repeatCount,
+        lastRepeatedAt,
+        latestMessageId,
+    };
+    saveNoteEdits(storePath, editData);
+    const updated = applyNoteEdit(note, editData.edits);
+    index.latest = (index.latest || []).map(item => item.id === note.id ? noteSummary(updated) : item);
+    saveIndex(storePath, index);
+    return noteSummary(updated);
+}
+
+function collapseConsecutiveUserInput(storePath, index, input) {
+    if (input?.type !== 'user_input' || input?.collapseRepeated === false) return null;
+    const incomingContent = normalizeRepeatContent(input.content);
+    const contextKey = userInputContextKey(input);
+    const previous = readAllNotes(storePath, index)
+        .filter(note => note.type === 'user_input' && userInputContextKey(note) === contextKey)
+        .sort((left, right) => Number(right.seq || 0) - Number(left.seq || 0))[0];
+    if (!previous || normalizeRepeatContent(previous.content) !== incomingContent) return null;
+    const repeatedAt = nowIso();
+    return writeRepeatEdit(
+        storePath,
+        index,
+        previous,
+        Math.max(1, Number(previous.repeatCount || 1)) + 1,
+        repeatedAt,
+        Number.isFinite(Number(input.chat?.messageId)) ? Number(input.chat.messageId) : previous.latestMessageId,
+    );
+}
+
+function findUserInputDedupeGroups(notes) {
+    const groups = new Map();
+    const previousByContext = new Map();
+    for (const note of [...notes].sort((left, right) => Number(left.seq || 0) - Number(right.seq || 0))) {
+        if (note.type !== 'user_input') continue;
+        const contextKey = userInputContextKey(note);
+        const contentKey = normalizeRepeatContent(note.content);
+        const previous = previousByContext.get(contextKey);
+        if (previous && previous.contentKey === contentKey) {
+            let group = groups.get(previous.canonical.id);
+            if (!group) groups.set(previous.canonical.id, group = { canonical: previous.canonical, duplicates: [] });
+            group.duplicates.push(note);
+            continue;
+        }
+        previousByContext.set(contextKey, { canonical: note, contentKey });
+    }
+    return Array.from(groups.values());
+}
+
+function dedupeUserInputs(storePath, index, apply = false, selectedIds = null) {
+    const selected = Array.isArray(selectedIds) ? new Set(selectedIds.map(String)) : null;
+    const groups = findUserInputDedupeGroups(readAllNotes(storePath, index))
+        .filter(group => !selected || selected.has(String(group.canonical.id)));
+    const duplicateNotes = groups.reduce((total, group) => total + group.duplicates.length, 0);
+    const items = groups.map(group => ({
+        id: group.canonical.id,
+        content: group.canonical.content,
+        characterName: group.canonical.character?.name || '',
+        chatName: group.canonical.chat?.name || '',
+        occurrences: group.duplicates.length + 1,
+        duplicateNotes: group.duplicates.length,
+    }));
+    if (!apply || !duplicateNotes) return { groups: groups.length, duplicateNotes, remainingNotes: readAllNotes(storePath, index).length - duplicateNotes, items };
+    const editData = loadNoteEdits(storePath);
+    const deleted = new Set(index.deletedIds || []);
+    const removedIds = new Set();
+    for (const group of groups) {
+        const all = [group.canonical, ...group.duplicates];
+        const repeatCount = all.reduce((total, note) => total + Math.max(1, Number(note.repeatCount || 1)), 0);
+        const last = all[all.length - 1];
+        editData.edits[group.canonical.id] = {
+            ...(editData.edits[group.canonical.id] || {}),
+            content: group.canonical.content,
+            tags: normalizeTags(group.canonical.tags),
+            updatedAt: last.lastRepeatedAt || last.updatedAt || last.createdAt || nowIso(),
+            repeatCount,
+            lastRepeatedAt: last.lastRepeatedAt || last.updatedAt || last.createdAt || nowIso(),
+            latestMessageId: last.latestMessageId ?? last.chat?.messageId ?? null,
+        };
+        for (const duplicate of group.duplicates) {
+            deleted.add(duplicate.id);
+            removedIds.add(duplicate.id);
+            delete editData.edits[duplicate.id];
+        }
+    }
+    index.deletedIds = Array.from(deleted);
+    index.latest = (index.latest || [])
+        .filter(note => !removedIds.has(note.id))
+        .map(note => noteSummary(applyNoteEdit(note, editData.edits)));
+    saveNoteEdits(storePath, editData);
+    saveIndex(storePath, index);
+    return { groups: groups.length, duplicateNotes, remainingNotes: readAllNotes(storePath, index).length, items };
 }
 
 function getVariantGroupKey(note) {
@@ -1151,6 +1274,7 @@ async function init(router) {
                 const tags = normalizeTags(note.tags);
                 if (!tags.some(item => item.toLocaleLowerCase() === key)) continue;
                 editData.edits[note.id] = {
+                    ...(editData.edits[note.id] || {}),
                     content: note.content,
                     tags: tags.filter(item => item.toLocaleLowerCase() !== key),
                     updatedAt,
@@ -1176,10 +1300,37 @@ async function init(router) {
         try {
             const storePath = getStorePath(request);
             const index = loadIndex(storePath, request.user.profile?.handle);
+            const collapsed = collapseConsecutiveUserInput(storePath, index, request.body || {});
+            if (collapsed) {
+                const backup = writeDailyBackup(storePath, index, request.user.profile?.handle);
+                return response.json({ ok: true, note: collapsed, deduplicated: true, backup });
+            }
             const note = normalizeNote(request.body || {}, index);
             appendNote(storePath, index, note);
             const backup = writeDailyBackup(storePath, index, request.user.profile?.handle);
             response.json({ ok: true, note: noteSummary(note), backup });
+        } catch (error) {
+            response.status(error.status || 500).json({ ok: false, error: error.message });
+        }
+    });
+
+    router.get('/user-input-dedupe', (request, response) => {
+        try {
+            const storePath = getStorePath(request);
+            const index = loadIndex(storePath, request.user.profile?.handle);
+            response.json({ ok: true, ...dedupeUserInputs(storePath, index, false) });
+        } catch (error) {
+            response.status(error.status || 500).json({ ok: false, error: error.message });
+        }
+    });
+
+    router.post('/user-input-dedupe', (request, response) => {
+        try {
+            const storePath = getStorePath(request);
+            const index = loadIndex(storePath, request.user.profile?.handle);
+            const backup = writeDailyBackup(storePath, index, request.user.profile?.handle);
+            const result = dedupeUserInputs(storePath, index, true, request.body?.ids);
+            response.json({ ok: true, ...result, backup });
         } catch (error) {
             response.status(error.status || 500).json({ ok: false, error: error.message });
         }
@@ -1199,6 +1350,7 @@ async function init(router) {
             const editData = loadNoteEdits(storePath);
             const updatedAt = nowIso();
             editData.edits[id] = {
+                ...(editData.edits[id] || {}),
                 content: content.slice(0, MAX_CONTENT_LENGTH),
                 tags: normalizeTags(request.body?.tags),
                 updatedAt,
