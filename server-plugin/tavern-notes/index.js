@@ -3,7 +3,7 @@ const path = require('node:path');
 const childProcess = require('node:child_process');
 
 const STORE_DIR = 'tavern-notes';
-const PLUGIN_VERSION = '1.0.22';
+const PLUGIN_VERSION = '1.0.23';
 const INDEX_FILE = 'index.json';
 const THEME_FILE = 'theme.json';
 const THEME_ACTIVE_FILE = 'theme-active.json';
@@ -666,6 +666,7 @@ function normalizeNote(input, index) {
             id: input.character?.id ?? null,
             name: input.character?.name || '未命名角色',
             avatar: input.character?.avatar ?? null,
+            isUser: input.character?.isUser === true,
         },
         chat: {
             id: input.chat?.id ?? null,
@@ -752,7 +753,7 @@ function findUserInputDedupeGroups(notes) {
     const groups = new Map();
     const previousByContext = new Map();
     for (const note of [...notes].sort((left, right) => Number(left.seq || 0) - Number(right.seq || 0))) {
-        if (note.type !== 'user_input') continue;
+        if (note.type !== 'user_input' || note.source === 'manual_inspiration') continue;
         const contextKey = userInputContextKey(note);
         const contentKey = normalizeRepeatContent(note.content);
         const previous = previousByContext.get(contextKey);
@@ -1035,6 +1036,7 @@ function summarizeCharacters(storePath, index, filters = {}) {
             id: character.id ?? null,
             name: character.name || '未命名角色',
             avatar: character.avatar ?? null,
+            isUser: character.isUser === true,
             total: 0,
             userInput: 0,
             excerpt: 0,
@@ -1052,7 +1054,7 @@ function summarizeCharacters(storePath, index, filters = {}) {
     }
 
     return Array.from(summaries.values())
-        .sort((a, b) => String(b.latestAt || '').localeCompare(String(a.latestAt || '')));
+        .sort((a, b) => Number(b.isUser) - Number(a.isUser) || String(b.latestAt || '').localeCompare(String(a.latestAt || '')));
 }
 
 function readAllNotes(storePath, index, filters = {}) {
@@ -1254,6 +1256,34 @@ async function init(router) {
             delete filters.limit;
             delete filters.offset;
             response.json({ ok: true, tags: summarizeTags(storePath, index, filters) });
+        } catch (error) {
+            response.status(error.status || 500).json({ ok: false, error: error.message });
+        }
+    });
+
+    router.patch('/tags/:tag', (request, response) => {
+        try {
+            const storePath = getStorePath(request);
+            const index = loadIndex(storePath, request.user.profile?.handle);
+            const oldTag = String(request.params.tag || '').trim();
+            const newTag = normalizeTags([request.body?.name])[0] || '';
+            if (!oldTag || !newTag) return response.status(400).json({ ok: false, error: 'Missing tag name.' });
+            const oldKey = oldTag.toLocaleLowerCase();
+            const editData = loadNoteEdits(storePath);
+            const updatedAt = nowIso();
+            let updated = 0;
+            for (const note of readAllNotes(storePath, index)) {
+                if (!normalizeTags(note.tags).some(tag => tag.toLocaleLowerCase() === oldKey)) continue;
+                editData.edits[note.id] = { ...(editData.edits[note.id] || {}), content: note.content, tags: normalizeTags(note.tags.map(tag => tag.toLocaleLowerCase() === oldKey ? newTag : tag)), updatedAt };
+                updated += 1;
+            }
+            if (updated) {
+                saveNoteEdits(storePath, editData);
+                index.latest = (index.latest || []).map(note => noteSummary(applyNoteEdit(note, editData.edits)));
+                saveIndex(storePath, index);
+            }
+            const backup = writeDailyBackup(storePath, index, request.user.profile?.handle);
+            response.json({ ok: true, oldTag, newTag, updated, backup });
         } catch (error) {
             response.status(error.status || 500).json({ ok: false, error: error.message });
         }

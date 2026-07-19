@@ -133,11 +133,23 @@ function invoke(router, method, route, req) {
         assert.equal(legacy.notes.find(note => note.content === 'legacy').repeatCount, 2);
         assert.equal(legacy.notes.filter(note => note.content === 'legacy two').length, 2);
 
+        const manualBase = { ...userBase, content: 'idea', source: 'manual_inspiration', collapseRepeated: false, tags: ['灵感笔记'], character: { id: 'tavern-notes-user', name: 'Tester', avatar: 'persona.png', isUser: true } };
+        invoke(router, 'POST', '/notes', request(root, { body: { ...manualBase, chat: { ...userBase.chat, messageId: null } } }));
+        invoke(router, 'POST', '/notes', request(root, { body: { ...manualBase, chat: { ...userBase.chat, messageId: null } } }));
+        const previewAfterManual = invoke(router, 'GET', '/user-input-dedupe', request(root));
+        assert.equal(previewAfterManual.duplicateNotes, 1);
+        const renamed = invoke(router, 'PATCH', '/tags/:tag', request(root, { params: { tag: '灵感笔记' }, body: { name: '剧情脑洞' } }));
+        assert.equal(renamed.updated, 2);
+        const renamedNotes = invoke(router, 'GET', '/notes', request(root, { query: { tag: '剧情脑洞' } }));
+        const renamedExport = invoke(router, 'GET', '/export.json', request(root));
+        assert.equal(renamedExport.notes.filter(note => note.tags.includes('剧情脑洞')).length, 2);
+        assert.equal(renamedNotes.notes[0].character.isUser, true);
+
         invoke(router, 'DELETE', '/notes/:id', request(root, {
             params: { id: created.id },
         }));
         const afterDelete = invoke(router, 'GET', '/notes', request(root));
-        assert.equal(afterDelete.totalNotes, 6);
+        assert.equal(afterDelete.totalNotes, 7);
 
         console.log('Full note edit/tag smoke test passed.');
     } finally {
