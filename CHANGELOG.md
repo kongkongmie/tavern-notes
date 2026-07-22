@@ -1,5 +1,18 @@
 ﻿# Changelog
 
+## 1.1.0
+
+- Introduced shared note-card, theme-runtime, and update-center modules aligned with Tavern Notes Lite while preserving the existing Full repository, install path, and file-backed storage.
+- Redesigned note cards for denser previews, clear User/excerpt color distinction, expandable full-detail reading, and direct actions from the detail view.
+- Reworked the header into consistent icon controls with width-aware overflow: more actions appear when the panel is wide and move into the More menu when space is limited.
+- Moved theme access into the top window toolbar and retired the built-in Secret Files theme, including cleanup of legacy active-theme selections and blocked re-import of the retired built-in file.
+- Added whole-message exclusion tags and a directly visible body-tag editor for removing configured tagged blocks before capture.
+- Added an in-app update center with version checks, the default changelog, and optional author-maintained Chinese annotations from `CHANGELOG.zh-CN.md`.
+- Kept manual USER inspiration notes visible when automatic User input recording is disabled; the recording switch now controls capture only, not visibility.
+- Reduced broad DOM rescans during selection, message, and toolbar observation to improve responsiveness while messages stream.
+- Completed Simplified Chinese, Traditional Chinese, English, and Korean coverage for the new controls and states.
+- This release updates both the frontend extension and Server Plugin. Reinstall/update the Full package and restart SillyTavern once.
+
 ## 1.0.23
 
 - Added draggable floating launcher positioning with reset support.

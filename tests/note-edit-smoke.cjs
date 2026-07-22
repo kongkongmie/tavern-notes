@@ -138,6 +138,10 @@ function invoke(router, method, route, req) {
         invoke(router, 'POST', '/notes', request(root, { body: { ...manualBase, chat: { ...userBase.chat, messageId: null } } }));
         const previewAfterManual = invoke(router, 'GET', '/user-input-dedupe', request(root));
         assert.equal(previewAfterManual.duplicateNotes, 1);
+        const manualWithAutoInputOff = invoke(router, 'GET', '/notes', request(root, { query: { includeUserInput: 'false', tag: '灵感笔记' } }));
+        assert.equal(manualWithAutoInputOff.totalNotes, 2);
+        const autoWithAutoInputOff = invoke(router, 'GET', '/notes', request(root, { query: { includeUserInput: 'false', q: '/qr fixed' } }));
+        assert.equal(autoWithAutoInputOff.totalNotes, 0);
         const renamed = invoke(router, 'PATCH', '/tags/:tag', request(root, { params: { tag: '灵感笔记' }, body: { name: '剧情脑洞' } }));
         assert.equal(renamed.updated, 2);
         const renamedNotes = invoke(router, 'GET', '/notes', request(root, { query: { tag: '剧情脑洞' } }));
@@ -149,7 +153,7 @@ function invoke(router, method, route, req) {
             params: { id: created.id },
         }));
         const afterDelete = invoke(router, 'GET', '/notes', request(root));
-        assert.equal(afterDelete.totalNotes, 7);
+        assert.equal(afterDelete.totalNotes, 8);
 
         console.log('Full note edit/tag smoke test passed.');
     } finally {

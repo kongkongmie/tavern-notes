@@ -3,7 +3,7 @@ const path = require('node:path');
 const childProcess = require('node:child_process');
 
 const STORE_DIR = 'tavern-notes';
-const PLUGIN_VERSION = '1.0.23';
+const PLUGIN_VERSION = '1.1.0';
 const INDEX_FILE = 'index.json';
 const THEME_FILE = 'theme.json';
 const THEME_ACTIVE_FILE = 'theme-active.json';
@@ -374,12 +374,12 @@ function secretFilesTheme() {
 
 const BUILT_IN_THEMES = {
     'apple-glass': appleGlassTheme('day'),
-    'secret-files': secretFilesTheme(),
 };
 
 function normalizeBuiltInThemeId(id) {
     const clean = String(id || '');
     if (clean === 'apple-glass-day' || clean === 'apple-glass-night') return 'apple-glass';
+    if (clean === 'secret-files') return 'default';
     return clean;
 }
 
@@ -671,7 +671,12 @@ function normalizeNote(input, index) {
         chat: {
             id: input.chat?.id ?? null,
             name: input.chat?.name || '',
-            messageId: Number.isFinite(Number(input.chat?.messageId)) ? Number(input.chat.messageId) : null,
+            messageId: input.chat?.messageId !== null
+                && input.chat?.messageId !== undefined
+                && input.chat?.messageId !== ''
+                && Number.isFinite(Number(input.chat.messageId))
+                ? Number(input.chat.messageId)
+                : null,
         },
         source: input.source || '',
         tags: normalizeTags(input.tags),
@@ -935,7 +940,9 @@ function getDeletedSet(index) {
 }
 
 function matchesFilters(note, filters) {
-    if ((filters.includeUserInput === 'false' || filters.includeUserInput === false) && note.type === 'user_input') return false;
+    if ((filters.includeUserInput === 'false' || filters.includeUserInput === false)
+        && note.type === 'user_input'
+        && note.source !== 'manual_inspiration') return false;
     if (filters.type && note.type !== filters.type) return false;
     if (filters.characterName && note.character?.name !== filters.characterName) return false;
     if (filters.characterId && String(note.character?.id ?? '') !== filters.characterId) return false;
@@ -1402,7 +1409,9 @@ async function init(router) {
             const index = loadIndex(storePath, request.user.profile?.handle);
             const id = String(request.params.id || '');
             if (!id) return response.status(400).json({ ok: false, error: 'Missing note id.' });
-            index.deletedIds = Array.from(new Set([...(index.deletedIds || []), id])).slice(-5000);
+            // JSONL shards are append-only. Every tombstone must be retained until a
+            // future, explicitly tested compaction has removed the source record.
+            index.deletedIds = Array.from(new Set([...(index.deletedIds || []), id]));
             index.latest = (index.latest || []).filter(note => note.id !== id);
             const editData = loadNoteEdits(storePath);
             if (editData.edits[id]) {
