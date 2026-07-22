@@ -114,6 +114,12 @@ function invoke(router, method, route, req) {
         const repeatAfterTagDelete = invoke(router, 'GET', '/notes', request(root, { query: { q: '/qr fixed' } }));
         assert.equal(repeatAfterTagDelete.notes[0].repeatCount, 2);
 
+        const excerptBase = { type: 'excerpt', content: 'same excerpt', character: { id: 'char-1', name: 'Test Character' }, chat: { id: 'chat-1', name: 'Chat', messageId: 22 }, source: 'selected_text' };
+        const firstExcerpt = invoke(router, 'POST', '/notes', request(root, { body: excerptBase }));
+        const repeatedExcerpt = invoke(router, 'POST', '/notes', request(root, { body: { ...excerptBase, content: '  same   excerpt  ' } }));
+        assert.equal(repeatedExcerpt.deduplicated, true);
+        assert.equal(repeatedExcerpt.note.id, firstExcerpt.note.id);
+
         invoke(router, 'POST', '/notes', request(root, { body: { ...userBase, content: 'break', chat: { ...userBase.chat, messageId: 12 } } }));
         const afterBreak = invoke(router, 'POST', '/notes', request(root, { body: { ...userBase, chat: { ...userBase.chat, messageId: 13 } } }));
         assert.notEqual(afterBreak.deduplicated, true);
@@ -153,7 +159,7 @@ function invoke(router, method, route, req) {
             params: { id: created.id },
         }));
         const afterDelete = invoke(router, 'GET', '/notes', request(root));
-        assert.equal(afterDelete.totalNotes, 8);
+        assert.equal(afterDelete.totalNotes, 9);
 
         console.log('Full note edit/tag smoke test passed.');
     } finally {

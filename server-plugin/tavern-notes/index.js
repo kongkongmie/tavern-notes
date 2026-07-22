@@ -717,6 +717,24 @@ function userInputContextKey(note) {
     ].map(value => String(value).replaceAll('|', '\\|')).join('|');
 }
 
+function excerptDedupeKey(note) {
+    if (note?.type !== 'excerpt') return '';
+    return [
+        note?.character?.id ?? '',
+        note?.character?.name ?? '',
+        note?.chat?.id ?? '',
+        note?.chat?.name ?? '',
+        note?.chat?.messageId ?? '',
+        String(note?.content || '').trim().replace(/\s+/g, ' '),
+    ].map(value => String(value).replaceAll('|', '\\|')).join('|');
+}
+
+function findDuplicateExcerpt(storePath, index, note) {
+    const key = excerptDedupeKey(note);
+    if (!key) return null;
+    return readAllNotes(storePath, index).find(existing => excerptDedupeKey(existing) === key) || null;
+}
+
 function writeRepeatEdit(storePath, index, note, repeatCount, lastRepeatedAt, latestMessageId) {
     const editData = loadNoteEdits(storePath);
     editData.edits[note.id] = {
@@ -1343,6 +1361,10 @@ async function init(router) {
                 return response.json({ ok: true, note: collapsed, deduplicated: true, backup });
             }
             const note = normalizeNote(request.body || {}, index);
+            const duplicateExcerpt = findDuplicateExcerpt(storePath, index, note);
+            if (duplicateExcerpt) {
+                return response.json({ ok: true, note: noteSummary(duplicateExcerpt), deduplicated: true });
+            }
             appendNote(storePath, index, note);
             const backup = writeDailyBackup(storePath, index, request.user.profile?.handle);
             response.json({ ok: true, note: noteSummary(note), backup });

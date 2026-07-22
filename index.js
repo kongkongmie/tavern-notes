@@ -122,6 +122,7 @@ const state = {
     variantIndexByGroup: {},
     lastSelection: null,
     selectionButtonTimer: null,
+    selectionDismissedUntil: 0,
     lastSelectionRoot: null,
     selectionFrameObserver: null,
     boundSelectionRoots: new WeakSet(),
@@ -1246,20 +1247,21 @@ const DEFAULT_THEME = {
         '--tn-gold': '#f4b51f',
         '--tn-gold-2': '#ffd45f',
         // 全局形状与阴影：面板半径、卡片半径、字体和外层投影。
-        '--tn-shadow-dark': 'rgba(151, 145, 132, 0.44)',
-        '--tn-shadow-light': 'rgba(255, 255, 255, 0.98)',
+        '--tn-shadow-dark': 'rgba(111, 105, 94, 0.18)',
+        '--tn-shadow-light': 'rgba(255, 255, 255, 0.52)',
         '--tn-radius-panel': '28px',
         '--tn-radius-card': '24px',
         '--tn-font-family': 'var(--mainFontFamily, inherit)',
-        '--tn-panel-border': 'rgba(255, 255, 255, 0.86)',
+        '--tn-panel-border': 'rgba(188, 183, 171, 0.42)',
+        '--tn-panel-shadow': '0 18px 48px rgba(74, 68, 58, 0.18), 0 1px 0 rgba(255, 255, 255, 0.62)',
         // 控件与卡片：搜索框、筛选卡、按钮、弹层背景。
         '--tn-control-bg': 'linear-gradient(145deg, #fffdf7 0%, #e4e1d8 100%)',
         '--tn-control-bg-hover': 'linear-gradient(145deg, rgba(255, 216, 82, 0.48), rgba(255, 254, 248, 0.98)), linear-gradient(145deg, #fffdf7, #e4e1d8)',
         '--tn-control-inset-bg': 'linear-gradient(145deg, #dedbd2 0%, #fffdf8 100%)',
-        '--tn-control-inset-shadow': 'inset 8px 8px 18px rgba(151, 145, 132, 0.24), inset -8px -8px 18px rgba(255, 255, 255, 0.92)',
+        '--tn-control-inset-shadow': 'inset 0 0 0 1px rgba(151, 145, 132, 0.16)',
         '--tn-card-bg': 'linear-gradient(145deg, #fffdf7 0%, #e5e2d9 100%)',
         '--tn-card-bg-active': 'radial-gradient(circle at 18% 22%, rgba(255, 212, 74, 0.58), transparent 32%), linear-gradient(145deg, #fffdf7 0%, #e5e2d9 100%)',
-        '--tn-card-active-shadow': 'inset 5px 5px 12px rgba(151, 145, 132, 0.18), inset -5px -5px 12px rgba(255, 255, 255, 0.78), 8px 8px 18px rgba(151, 145, 132, 0.2)',
+        '--tn-card-active-shadow': '0 0 0 1px rgba(216, 148, 0, 0.22), 0 5px 14px rgba(106, 99, 87, 0.12)',
         '--tn-icon-bg': 'linear-gradient(145deg, #fffef9 0%, #ddd9cf 100%)',
         '--tn-action-bg': 'linear-gradient(145deg, rgba(255, 253, 247, 0.98), rgba(230, 226, 217, 0.96))',
         '--tn-overlay-bg': 'rgba(238, 236, 229, 0.84)',
@@ -1271,27 +1273,27 @@ const DEFAULT_THEME = {
         '--tn-quote': '#d89400',
         '--tn-text-shadow': 'transparent',
         // 滚动条与小按钮：分页、主题按钮、笔记操作按钮共用。
-        '--tn-panel-glow': 'rgba(255, 215, 91, 0.24)',
+        '--tn-panel-glow': 'rgba(255, 215, 91, 0.08)',
         '--tn-scrollbar-thumb': '#f4b51f',
         '--tn-scrollbar-track': 'rgba(244, 181, 31, 0.13)',
         '--tn-mini-button-bg': 'linear-gradient(145deg, #fffef9, #e4e1da)',
-        '--tn-mini-button-shadow': '4px 4px 9px rgba(151, 145, 132, 0.3), -4px -4px 9px rgba(255, 255, 255, 0.98)',
+        '--tn-mini-button-shadow': '0 3px 8px rgba(106, 99, 87, 0.14)',
         '--tn-mini-button-hover-bg': 'linear-gradient(145deg, rgba(255, 218, 94, 0.45), #fffef9)',
-        '--tn-mini-button-hover-shadow': '6px 6px 13px rgba(151, 145, 132, 0.38), -6px -6px 13px rgba(255, 255, 255, 1)',
-        '--tn-filter-hover-shadow': '15px 15px 28px rgba(151, 145, 132, 0.3), -12px -12px 24px rgba(255, 255, 255, 0.99)',
-        '--tn-filter-icon-border': 'rgba(255, 255, 255, 0.76)',
-        '--tn-filter-icon-shadow': '6px 6px 12px rgba(151, 145, 132, 0.28), -5px -5px 11px rgba(255, 255, 255, 0.96), inset 1px 1px 2px rgba(255, 255, 255, 0.82), inset -1px -1px 2px rgba(151, 145, 132, 0.12)',
+        '--tn-mini-button-hover-shadow': '0 5px 12px rgba(106, 99, 87, 0.18)',
+        '--tn-filter-hover-shadow': '0 7px 18px rgba(106, 99, 87, 0.16)',
+        '--tn-filter-icon-border': 'rgba(188, 183, 171, 0.34)',
+        '--tn-filter-icon-shadow': '0 3px 9px rgba(106, 99, 87, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.48)',
         '--tn-inline-action-bg': 'rgba(255, 253, 247, 0.42)',
         '--tn-inline-action-hover-bg': 'rgba(255, 229, 138, 0.24)',
-        '--tn-inline-action-shadow': '3px 3px 7px rgba(151, 145, 132, 0.16), -3px -3px 7px rgba(255, 255, 255, 0.72)',
+        '--tn-inline-action-shadow': '0 2px 6px rgba(106, 99, 87, 0.1)',
         '--tn-inline-action-hover-shadow': 'inset 3px 3px 7px rgba(151, 145, 132, 0.14), inset -3px -3px 7px rgba(255, 255, 255, 0.78)',
         '--tn-inline-icon-bg': 'linear-gradient(145deg, #fffdf8, #dedbd3)',
         '--tn-inline-icon-hover-bg': 'linear-gradient(145deg, #fff7d9, #fffefa)',
-        '--tn-inline-icon-shadow': '2px 2px 5px rgba(151, 145, 132, 0.28), -2px -2px 5px rgba(255, 255, 255, 0.88)',
+        '--tn-inline-icon-shadow': '0 2px 5px rgba(106, 99, 87, 0.12)',
         // 笔记卡片：卡片背景、类型标签、User 输入/摘抄的区分色。
         '--tn-note-bg': 'var(--tn-card-image), var(--tn-card-bg)',
-        '--tn-note-border': '1px solid rgba(255, 255, 255, 0.82)',
-        '--tn-note-shadow': '16px 16px 30px rgba(151, 145, 132, 0.28), -14px -14px 28px rgba(255, 255, 255, 0.98)',
+        '--tn-note-border': '1px solid rgba(188, 183, 171, 0.44)',
+        '--tn-note-shadow': '0 8px 22px rgba(106, 99, 87, 0.14)',
         '--tn-note-type-bg': 'linear-gradient(145deg, rgba(255, 225, 127, 0.7), rgba(255, 248, 224, 0.78))',
         '--tn-note-type-color': '#805d05',
         '--tn-note-type-user-bg': 'linear-gradient(145deg, rgba(255, 225, 127, 0.7), rgba(255, 248, 224, 0.78))',
@@ -1307,9 +1309,9 @@ const DEFAULT_THEME = {
         '--tn-note-topline-radius': '0',
         '--tn-note-topline-margin': '0 0 12px 18px',
         '--tn-note-dot-display': 'block',
-        '--tn-filter-shadow': '13px 13px 25px rgba(151, 145, 132, 0.28), -11px -11px 23px rgba(255, 255, 255, 0.99)',
-        '--tn-control-shadow': '9px 9px 18px rgba(151, 145, 132, 0.3), -8px -8px 18px rgba(255, 255, 255, 0.99)',
-        '--tn-inset-light': 'rgba(255, 255, 255, 0.94)',
+        '--tn-filter-shadow': '0 5px 15px rgba(106, 99, 87, 0.12)',
+        '--tn-control-shadow': '0 4px 12px rgba(106, 99, 87, 0.12)',
+        '--tn-inset-light': 'rgba(255, 255, 255, 0.5)',
     },
     assets: {
         brandIcon: 'fa-book-open',
@@ -2988,17 +2990,24 @@ function hideSelectionCaptureButton() {
 
 function dismissSelectionCaptureButton() {
     state.lastSelection = null;
+    state.selectionDismissedUntil = Date.now() + 1000;
     clearTimeout(state.selectionButtonTimer);
     hideSelectionCaptureButton();
-    try {
-        window.getSelection()?.removeAllRanges();
-    } catch {
-        // Some embedded selections cannot be cleared from the parent page.
+    const selections = [getRootSelection(state.lastSelectionRoot), window.getSelection?.()];
+    for (const frame of document.querySelectorAll('iframe')) {
+        try { selections.push(frame.contentWindow?.getSelection?.()); } catch { /* cross-origin */ }
+    }
+    for (const selection of new Set(selections.filter(Boolean))) {
+        try { selection.removeAllRanges(); } catch { /* embedded selection may reject clearing */ }
     }
     setTimeout(hideSelectionCaptureButton, 120);
 }
 
 function updateSelectionCaptureButton() {
+    if (Date.now() < state.selectionDismissedUntil) {
+        hideSelectionCaptureButton();
+        return;
+    }
     if (!state.showSelectionCaptureButton) {
         hideSelectionCaptureButton();
         return;
