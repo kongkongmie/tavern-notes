@@ -1,5 +1,18 @@
 ﻿# Changelog
 
+## 1.2.0
+
+- Unified Tavern Notes into one install: new users install `tavern-notes` once and choose Full file storage or Lite browser storage on first launch.
+- Added a repository router so the same interface, capture tools, tags, editing, search, detail actions, share cards, themes, and update center work with either storage mode.
+- Reconnected the existing `tavern-notes-lite` IndexedDB, Lite themes, imported fonts, and Lite interface settings without moving or rewriting user data.
+- Preserved the existing Full Server Plugin API, data directory, backups, repository URL, and update path.
+- Added an in-app storage-mode indicator and switcher. Switching changes the active repository only; it never migrates, merges, or deletes notes.
+- Existing Full users with prior settings or file-backed notes continue in Full automatically, while genuinely new users still receive the Full/Lite choice even when a backend is already available.
+- Added Lite-compatible chunked JSON import and local JSON/TXT export to the unified interface, including duplicate detection on repeated imports.
+- Kept Full-only theme merging and theme-folder access hidden in Lite mode, while translating legacy Lite theme variables into the unified theme runtime.
+- Kept the standalone `tavern-notes-lite` repository as a temporary compatibility and emergency-update channel during unified-release validation.
+- This release does not change either storage schema. Existing Full and Lite data remain in their original locations.
+
 ## 1.1.0
 
 - Introduced shared note-card, theme-runtime, and update-center modules aligned with Tavern Notes Lite while preserving the existing Full repository, install path, and file-backed storage.

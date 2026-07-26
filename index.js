@@ -14,16 +14,32 @@ import { buildFloorExcludeSelector, extractFloorText, normalizeExcludedTagNames,
 import { closeNoteActionMenus, renderNoteCards, toggleNoteActionMenu } from './core/note-card.js';
 import { normalizeThemeFlavor, replaceThemeVariables } from './core/theme-runtime.js';
 import { fetchUpdateInfo } from './core/update-center.js';
+import { createRepositoryRouter } from './core/repository-router.js';
+import { createLocalThemeRepository } from './core/local-theme-repository.js';
+import { prepareStorageModeSwitch, shouldResumeFullMode } from './core/storage-mode-settings.js';
+import { toFullThemeVariables } from './theme-compat.js';
+import {
+    getAllLiteNotes,
+    getLiteExport,
+    liteApi,
+    markLiteExported,
+} from './storage.js';
 
 const API_BASE = '/api/plugins/tavern-notes';
 const SETTINGS_KEY = 'tavern-notes-settings';
+const FULL_SETTINGS_PROFILE_KEY = 'tavern-notes-unified-full-settings';
+const LITE_SETTINGS_PROFILE_KEY = 'tavern-notes-unified-lite-settings';
+const LEGACY_LITE_SETTINGS_KEY = 'tavern-notes-lite-settings';
 const UPDATE_NOTICE_KEY = 'tavern-notes-update-notice';
-const EXTENSION_VERSION = '1.1.0';
+const EXTENSION_VERSION = '1.2.0';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/manifest.json';
 const REMOTE_CHANGELOG_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/CHANGELOG.md';
 const REMOTE_CHANGELOG_ANNOTATION_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/CHANGELOG.zh-CN.md';
 const REPOSITORY_URL = 'https://github.com/kongkongmie/tavern-notes';
-const FONT_DB_NAME = 'tavern-notes-fonts';
+const LITE_THEME_STORAGE_KEY = 'tavern-notes-lite-themes';
+const LITE_ACTIVE_THEME_KEY = 'tavern-notes-lite-active-theme';
+const FULL_FONT_DB_NAME = 'tavern-notes-fonts';
+const LITE_FONT_DB_NAME = 'tavern-notes-lite-fonts';
 const FONT_DB_STORE = 'fonts';
 const BACKEND_INSTALL_WINDOWS_PATH = 'SillyTavern\\public\\scripts\\extensions\\third-party\\tavern-notes\\install-server-plugin.bat';
 const BACKEND_INSTALL_SHELL_COMMAND = 'node SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-server-plugin.js';
@@ -72,6 +88,7 @@ function loadLocalSettings() {
 }
 
 const localSettings = loadLocalSettings();
+const hasLegacyFullSettings = Object.keys(localSettings).length > 0 && !localSettings.storageMode;
 const savedLanguage = ['auto', 'zh-CN', 'zh-TW', 'en', 'ko'].includes(localSettings.language)
     ? localSettings.language
     : 'auto';
@@ -81,6 +98,9 @@ const savedShareTheme = ['calendar', 'jianshu', 'dialogue', 'mobai'].includes(lo
 const savedLauncherMode = ['toolbar', 'floating'].includes(localSettings.launcherMode)
     ? localSettings.launcherMode
     : 'toolbar';
+const savedStorageMode = ['full', 'lite'].includes(localSettings.storageMode)
+    ? localSettings.storageMode
+    : null;
 
 function sanitizeImportedFonts(fonts) {
     if (!Array.isArray(fonts)) return [];
@@ -115,6 +135,8 @@ const state = {
     page: 1,
     pageSize: 15,
     status: null,
+    storageMode: savedStorageMode,
+    storageModeResolved: Boolean(savedStorageMode),
     language: savedLanguage,
     currentUserName: localSettings.currentUserName || '',
     lastCapturedMessageId: null,
@@ -325,10 +347,21 @@ const TEXT_ZH_CN = {
     updateAvailableTitle: '酒馆笔记有新版本',
     updateAvailable: '检测到 v{version}。请在 SillyTavern 扩展面板里更新；如果当初用黑窗安装，也可以重新运行安装器。',
     updateCenter: '版本与更新', updateCenterIntro: '查看当前版本、最新版本和更新日志。是否更新完全由你决定。', checkUpdates: '检查更新', checkingUpdates: '正在检查…', installedVersion: '当前版本', latestVersion: '最新版本', updateAvailableStatus: '发现新版本 v{version}', upToDateStatus: '已经是最新版本', updateCheckFailed: '暂时无法连接更新服务器', openExtensionManager: '打开扩展管理', openRepository: '打开项目页面', updateInstructions: '更新由 SillyTavern 扩展管理器执行；酒馆笔记不会静默安装或覆盖文件。', changelogTitle: '更新日志', latestBadge: '最新', noChangelog: '暂时没有取得更新日志。', viewUpdate: '查看更新', authorAnnotation: '作者中文注释',
-    backendInstallTitle: '酒馆笔记还差一步',
-    backendInstallMessage: '前端已经安装完成。为了把笔记保存到本地文件，还需要运行一次后端安装器，然后重启 SillyTavern。',
+    backendInstallTitle: '你正在安装酒馆笔记 Full',
+    backendInstallMessage: '当前安装的是 Full 前端。关闭此提示不会切换成 Lite。要继续使用 Full，请运行一次下面的后端安装器，然后重启 SillyTavern；如果想用 Lite，请卸载当前 Full，再安装 tavern-notes-lite，Lite 不需要这一步。',
     backendInstallWindows: 'Windows：打开并运行这个文件',
     backendInstallOther: 'Mac / Linux / 安卓 Termux / 云服务器：在终端运行',
+    storageChoiceTitle: '选择酒馆笔记的保存方式',
+    storageChoiceMessage: '只需要安装这一个扩展。请选择笔记保存在 SillyTavern 文件中，还是当前浏览器中。两边数据彼此独立，不会自动搬移或删除。',
+    storageFullTitle: 'Full · 本地文件',
+    storageFullDescription: '适合电脑或可安装 Server Plugin 的环境。沿用原 Full 笔记、自动备份和完整主题工具，需要完成一次后端安装。',
+    storageLiteTitle: 'Lite · 浏览器存储',
+    storageLiteDescription: '适合手机、Termux 限制环境或不能安装后端的用户。立即使用 IndexedDB，也会连接此浏览器中原有的 Lite 笔记。',
+    storageModeFull: 'Full 文件模式',
+    storageModeLite: 'Lite 浏览器模式',
+    storageModeCurrent: '当前保存方式：{mode}',
+    chooseStorageMode: '保存方式',
+    changeStorageModeWarning: '切换保存方式不会迁移或删除笔记。切换后将显示另一存储中的内容，是否继续？',
     copyWindowsPath: '复制 Windows 路径',
     copyShellCommand: '复制终端命令',
     copiedInstallCommand: '已复制后端安装命令。',
@@ -551,10 +584,21 @@ const TEXTS = {
         updateAvailableTitle: '酒館筆記有新版本',
         updateAvailable: '偵測到 v{version}。請在 SillyTavern 擴充面板裡更新；如果當初用黑窗安裝，也可以重新執行安裝器。',
         updateCenter: '版本與更新', updateCenterIntro: '查看目前版本、最新版本和更新日誌。是否更新完全由你決定。', checkUpdates: '檢查更新', checkingUpdates: '正在檢查…', installedVersion: '目前版本', latestVersion: '最新版本', updateAvailableStatus: '發現新版本 v{version}', upToDateStatus: '已經是最新版本', updateCheckFailed: '暫時無法連線更新伺服器', openExtensionManager: '開啟擴充管理', openRepository: '開啟專案頁面', updateInstructions: '更新由 SillyTavern 擴充管理器執行；酒館筆記不會靜默安裝或覆蓋檔案。', changelogTitle: '更新日誌', latestBadge: '最新', noChangelog: '暫時沒有取得更新日誌。', viewUpdate: '查看更新', authorAnnotation: '作者中文註釋',
-        backendInstallTitle: '酒館筆記還差一步',
-        backendInstallMessage: '前端已安裝完成。為了把筆記保存到本機檔案，還需要執行一次後端安裝器，然後重啟 SillyTavern。',
+        backendInstallTitle: '你正在安裝酒館筆記 Full',
+        backendInstallMessage: '目前安裝的是 Full 前端。關閉此提示不會切換成 Lite。要繼續使用 Full，請執行一次下方的後端安裝器，然後重新啟動 SillyTavern；如果想用 Lite，請解除安裝目前的 Full，再安裝 tavern-notes-lite，Lite 不需要此步驟。',
         backendInstallWindows: 'Windows：打開並執行這個檔案',
         backendInstallOther: 'Mac / Linux / Android Termux / 雲端伺服器：在終端執行',
+        storageChoiceTitle: '選擇酒館筆記的儲存方式',
+        storageChoiceMessage: '只需要安裝這一個擴充。請選擇將筆記儲存在 SillyTavern 檔案中，或目前瀏覽器中。兩邊資料彼此獨立，不會自動搬移或刪除。',
+        storageFullTitle: 'Full · 本機檔案',
+        storageFullDescription: '適合電腦或可安裝 Server Plugin 的環境。沿用原 Full 筆記、自動備份和完整主題工具，需要完成一次後端安裝。',
+        storageLiteTitle: 'Lite · 瀏覽器儲存',
+        storageLiteDescription: '適合手機、Termux 受限環境或無法安裝後端的使用者。立即使用 IndexedDB，也會連接此瀏覽器中原有的 Lite 筆記。',
+        storageModeFull: 'Full 檔案模式',
+        storageModeLite: 'Lite 瀏覽器模式',
+        storageModeCurrent: '目前儲存方式：{mode}',
+        chooseStorageMode: '儲存方式',
+        changeStorageModeWarning: '切換儲存方式不會移轉或刪除筆記。切換後將顯示另一個儲存空間中的內容，是否繼續？',
         copyWindowsPath: '複製 Windows 路徑',
         copyShellCommand: '複製終端命令',
         copiedInstallCommand: '已複製後端安裝命令。',
@@ -815,10 +859,21 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         updateAvailableTitle: 'Tavern Notes update available',
         updateAvailable: 'Version {version} is available. Update it in the SillyTavern extensions panel, or rerun the installer if you originally used the installer.',
         updateCenter: 'Version & updates', updateCenterIntro: 'View the installed version, latest version, and release notes. You decide whether to update.', checkUpdates: 'Check for updates', checkingUpdates: 'Checking…', installedVersion: 'Installed', latestVersion: 'Latest', updateAvailableStatus: 'Version {version} is available', upToDateStatus: 'You are up to date', updateCheckFailed: 'Could not reach the update server', openExtensionManager: 'Open extension manager', openRepository: 'Open project page', updateInstructions: 'Updates are performed by the SillyTavern extension manager. Tavern Notes never installs silently or overwrites files on its own.', changelogTitle: 'Release notes', latestBadge: 'Latest', noChangelog: 'Release notes are not available right now.', viewUpdate: 'View update', authorAnnotation: 'Author’s Chinese notes',
-        backendInstallTitle: 'One more step for Tavern Notes',
-        backendInstallMessage: 'The frontend is installed. To save notes as local files, run the backend installer once, then restart SillyTavern.',
+        backendInstallTitle: 'You are installing Tavern Notes Full',
+        backendInstallMessage: 'The Full frontend is installed. Closing this dialog does not switch to Lite. To continue with Full, run the backend installer below once, then restart SillyTavern. To use Lite instead, uninstall Full and install tavern-notes-lite; Lite does not need this step.',
         backendInstallWindows: 'Windows: open and run this file',
         backendInstallOther: 'Mac / Linux / Android Termux / cloud server: run this in a terminal',
+        storageChoiceTitle: 'Choose how Tavern Notes stores notes',
+        storageChoiceMessage: 'Install this extension only once, then choose SillyTavern file storage or storage in this browser. The two stores remain separate and are never moved or deleted automatically.',
+        storageFullTitle: 'Full · Local files',
+        storageFullDescription: 'For computers or environments that support Server Plugins. Keeps existing Full notes, automatic backups, and complete theme tools; one backend installation is required.',
+        storageLiteTitle: 'Lite · Browser storage',
+        storageLiteDescription: 'For phones, restricted Termux setups, or users who cannot install a backend. Uses IndexedDB immediately and reconnects existing Lite notes in this browser.',
+        storageModeFull: 'Full file mode',
+        storageModeLite: 'Lite browser mode',
+        storageModeCurrent: 'Current storage: {mode}',
+        chooseStorageMode: 'Storage mode',
+        changeStorageModeWarning: 'Switching storage does not migrate or delete notes. The app will show notes from the other store. Continue?',
         copyWindowsPath: 'Copy Windows path',
         copyShellCommand: 'Copy terminal command',
         copiedInstallCommand: 'Backend install command copied.',
@@ -1080,10 +1135,21 @@ Click Preview & save or Save as to create a theme file.`,
         updateAvailableTitle: 'Tavern Notes 업데이트 가능',
         updateAvailable: 'v{version} 버전이 있습니다. SillyTavern 확장 패널에서 업데이트하거나, 설치기로 설치했다면 설치기를 다시 실행하세요.',
         updateCenter: '버전 및 업데이트', updateCenterIntro: '현재 버전, 최신 버전과 변경 사항을 확인합니다. 업데이트 여부는 사용자가 결정합니다.', checkUpdates: '업데이트 확인', checkingUpdates: '확인 중…', installedVersion: '현재 버전', latestVersion: '최신 버전', updateAvailableStatus: '새 버전 v{version} 사용 가능', upToDateStatus: '최신 버전입니다', updateCheckFailed: '업데이트 서버에 연결할 수 없습니다', openExtensionManager: '확장 관리 열기', openRepository: '프로젝트 페이지 열기', updateInstructions: '업데이트는 SillyTavern 확장 관리자가 수행합니다. Tavern Notes는 자동으로 설치하거나 파일을 덮어쓰지 않습니다.', changelogTitle: '업데이트 기록', latestBadge: '최신', noChangelog: '현재 업데이트 기록을 가져올 수 없습니다.', viewUpdate: '업데이트 보기', authorAnnotation: '작성자 중국어 주석',
-        backendInstallTitle: 'Tavern Notes 설치가 한 단계 남았습니다',
-        backendInstallMessage: '프론트엔드는 설치되었습니다. 노트를 로컬 파일로 저장하려면 백엔드 설치기를 한 번 실행한 뒤 SillyTavern을 다시 시작하세요.',
+        backendInstallTitle: 'Tavern Notes Full을 설치하고 있습니다',
+        backendInstallMessage: '현재 Full 프론트엔드가 설치되어 있습니다. 이 창을 닫아도 Lite로 전환되지 않습니다. Full을 계속 사용하려면 아래 백엔드 설치기를 한 번 실행한 뒤 SillyTavern을 다시 시작하세요. Lite를 사용하려면 Full을 제거하고 tavern-notes-lite를 설치하세요. Lite에는 이 단계가 필요하지 않습니다.',
         backendInstallWindows: 'Windows: 이 파일을 열어 실행하세요',
         backendInstallOther: 'Mac / Linux / Android Termux / 클라우드 서버: 터미널에서 실행하세요',
+        storageChoiceTitle: 'Tavern Notes 저장 방식을 선택하세요',
+        storageChoiceMessage: '이 확장 하나만 설치한 뒤 SillyTavern 파일 저장소 또는 현재 브라우저 저장소를 선택하세요. 두 저장소의 데이터는 서로 분리되며 자동으로 이동하거나 삭제되지 않습니다.',
+        storageFullTitle: 'Full · 로컬 파일',
+        storageFullDescription: 'PC 또는 Server Plugin을 설치할 수 있는 환경용입니다. 기존 Full 노트, 자동 백업, 전체 테마 도구를 사용하며 백엔드를 한 번 설치해야 합니다.',
+        storageLiteTitle: 'Lite · 브라우저 저장소',
+        storageLiteDescription: '휴대폰, 제한된 Termux 환경 또는 백엔드를 설치할 수 없는 사용자용입니다. IndexedDB를 즉시 사용하며 이 브라우저의 기존 Lite 노트에도 다시 연결합니다.',
+        storageModeFull: 'Full 파일 모드',
+        storageModeLite: 'Lite 브라우저 모드',
+        storageModeCurrent: '현재 저장 방식: {mode}',
+        chooseStorageMode: '저장 방식',
+        changeStorageModeWarning: '저장 방식을 바꿔도 노트를 이전하거나 삭제하지 않습니다. 전환 후 다른 저장소의 노트가 표시됩니다. 계속할까요?',
         copyWindowsPath: 'Windows 경로 복사',
         copyShellCommand: '터미널 명령 복사',
         copiedInstallCommand: '백엔드 설치 명령을 복사했습니다.',
@@ -1533,7 +1599,55 @@ function getChatName() {
     return getCurrentChatId?.() || '';
 }
 
-async function api(path, options = {}) {
+function getLiteUserName() {
+    return String(name1 || state.currentUserName || 'default-user').trim() || 'default-user';
+}
+
+const RETIRED_LOCAL_THEME_IDS = new Set(['secret-files', 'archive']);
+
+function getLocalBuiltInThemes() {
+    const defaultTheme = normalizeTheme({ ...DEFAULT_THEME, id: 'default', name: 'Soft Neomorphism' });
+    const appleTheme = normalizeTheme({
+        ...DEFAULT_THEME,
+        id: APPLE_THEME_ID,
+        name: 'Apple Glass',
+        variables: {
+            ...DEFAULT_THEME.variables,
+            ...APPLE_GLASS_SHARED_VARIABLES,
+            ...APPLE_GLASS_DAY_VARIABLES,
+            '--tn-theme-flavor': 'apple',
+        },
+    });
+    return [
+        { id: 'default', name: defaultTheme.name, author: 'Tavern Notes', builtIn: true, theme: defaultTheme },
+        { id: APPLE_THEME_ID, name: appleTheme.name, author: 'Tavern Notes', builtIn: true, theme: appleTheme },
+    ];
+}
+
+function isRetiredLocalTheme(record) {
+    const id = String(record?.id || record?.theme?.id || '').trim().toLowerCase();
+    const name = String(record?.name || record?.theme?.name || '').trim();
+    const variables = record?.theme?.variables || {};
+    const flavor = String(variables['--tn-theme-flavor'] || variables['--tnl-theme-flavor'] || '').trim().toLowerCase();
+    return RETIRED_LOCAL_THEME_IDS.has(id)
+        || flavor === 'archive'
+        || /secret\s*files?/i.test(name)
+        || /秘密档案|秘密檔案/.test(name);
+}
+
+const localThemeApi = createLocalThemeRepository({
+    storage: localStorage,
+    themeStorageKey: LITE_THEME_STORAGE_KEY,
+    activeThemeKey: LITE_ACTIVE_THEME_KEY,
+    appleThemeId: APPLE_THEME_ID,
+    getBuiltInThemes: getLocalBuiltInThemes,
+    normalizeTheme,
+    normalizeThemeId: normalizeAppleThemeId,
+    isRetiredTheme: isRetiredLocalTheme,
+    translate: t,
+});
+
+async function serverApi(path, options = {}) {
     let response;
     try {
         response = await fetch(`${API_BASE}${path}`, {
@@ -1578,6 +1692,15 @@ async function api(path, options = {}) {
     return data;
 }
 
+const api = createRepositoryRouter({
+    getMode: () => state.storageMode,
+    serverRequest: serverApi,
+    liteRequest: liteApi,
+    localThemeRequest: localThemeApi,
+    getLiteUser: getLiteUserName,
+    getRuntimeVersion: () => EXTENSION_VERSION,
+});
+
 function notify(message, kind = 'info') {
     setStatus(message);
     const toastrApi = globalThis.toastr;
@@ -1601,6 +1724,77 @@ async function copyTextToClipboard(text) {
     textarea.select();
     document.execCommand('copy');
     textarea.remove();
+}
+
+async function resolveInitialStorageMode() {
+    if (state.storageModeResolved && state.storageMode) return null;
+    try {
+        const status = await serverApi('/status');
+        if (shouldResumeFullMode({ hasLegacySettings: hasLegacyFullSettings, totalNotes: status.totalNotes })) {
+            state.storageMode = 'full';
+            state.storageModeResolved = true;
+            state.currentUserName = status.user || state.currentUserName || '';
+            saveLocalSettings();
+        }
+        return status;
+    } catch {
+        state.storageMode = null;
+        state.storageModeResolved = false;
+        return null;
+    }
+}
+
+function selectStorageMode(mode) {
+    if (!['full', 'lite'].includes(mode)) return;
+    if (state.storageMode === mode) {
+        document.querySelector('#tavern-notes-storage-choice')?.remove();
+        return;
+    }
+    if (state.storageMode && state.storageMode !== mode
+        && !window.confirm(t('changeStorageModeWarning'))) return;
+    prepareStorageModeSwitch({
+        storage: localStorage,
+        currentSettingsKey: SETTINGS_KEY,
+        fullProfileKey: FULL_SETTINGS_PROFILE_KEY,
+        liteProfileKey: LITE_SETTINGS_PROFILE_KEY,
+        legacyLiteSettingsKey: LEGACY_LITE_SETTINGS_KEY,
+        currentMode: state.storageMode,
+        targetMode: mode,
+    });
+    window.location.reload();
+}
+
+function showStorageModeChooser({ allowClose = Boolean(state.storageMode) } = {}) {
+    document.querySelector('#tavern-notes-storage-choice')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'tavern-notes-storage-choice';
+    overlay.dataset.tnOverlay = 'storage-choice';
+    overlay.innerHTML = `
+        <div class="tn-install-card tn-storage-choice-card" role="dialog" aria-modal="true" aria-label="${htmlEscape(t('storageChoiceTitle'))}">
+            ${allowClose ? `<button class="tn-install-close" type="button" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>` : ''}
+            <h2>${htmlEscape(t('storageChoiceTitle'))}</h2>
+            <p>${htmlEscape(t('storageChoiceMessage'))}</p>
+            <div class="tn-storage-choice-grid">
+                <button class="tn-storage-choice ${state.storageMode === 'full' ? 'active' : ''}" data-storage-mode="full" type="button">
+                    <i class="fa-solid fa-hard-drive"></i>
+                    <span><b>${htmlEscape(t('storageFullTitle'))}</b><small>${htmlEscape(t('storageFullDescription'))}</small></span>
+                </button>
+                <button class="tn-storage-choice ${state.storageMode === 'lite' ? 'active' : ''}" data-storage-mode="lite" type="button">
+                    <i class="fa-solid fa-window-maximize"></i>
+                    <span><b>${htmlEscape(t('storageLiteTitle'))}</b><small>${htmlEscape(t('storageLiteDescription'))}</small></span>
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.append(overlay);
+    overlay.querySelectorAll('[data-storage-mode]').forEach(button => {
+        button.addEventListener('click', () => selectStorageMode(button.dataset.storageMode));
+    });
+    if (allowClose) {
+        overlay.addEventListener('click', event => {
+            if (event.target === overlay || event.target.closest('.tn-install-close')) overlay.remove();
+        });
+    }
 }
 
 function showBackendInstallGuide() {
@@ -1629,6 +1823,7 @@ function showBackendInstallGuide() {
                     <i class="fa-solid fa-copy"></i><span>${htmlEscape(t('copyShellCommand'))}</span>
                 </button>
             </section>
+            <button class="tn-install-use-lite" type="button"><i class="fa-solid fa-window-maximize"></i><span>${htmlEscape(t('storageLiteTitle'))}</span></button>
         </div>
     `;
     document.body.append(overlay);
@@ -1643,10 +1838,20 @@ function showBackendInstallGuide() {
             notify(t('copiedInstallCommand'), 'success');
         });
     });
+    overlay.querySelector('.tn-install-use-lite')?.addEventListener('click', () => selectStorageMode('lite'));
 }
 
 export function showInstallGuide() {
-    setTimeout(showBackendInstallGuide, 500);
+    setTimeout(async () => {
+        if (!state.storageMode) await resolveInitialStorageMode();
+        if (!state.storageMode) {
+            showStorageModeChooser();
+            return;
+        }
+        if (state.storageMode === 'full') {
+            try { await serverApi('/status'); } catch { showBackendInstallGuide(); }
+        }
+    }, 500);
 }
 
 function setStatus(message) {
@@ -1714,6 +1919,7 @@ async function checkForTavernNotesUpdate({ notifyAvailable = true, throwOnError 
 
 function saveLocalSettings() {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+        storageMode: state.storageMode,
         language: state.language,
         launcherMode: state.launcherMode,
         floatingPosition: state.floatingPosition,
@@ -1741,6 +1947,7 @@ function saveLanguageSetting(language) {
     updateFloorCaptureButtonSetting();
     updateFloorCaptureSelectorInput();
     updateAppleThemeModeButton();
+    applyStorageCapabilities();
     updateLauncherModeButton();
     updateFloatingLauncher();
     notify(t('languageSaved'), 'success');
@@ -3168,6 +3375,19 @@ function clearCharacterFilter() {
     refreshNotes();
 }
 
+function applyStorageCapabilities() {
+    const isLite = state.storageMode === 'lite';
+    const panel = document.querySelector('#tavern-notes-panel');
+    if (panel) panel.dataset.storageMode = isLite ? 'lite' : 'full';
+    const badge = document.querySelector('#tavern-notes-storage-mode');
+    if (badge) {
+        badge.textContent = t(isLite ? 'storageModeLite' : 'storageModeFull');
+        badge.title = t('storageModeCurrent', { mode: badge.textContent });
+    }
+    document.querySelector('#tavern-notes-theme-merge-st')?.classList.toggle('tn-hidden', isLite);
+    document.querySelector('#tavern-notes-theme-open-folder')?.classList.toggle('tn-hidden', isLite);
+}
+
 function buildPanel() {
     if (document.querySelector('#tavern-notes-panel')) return;
 
@@ -3177,7 +3397,7 @@ function buildPanel() {
                 <div class="tn-brand-mark"><i class="fa-solid fa-book-open"></i></div>
                 <div class="tn-heading">
                     <div class="tn-title">${htmlEscape(t('appName'))} <span>@KKM</span><button id="tavern-notes-update-indicator" class="tn-update-indicator tn-hidden" type="button" title="${htmlEscape(t('viewUpdate'))}" aria-label="${htmlEscape(t('viewUpdate'))}"><i></i><span data-update-indicator-version></span></button></div>
-                    <div class="tn-subtitle">${htmlEscape(t('subtitle'))}</div>
+                    <div class="tn-subtitle">${htmlEscape(t('subtitle'))}<button id="tavern-notes-storage-mode" class="tn-storage-mode-badge" type="button" title="${htmlEscape(t('chooseStorageMode'))}">${htmlEscape(t(state.storageMode === 'lite' ? 'storageModeLite' : 'storageModeFull'))}</button></div>
                 </div>
                 <div class="tn-window-actions">
                     <button id="tavern-notes-launcher-mode" class="tn-soft-button tn-window-soft-button" title="${htmlEscape(t('switchLauncherMode'))}" aria-label="${htmlEscape(t('switchLauncherMode'))}">
@@ -3199,7 +3419,7 @@ function buildPanel() {
                     <button id="tavern-notes-selection-capture-setting" class="tn-soft-button ${state.showSelectionCaptureButton ? 'active' : ''}" title="${htmlEscape(t('selectionCaptureButtonTitle'))}"><i class="fa-solid fa-highlighter"></i><span>${htmlEscape(t('captureSelected'))}</span></button>
                     <button id="tavern-notes-floor-capture-open" class="tn-soft-button ${state.showFloorCaptureButton ? 'active' : ''}" title="${htmlEscape(t('floorCaptureEntryTitle'))}"><i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('captureFloor'))}</span></button>
                     <button id="tavern-notes-more-open" class="tn-soft-button" title="${htmlEscape(t('more'))}" aria-label="${htmlEscape(t('more'))}"><i class="fa-solid fa-ellipsis"></i><span>${htmlEscape(t('more'))}</span></button>
-                    <div id="tavern-notes-more-menu" class="tn-header-popover tn-header-secondary"><button id="tavern-notes-auto-user-input" class="tn-soft-button ${state.autoCaptureUserInput ? 'active' : ''}" title="${htmlEscape(t('autoCaptureUserInputTitle'))}"><i class="fa-solid fa-keyboard"></i><span>${htmlEscape(t('autoCaptureUserInput'))}</span></button><button id="tavern-notes-user-input-cleanup-open" class="tn-soft-button" title="${htmlEscape(t('userInputCleanupIntro'))}"><i class="fa-solid fa-filter-circle-xmark"></i><span>${htmlEscape(t('userInputCleanup'))}</span></button><button id="tavern-notes-export" class="tn-soft-button" title="${htmlEscape(t('exportNotes'))}"><i class="fa-solid fa-download"></i><span>${htmlEscape(t('exportNotes'))}</span></button><button id="tavern-notes-update-open" class="tn-soft-button" title="${htmlEscape(t('updateCenter'))}"><i class="fa-solid fa-clock-rotate-left"></i><span>${htmlEscape(t('updateCenter'))}</span></button><button id="tavern-notes-reset-floating" class="tn-soft-button" title="${htmlEscape(t('resetFloatingPosition'))}"><i class="fa-solid fa-location-crosshairs"></i><span>${htmlEscape(t('resetFloatingPosition'))}</span></button><button id="tavern-notes-apple-mode-main" class="tn-soft-button tn-hidden"><i class="fa-solid fa-moon"></i><span>${htmlEscape(t('appleThemeNight'))}</span></button></div>
+                    <div id="tavern-notes-more-menu" class="tn-header-popover tn-header-secondary"><button id="tavern-notes-auto-user-input" class="tn-soft-button ${state.autoCaptureUserInput ? 'active' : ''}" title="${htmlEscape(t('autoCaptureUserInputTitle'))}"><i class="fa-solid fa-keyboard"></i><span>${htmlEscape(t('autoCaptureUserInput'))}</span></button><button id="tavern-notes-user-input-cleanup-open" class="tn-soft-button" title="${htmlEscape(t('userInputCleanupIntro'))}"><i class="fa-solid fa-filter-circle-xmark"></i><span>${htmlEscape(t('userInputCleanup'))}</span></button><button id="tavern-notes-export" class="tn-soft-button" title="${htmlEscape(t('exportNotes'))}"><i class="fa-solid fa-download"></i><span>${htmlEscape(t('exportNotes'))}</span></button><button id="tavern-notes-storage-mode-open" class="tn-soft-button" title="${htmlEscape(t('chooseStorageMode'))}"><i class="fa-solid fa-database"></i><span>${htmlEscape(t('chooseStorageMode'))}</span></button><button id="tavern-notes-update-open" class="tn-soft-button" title="${htmlEscape(t('updateCenter'))}"><i class="fa-solid fa-clock-rotate-left"></i><span>${htmlEscape(t('updateCenter'))}</span></button><button id="tavern-notes-reset-floating" class="tn-soft-button" title="${htmlEscape(t('resetFloatingPosition'))}"><i class="fa-solid fa-location-crosshairs"></i><span>${htmlEscape(t('resetFloatingPosition'))}</span></button><button id="tavern-notes-apple-mode-main" class="tn-soft-button tn-hidden"><i class="fa-solid fa-moon"></i><span>${htmlEscape(t('appleThemeNight'))}</span></button></div>
                 </div>
             </header>
             <div class="tn-search-row">
@@ -3463,12 +3683,18 @@ function buildPanel() {
     updateFloorCaptureButtonSetting();
     updateFloorCaptureSelectorInput();
     bindEvents();
+    applyStorageCapabilities();
 }
 
 function bindEvents() {
     window.addEventListener('resize', () => applyFloatingLauncherPosition(document.querySelector('#tavern-notes-floating-launcher')), { passive: true });
     document.querySelector('#tavern-notes-new-note-open')?.addEventListener('click', openNewNoteMenu);
     document.querySelector('#tavern-notes-more-open')?.addEventListener('click', () => toggleHeaderPopover('tavern-notes-more-menu'));
+    document.querySelector('#tavern-notes-storage-mode')?.addEventListener('click', () => showStorageModeChooser({ allowClose: true }));
+    document.querySelector('#tavern-notes-storage-mode-open')?.addEventListener('click', () => {
+        closeHeaderPopovers();
+        showStorageModeChooser({ allowClose: true });
+    });
     document.querySelector('#tavern-notes-update-open')?.addEventListener('click', openUpdateCenter);
     document.querySelector('#tavern-notes-update-indicator')?.addEventListener('click', openUpdateCenter);
     document.querySelector('.tn-update-close')?.addEventListener('click', closeUpdateCenter);
@@ -4029,11 +4255,23 @@ async function exportNotes(format = 'json') {
             downloadTextFile(buildCurrentPageTxtExport(exportData), `tavern-notes-current-page-${stamp}.txt`, 'text/plain;charset=utf-8');
         }
     } else {
-        if (format === 'json') {
-            await downloadApiFile('/export.json', `tavern-notes-all-${stamp}.json`, 'application/json;charset=utf-8');
-        }
-        if (format === 'txt') {
-            await downloadApiFile('/export.txt', `tavern-notes-all-${stamp}.txt`, 'text/plain;charset=utf-8');
+        if (state.storageMode === 'lite') {
+            const notes = await getAllLiteNotes();
+            if (format === 'json') {
+                const exportData = await getLiteExport(getLiteUserName());
+                downloadTextFile(JSON.stringify(exportData, null, 2), `tavern-notes-lite-all-${stamp}.json`, 'application/json;charset=utf-8');
+            }
+            if (format === 'txt') {
+                downloadTextFile(buildPlainTextExport(notes), `tavern-notes-lite-all-${stamp}.txt`, 'text/plain;charset=utf-8');
+            }
+            await markLiteExported();
+        } else {
+            if (format === 'json') {
+                await downloadApiFile('/export.json', `tavern-notes-all-${stamp}.json`, 'application/json;charset=utf-8');
+            }
+            if (format === 'txt') {
+                await downloadApiFile('/export.txt', `tavern-notes-all-${stamp}.txt`, 'text/plain;charset=utf-8');
+            }
         }
     }
     closeExportMenu();
@@ -4198,7 +4436,8 @@ function openFontDb() {
             reject(new Error(t('localFontUnsupported')));
             return;
         }
-        const request = indexedDB.open(FONT_DB_NAME, 1);
+        const databaseName = state.storageMode === 'lite' ? LITE_FONT_DB_NAME : FULL_FONT_DB_NAME;
+        const request = indexedDB.open(databaseName, 1);
         request.onupgradeneeded = () => {
             request.result.createObjectStore(FONT_DB_STORE, { keyPath: 'id' });
         };
@@ -5156,7 +5395,7 @@ function normalizeTheme(theme) {
         ...(theme || {}),
         variables: {
             ...DEFAULT_THEME.variables,
-            ...(theme?.variables || {}),
+            ...toFullThemeVariables(theme?.variables),
         },
         assets: {
             ...DEFAULT_THEME.assets,
@@ -6096,6 +6335,11 @@ function closePanel() {
 }
 
 async function init() {
+    const detectedStatus = await resolveInitialStorageMode();
+    if (!state.storageMode) {
+        showStorageModeChooser();
+        return;
+    }
     installMobileViewportGuard();
     buildPanel();
     observeHeaderActionLayout();
@@ -6107,13 +6351,14 @@ async function init() {
     setTimeout(() => checkForTavernNotesUpdate(), 5000);
 
     try {
-        const status = await api('/status');
+        const status = detectedStatus || await api('/status');
         state.currentUserName = status.user || state.currentUserName || '';
         saveLocalSettings();
-        setStatus(t('connected', { user: status.user, version: status.version || '1.0.0', count: status.totalNotes || 0 }));
+        const mode = t(state.storageMode === 'lite' ? 'storageModeLite' : 'storageModeFull');
+        setStatus(`${mode} · ${t('connected', { user: status.user, version: status.version || EXTENSION_VERSION, count: status.totalNotes || 0 })}`);
     } catch (error) {
-        notify(t('backendDisconnected', { message: error.message }), 'error');
-        if (['backend_missing', 'backend_unreachable'].includes(error.code)) {
+        notify(state.storageMode === 'full' ? t('backendDisconnected', { message: error.message }) : error.message, 'error');
+        if (state.storageMode === 'full' && ['backend_missing', 'backend_unreachable'].includes(error.code)) {
             showBackendInstallGuide();
         }
     }

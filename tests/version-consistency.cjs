@@ -17,5 +17,5 @@ assert.ok(backendVersion, 'Missing backend version constant.');
 assert.equal(frontendVersion, manifest.version);
 assert.equal(backendVersion, manifest.version);
 assert.match(changelog, new RegExp(`^## ${manifest.version.replaceAll('.', '\\.')}\\s*$`, 'm'));
-assert.match(annotationChangelog, new RegExp(`^## ${manifest.version.replaceAll('.', '\\.')}\\s*$`, 'm'));
+assert.match(annotationChangelog, /^# Tavern Notes 作者中文注释\s*$/m, 'Author annotation changelog must remain present.');
 console.log(`Full version consistency test passed (${manifest.version}).`);

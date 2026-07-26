@@ -26,7 +26,12 @@ try {
         'style.css',
         'manifest.json',
         'floor-capture.js',
+        'storage.js',
+        'theme-compat.js',
         'core/note-card.js',
+        'core/local-theme-repository.js',
+        'core/repository-router.js',
+        'core/storage-mode-settings.js',
         'core/theme-runtime.js',
         'core/update-center.js',
         'CHANGELOG.md',
@@ -34,7 +39,7 @@ try {
     ].forEach(relativePath => assert.ok(fs.existsSync(path.join(frontend, relativePath)), `Missing installed frontend file: ${relativePath}`));
     assert.ok(fs.existsSync(path.join(backend, 'index.js')), 'Missing installed Server Plugin.');
     assert.match(fs.readFileSync(path.join(fixtureRoot, 'config.yaml'), 'utf8'), /^enableServerPlugins:\s*true$/m);
-    assert.equal(JSON.parse(fs.readFileSync(path.join(frontend, 'manifest.json'), 'utf8')).version, '1.1.0');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(frontend, 'manifest.json'), 'utf8')).version, '1.2.0');
 
     console.log('Full fresh-install smoke test passed.');
 } finally {

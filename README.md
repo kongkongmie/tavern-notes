@@ -6,7 +6,7 @@
 - User 输入：自动记录你发出去的用户消息，方便隔很久以后快速找回、复制、重新放回输入栏。
 - 摘抄：保存你在聊天页面选中的文字，支持查看、复制、分享成图片。
 
-数据会写入当前 SillyTavern 用户自己的 `data/<用户>/tavern-notes/` 文件夹，不写入世界书，也不会自动发给模型。
+数据按你选择的模式保存到当前 SillyTavern 用户自己的 `data/<用户>/tavern-notes/` 文件夹，或当前浏览器原有的 `tavern-notes-lite` IndexedDB。两种模式都不写入世界书，也不会自动发给模型。
 
 ## 功能
 
@@ -26,12 +26,14 @@
 
 ## 安装方式
 
-酒馆笔记由两部分组成：
+酒馆笔记现在采用统一前端。新用户只需安装一次，首次打开时选择保存方式：
 
-1. 前端扩展：显示按钮、面板和分享卡。
-2. 后端插件：负责把笔记保存为本地文件。
+- **Full 文件模式**：把笔记保存到 SillyTavern 用户数据目录，支持自动备份和完整主题工具，需要安装一次 Server Plugin。
+- **Lite 浏览器模式**：把笔记保存到当前浏览器的 IndexedDB，不需要 Server Plugin，手机和受限环境也能直接使用。
 
-推荐先用 SillyTavern 自带的 Git 扩展安装器安装前端。这样以后酒馆可以提示更新，不需要每次重新下载压缩包。
+两种模式的数据彼此独立。切换模式不会迁移或删除笔记；需要迁移时请使用 JSON 导出和导入。旧 Full 文件和旧 Lite IndexedDB 的位置都保持不变。
+
+推荐使用 SillyTavern 自带的 Git 扩展安装器。这样以后可以直接检查更新，不需要反复下载压缩包。
 
 ### 推荐：在酒馆里粘贴 Git 地址安装
 
@@ -43,9 +45,9 @@
 https://github.com/kongkongmie/tavern-notes
 ```
 
-4. 安装完成后，再运行一次后端安装器。
+4. 安装完成后，按首次启动页面选择 Full 或 Lite。
 
-后端安装器只需要首次安装时运行一次，用来安装 `server-plugin/tavern-notes` 并开启 `enableServerPlugins`。
+选择 Lite 后可以直接使用。选择 Full 后，后端安装器只需要首次运行一次，用来安装 `server-plugin/tavern-notes` 并开启 `enableServerPlugins`。
 
 Windows：
 
@@ -59,9 +61,11 @@ SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-server-pl
 node SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-server-plugin.js
 ```
 
-看到“安装完成”后，重启 SillyTavern，然后刷新浏览器页面。
+选择 Full 时，看到“安装完成”后重启 SillyTavern，然后刷新浏览器页面。选择 Lite 时不需要安装后端或重启服务。
 
-以后前端扩展可以跟随 SillyTavern 的扩展更新提示更新。后端插件通常不需要更新；如果某个版本明确写了“需要更新后端插件”，再重新运行一次后端安装器即可。
+以后统一前端可以跟随 SillyTavern 的扩展更新提示更新。Full 后端插件通常不需要更新；如果某个版本明确写了“需要更新后端插件”，再重新运行一次后端安装器即可。
+
+原 `tavern-notes-lite` 仓库继续为现有 Lite 用户提供兼容更新和应急安装，但新用户无需同时安装两个扩展。
 
 ### 不方便用 Git 时：单文件安装器
 
@@ -81,7 +85,7 @@ Windows / PC：
 
 ### 离线包安装
 
-1. 到 GitHub Release 下载 `tavern-notes-v1.0.21.zip`。
+1. 到 GitHub Release 下载当前版本的完整 `tavern-notes-*.zip`。
 2. 解压压缩包。
 3. Windows 用户直接双击最外层的：
 
@@ -150,9 +154,9 @@ sh install-tavern-notes.sh
 
 ### 检查是否成功
 
-进入聊天页面后，输入栏附近会出现酒馆笔记按钮。
+进入聊天页面后，工具栏或悬浮位置会出现酒馆笔记入口。
 
-打开酒馆笔记面板，底部状态如果显示“已连接”，就说明前端和后端都正常。
+打开酒馆笔记面板后，标题旁会显示当前保存方式。Full 文件模式底部显示“已连接”代表前后端正常；Lite 浏览器模式显示 IndexedDB 状态即可直接使用。
 
 如果提示“后端未连接”或“找不到酒馆笔记后端”，请检查：
 
@@ -228,7 +232,7 @@ https://github.com/kongkongmie/tavern-notes
 
 ## 当前版本
 
-v1.1.0
+v1.2.0
 
 - Full 与 Lite 采用一致的共享卡片、主题运行时和更新中心核心，同时保留各自仓库、安装路径与存储方式。
 - 重新设计笔记卡片、详情操作区、顶部图标栏及自适应“更多”菜单。
