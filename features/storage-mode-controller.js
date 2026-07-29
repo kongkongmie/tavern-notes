@@ -7,11 +7,11 @@ export function createStorageModeController({ view, getMode, prepareSwitch, repl
             mounted = true;
             view.mount(mode => this.select(mode));
         },
-        async select(mode) {
+        async select(mode, options = {}) {
             if (!mounted || switching || !['full', 'lite'].includes(mode)) return;
             const previous = getMode();
             if (previous === mode) { view.close(); return; }
-            if (previous && !await confirmSwitch(previous, mode)) return;
+            if (previous && !options.skipConfirm && !await confirmSwitch(previous, mode)) return;
             switching = true;
             view.setLoading?.(true);
             try {

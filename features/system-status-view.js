@@ -24,13 +24,20 @@ export function createSystemStatusView({ statusSelector, classPrefix, translate,
                 </div>`;
             document.body.append(overlay);
             overlay.addEventListener('click', async event => {
-                if (event.target === overlay || event.target.closest(`.${classPrefix}-install-close`)) overlay.remove();
+                if (event.target === overlay || event.target.closest(`.${classPrefix}-install-close`)) {
+                    await chooseLite();
+                    overlay.remove();
+                    return;
+                }
                 const copy = event.target.closest(`.${classPrefix}-install-copy`);
                 if (copy) {
                     await copyText(copy.dataset.copyKind === 'windows' ? install.windowsPath : install.shellCommand);
                     notify(translate('copiedInstallCommand'), 'success');
                 }
-                if (event.target.closest(`.${classPrefix}-install-use-lite`)) chooseLite();
+                if (event.target.closest(`.${classPrefix}-install-use-lite`)) {
+                    await chooseLite();
+                    overlay.remove();
+                }
             });
         },
         destroy() { mounted = false; overlay?.remove(); overlay = null; },

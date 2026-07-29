@@ -8,6 +8,7 @@ const storage = fs.readFileSync(new URL('../storage.js', import.meta.url), 'utf8
 const modeNoteRepository = fs.readFileSync(new URL('../repositories/mode-note-repository.js', import.meta.url), 'utf8');
 const storageModeView = fs.readFileSync(new URL('../features/storage-mode-view.js', import.meta.url), 'utf8');
 const storageModeController = fs.readFileSync(new URL('../features/storage-mode-controller.js', import.meta.url), 'utf8');
+const systemStatusView = fs.readFileSync(new URL('../features/system-status-view.js', import.meta.url), 'utf8');
 const httpAdapter = fs.readFileSync(new URL('../repositories/full-http-adapter.js', import.meta.url), 'utf8');
 
 assert.match(source, /from '\.\/storage\.js'/, 'unified entry must bundle the Lite repository adapter');
@@ -15,11 +16,15 @@ assert.match(source, /createFullHttpAdapter/, 'Full server adapter must remain a
 assert.match(httpAdapter, /async function request\(/);
 assert.match(source, /createModeNoteRepository\(\{[\s\S]*?lite:\s*createLiteNoteRepository/, 'Lite mode must route note operations through its IndexedDB Note Repository');
 assert.match(modeNoteRepository, /validated\[getMode\(\)\]/, 'storage-mode selection must stay inside the Repository adapter layer');
-assert.match(source, /storageModeController\.open\(\)/, 'first launch must offer a storage choice');
-assert.match(source, /shouldResumeFullMode\(\{ hasLegacySettings: hasLegacyFullSettings, totalNotes: status\.totalNotes \}\)/, 'existing Full users must reconnect while a fresh empty backend still leaves the choice to the user');
+assert.match(source, /const isFirstInstall = !loadedSettings\.found/);
+assert.match(source, /isFirstInstall && !state\.storageMode[\s\S]*?settingsService\.update\(\{ storageMode: 'lite' \}\)/, 'a fresh install must become usable in Lite mode without probing the Full backend');
+assert.match(source, /if \(isFirstInstall\) setTimeout\(\(\) => systemStatusController\.showInstallGuide\(\), 500\)/, 'a fresh install must explain the optional Full backend after Lite is ready');
+assert.match(source, /shouldResumeFullMode\(\{ hasLegacySettings: hasLegacyFullSettings, totalNotes: status\.totalNotes \}\)/, 'existing Full users must still reconnect to their Full storage');
 assert.match(source, /systemStatusController\.refresh\(\)/, 'install hook must check backend status through the System Status Controller');
 assert.match(storageModeView, /data-storage-mode="full"/);
 assert.match(storageModeView, /data-storage-mode="lite"/);
+assert.match(systemStatusView, /await chooseLite\(\);[\s\S]*?overlay\.remove\(\)/, 'closing the install guide must keep or switch the user to Lite');
+assert.match(source, /storageModeController\.select\('lite', \{ skipConfirm: true \}\)/, 'the install guide Lite path must not show a storage-switch warning');
 assert.doesNotMatch(storageModeController, /storageMode === ['"](?:full|lite)/);
 assert.match(source, /changeStorageModeWarning/, 'mode switching must warn that data is not migrated');
 assert.match(source, /exportData:\s*getLiteExport/, 'Lite all-notes export must stay local behind the Note Repository');
