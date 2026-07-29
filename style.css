@@ -1269,7 +1269,7 @@
 }
 #tavern-notes-panel[data-theme-flavor="default"][data-theme-mode="night"] .tn-header {
     background: linear-gradient(180deg, rgba(48, 65, 78, 0.72), rgba(30, 40, 50, 0.2));
-    border-bottom: 1px solid rgba(159, 183, 198, 0.12);
+    border-bottom: 0;
 }
 #tavern-notes-panel[data-theme-flavor="default"][data-theme-mode="night"] .tn-soft-button,
 #tavern-notes-panel[data-theme-flavor="default"][data-theme-mode="night"] .tn-icon-button,
