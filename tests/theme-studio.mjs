@@ -73,6 +73,39 @@ promptResult = 'Saved draft';
 await studio.saveAsFromEditor();
 assert.equal(controllerCalls.at(-1)[0], 'save');
 assert.equal(controllerCalls.at(-1)[2].activate, false, 'save as must not activate the draft');
+
+const mergedStudio = createThemeStudio({
+    document,
+    window: { prompt: () => null },
+    getComputedStyle: target => ({
+        getPropertyValue(name) {
+            if (target === document.documentElement) {
+                if (name === '--SmartThemeBlurTintColor') return 'rgba(40, 60, 80, 0.5)';
+                if (name === '--SmartThemeBorderColor') return 'rgba(220, 180, 120, 0.45)';
+                if (name === '--SmartThemeBodyColor') return 'rgb(235, 235, 235)';
+                if (name === '--SmartThemeQuoteColor') return 'rgb(220, 180, 120)';
+            }
+            if (target === document.body && name === 'background-color') return 'rgb(10, 20, 30)';
+            return '';
+        },
+    }),
+    defaultTheme: {
+        ...defaultTheme,
+        variables: {
+            '--tn-paper': '#fff', '--tn-paper-2': '#fff', '--tn-ink': '#222', '--tn-line': '#999',
+            '--tn-gold': '#b88a34', '--tn-radius-card': '20px',
+        },
+    },
+    normalizeTheme,
+    themeController,
+    translate: key => key,
+    notify: () => {},
+});
+const merged = mergedStudio.extractCurrentSillyTavernTheme();
+assert.equal(merged.variables['--tn-paper'], 'rgb(25, 40, 55)', 'translucent Tavern tint must be composited over the real page background');
+assert.match(merged.variables['--tn-panel-border'], /46%/, 'dark merged themes must soften the Tavern border color');
+assert.equal(merged.variables['--tn-input-border'], merged.variables['--tn-panel-border']);
+
 const markup = renderThemeStudioMarkup({ translate: key => key, escapeHtml: value => String(value) });
 assert.match(markup, /data-theme-studio/);
 assert.match(markup, /tavern-notes-theme-code/);
