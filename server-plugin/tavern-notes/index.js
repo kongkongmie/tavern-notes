@@ -79,9 +79,9 @@ function openFolder(folderPath) {
     const systemRoot = process.env.SystemRoot || process.env.WINDIR || 'C:\\Windows';
     const candidates = process.platform === 'win32'
         ? [
-            { command: process.env.ComSpec || path.join(systemRoot, 'System32', 'cmd.exe'), args: ['/c', 'start', '', resolved] },
             { command: path.join(systemRoot, 'explorer.exe'), args: [resolved] },
-            { command: path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), args: ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', 'Start-Process', '-LiteralPath', resolved] },
+            { command: process.env.ComSpec || path.join(systemRoot, 'System32', 'cmd.exe'), args: ['/d', '/s', '/c', 'start', '""', resolved] },
+            { command: path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe'), args: ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', 'Start-Process', '-FilePath', resolved] },
         ]
         : [
             { command: process.platform === 'darwin' ? 'open' : 'xdg-open', args: [resolved] },

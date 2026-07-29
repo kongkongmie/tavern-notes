@@ -41,6 +41,11 @@ try {
         'CHANGELOG.zh-CN.md',
     ].forEach(relativePath => assert.ok(fs.existsSync(path.join(frontend, relativePath)), `Missing installed frontend file: ${relativePath}`));
     assert.ok(fs.existsSync(path.join(backend, 'index.js')), 'Missing installed Server Plugin.');
+    const installedBackendSource = fs.readFileSync(path.join(backend, 'index.js'), 'utf8');
+    assert.ok(
+        installedBackendSource.indexOf("path.join(systemRoot, 'explorer.exe')") < installedBackendSource.indexOf('process.env.ComSpec'),
+        'Windows folder opening must use Explorer directly before command-shell fallbacks',
+    );
     assert.match(fs.readFileSync(path.join(fixtureRoot, 'config.yaml'), 'utf8'), /^enableServerPlugins:\s*true$/m);
     assert.equal(JSON.parse(fs.readFileSync(path.join(frontend, 'manifest.json'), 'utf8')).version, '1.2.0');
 
