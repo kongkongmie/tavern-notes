@@ -1944,6 +1944,7 @@
     border: var(--tn-note-topline-border);
     border-radius: var(--tn-note-topline-radius);
     background: var(--tn-note-topline-bg);
+    margin-right: 46px;
 }
 
 .tn-note-type {
@@ -2080,26 +2081,25 @@
     z-index: 4;
     transform: translateY(-50%);
     display: grid;
-    gap: 4px;
-    padding: 4px;
-    border: 1px solid color-mix(in srgb, var(--tn-line) 72%, transparent);
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--tn-paper-2) 76%, transparent);
-    box-shadow: 0 5px 14px color-mix(in srgb, var(--tn-shadow-dark) 16%, transparent);
-    backdrop-filter: blur(10px);
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
 }
 
 .tn-note-menu-toggle,
 .tn-note-quick-fill {
-    width: 28px;
-    height: 28px;
-    border: 0;
+    width: 30px;
+    height: 30px;
+    border: 1px solid color-mix(in srgb, var(--tn-line) 72%, transparent);
     border-radius: 999px;
     display: grid;
     place-items: center;
     color: var(--tn-note-type-color);
-    background: transparent;
-    box-shadow: none;
+    background: color-mix(in srgb, var(--tn-paper-2) 82%, transparent);
+    box-shadow: 0 3px 9px color-mix(in srgb, var(--tn-shadow-dark) 13%, transparent);
     cursor: pointer;
 }
 
