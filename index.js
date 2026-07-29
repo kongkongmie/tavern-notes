@@ -16,7 +16,7 @@ import { createRepositoryRouter } from './core/repository-router.js';
 import { createLocalThemeRepository } from './core/local-theme-repository.js';
 import { createModeThemeRepository, createThemeRepository } from './core/theme-repository.js';
 import { prepareStorageModeSwitch, shouldResumeFullMode } from './core/storage-mode-settings.js';
-import { createBuiltInThemeRecords } from './core/theme-presets.js';
+import { createBuiltInThemeRecords, isRetiredLegacyTheme } from './core/theme-presets.js';
 import { createThemeModel } from './core/theme-model.js';
 import { createAppStore } from './core/app-store.js';
 import { createApplicationCapabilities } from './core/application-capabilities.js';
@@ -499,7 +499,7 @@ const TEXT_ZH_CN = {
     previewTheme: '预览：{name}',
     tempMergedTheme: '临时融合：{name}',
     unnamedTheme: '未命名主题',
-    previewSave: '预览并保存',
+    previewSave: '应用并保存',
     themeCalendar: '日历',
     themeJianshu: '简书',
     themeDialogue: '对话',
@@ -515,7 +515,7 @@ assets 控制标题图标和背景图；输入栏与摘录按钮使用固定默�
 只有点击“预览并保存”或“另存为”才会生成主题文件。`,
     invalidThemeFile: '这不是酒馆笔记主题文件。',
     previewedTheme: '已预览主题，还没有保存。',
-    mergedThemeDraft: '已生成临时融合预览；点“预览并保存”或“另存为”才会生成主题文件。',
+    mergedThemeDraft: '已生成融合主题草稿；当前主题未改变。点“应用并保存”才会切换当前主题。',
     savedAsTheme: '已另存为新主题。',
     savedTheme: '主题已保存。',
     switchedTheme: '主题已切换。',
@@ -733,7 +733,7 @@ const TEXTS = {
         previewTheme: '預覽：{name}',
         tempMergedTheme: '臨時融合：{name}',
         unnamedTheme: '未命名主題',
-        previewSave: '預覽並儲存',
+        previewSave: '套用並儲存',
         themeCalendar: '日曆',
         themeJianshu: '簡書',
         themeDialogue: '對話',
@@ -747,7 +747,7 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
 只有點擊「預覽並儲存」或「另存為」才會產生主題檔案。`,
         invalidThemeFile: '這不是酒館筆記主題檔案。',
         previewedTheme: '已預覽主題，尚未儲存。',
-        mergedThemeDraft: '已產生臨時融合預覽；點「預覽並儲存」或「另存為」才會產生主題檔案。',
+        mergedThemeDraft: '已產生融合主題草稿；目前主題未變更。點「套用並儲存」才會切換目前主題。',
         savedAsTheme: '已另存為新主題。',
         savedTheme: '主題已儲存。',
         switchedTheme: '主題已切換。',
@@ -1011,7 +1011,7 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         previewTheme: 'Preview: {name}',
         tempMergedTheme: 'Temporary merge: {name}',
         unnamedTheme: 'Untitled theme',
-        previewSave: 'Preview & save',
+        previewSave: 'Apply & save',
         themeCalendar: 'Calendar',
         themeJianshu: 'Jianshu',
         themeDialogue: 'Dialogue',
@@ -1025,7 +1025,7 @@ Merge current Tavern theme reads SillyTavern theme variables and creates a tempo
 Click Preview & save or Save as to create a theme file.`,
         invalidThemeFile: 'This is not a Tavern Notes theme file.',
         previewedTheme: 'Theme previewed. It is not saved yet.',
-        mergedThemeDraft: 'Temporary merged preview created. Use Preview & save or Save as to create a theme file.',
+        mergedThemeDraft: 'Merged theme draft created. The active theme is unchanged. Use Apply & save to switch themes.',
         savedAsTheme: 'Saved as a new theme.',
         savedTheme: 'Theme saved.',
         switchedTheme: 'Theme switched.',
@@ -1272,7 +1272,7 @@ Click Preview & save or Save as to create a theme file.`,
         previewTheme: '미리보기: {name}',
         tempMergedTheme: '임시 병합: {name}',
         unnamedTheme: '이름 없는 테마',
-        previewSave: '미리보기 후 저장',
+        previewSave: '적용 및 저장',
         themeCalendar: '캘린더',
         themeJianshu: '젠슈',
         themeDialogue: '대화',
@@ -1286,7 +1286,7 @@ assets는 제목 아이콘과 배경 이미지를 제어합니다. 입력창과 
 미리보기 후 저장 또는 다른 이름으로 저장을 눌러야 테마 파일이 생성됩니다.`,
         invalidThemeFile: '술집 노트 테마 파일이 아닙니다.',
         previewedTheme: '테마를 미리보았습니다. 아직 저장되지 않았습니다.',
-        mergedThemeDraft: '임시 병합 미리보기를 만들었습니다. 미리보기 후 저장 또는 다른 이름으로 저장을 눌러 테마 파일을 만드세요.',
+        mergedThemeDraft: '병합 테마 초안을 만들었습니다. 현재 테마는 변경되지 않았습니다. 적용 및 저장을 눌러 테마를 전환하세요.',
         savedAsTheme: '새 테마로 저장했습니다.',
         savedTheme: '테마를 저장했습니다.',
         switchedTheme: '테마를 전환했습니다.',
@@ -1651,8 +1651,6 @@ function getLiteUserName() {
     return String(name1 || state.currentUserName || 'default-user').trim() || 'default-user';
 }
 
-const RETIRED_LOCAL_THEME_IDS = new Set(['secret-files', 'archive']);
-
 function getLocalBuiltInThemes() {
     return createBuiltInThemeRecords({
         defaultTheme: DEFAULT_THEME,
@@ -1664,17 +1662,6 @@ function getLocalBuiltInThemes() {
     });
 }
 
-function isRetiredLocalTheme(record) {
-    const id = String(record?.id || record?.theme?.id || '').trim().toLowerCase();
-    const name = String(record?.name || record?.theme?.name || '').trim();
-    const variables = record?.theme?.variables || {};
-    const flavor = String(variables['--tn-theme-flavor'] || variables['--tnl-theme-flavor'] || '').trim().toLowerCase();
-    return RETIRED_LOCAL_THEME_IDS.has(id)
-        || flavor === 'archive'
-        || /secret\s*files?/i.test(name)
-        || /秘密档案|秘密檔案/.test(name);
-}
-
 const localThemeApi = createLocalThemeRepository({
     storage: localStorage,
     themeStorageKey: LITE_THEME_STORAGE_KEY,
@@ -1683,7 +1670,7 @@ const localThemeApi = createLocalThemeRepository({
     getBuiltInThemes: getLocalBuiltInThemes,
     normalizeTheme: themeModel.normalizeTheme,
     normalizeThemeId: themeModel.normalizeAppleThemeId,
-    isRetiredTheme: isRetiredLocalTheme,
+    isRetiredTheme: isRetiredLegacyTheme,
     translate: t,
 });
 
@@ -2077,6 +2064,7 @@ const tagView = createTagView({
     onSort: sort => { state.tagManagerSort = sort; },
 });
 const captureView = createCaptureView({
+    classPrefix: 'tn',
     selectors: {
         selectionButton: '#tavern-notes-selection-capture',
         selectionClass: 'tn-selection-capture',

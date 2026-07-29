@@ -38,6 +38,7 @@ const normalizeTheme = theme => ({
 });
 const themeState = { theme: defaultTheme, draft: false, activeId: 'default' };
 const controllerCalls = [];
+let promptResult = null;
 const themeController = {
     getThemeState: () => ({ ...themeState }),
     previewTheme: (theme, options) => controllerCalls.push(['preview', theme, options]),
@@ -47,7 +48,7 @@ const themeController = {
 };
 const studio = createThemeStudio({
     document,
-    window: { prompt: () => null },
+    window: { prompt: () => promptResult },
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
     defaultTheme,
     normalizeTheme,
@@ -64,9 +65,25 @@ elements.get('#tavern-notes-theme-name-input').value = 'From input';
 assert.equal(studio.getThemeFromEditor().name, 'From input');
 elements.get('#tavern-notes-theme-code').value = JSON.stringify({ format: 'other-format' });
 assert.throws(() => studio.getThemeFromEditor(), /invalidThemeFile/);
+elements.get('#tavern-notes-theme-code').value = JSON.stringify(defaultTheme);
+await studio.mergeCurrentSillyTavernTheme();
+assert.equal(themeState.draft, true);
+assert.equal(controllerCalls.some(([action]) => action === 'preview'), false, 'merge must not preview on the active panel');
+promptResult = 'Saved draft';
+await studio.saveAsFromEditor();
+assert.equal(controllerCalls.at(-1)[0], 'save');
+assert.equal(controllerCalls.at(-1)[2].activate, false, 'save as must not activate the draft');
 const markup = renderThemeStudioMarkup({ translate: key => key, escapeHtml: value => String(value) });
 assert.match(markup, /data-theme-studio/);
 assert.match(markup, /tavern-notes-theme-code/);
+const liteMarkup = renderThemeStudioMarkup({
+    translate: key => key,
+    escapeHtml: value => String(value),
+    idPrefix: 'tavern-notes-lite',
+    classPrefix: 'tnl',
+});
+assert.match(liteMarkup, /id="tavern-notes-lite-theme-code"/);
+assert.match(liteMarkup, /class="tnl-theme-studio"/);
 studio.mount();
 studio.mount();
 assert.equal(elements.get('#tavern-notes-theme-preview-save').listeners.size, 1);
@@ -78,5 +95,6 @@ assert.doesNotMatch(source, /\bstate\.(?:theme|activeThemeId|previewTheme|themeD
 assert.doesNotMatch(source, /\bapplyTheme\b|\bsaveTheme\s*[,}]/);
 assert.match(source, /themeController\.previewTheme/);
 assert.match(source, /themeController\.saveTheme/);
+assert.match(source, /activate:\s*false/);
 
 console.log('Theme studio controller test passed.');

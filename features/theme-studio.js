@@ -1,20 +1,25 @@
-export function renderThemeStudioMarkup({ translate, escapeHtml }) {
+export function renderThemeStudioMarkup({
+    translate,
+    escapeHtml,
+    idPrefix = 'tavern-notes',
+    classPrefix = 'tn',
+}) {
     const t = translate;
     const escape = escapeHtml;
     return `
-        <div class="tn-theme-studio" data-theme-studio>
-            <input id="tavern-notes-theme-name-input" class="tn-theme-input" type="text" placeholder="${escape(t('themeName'))}" />
-            <button id="tavern-notes-theme-merge-st" class="tn-theme-merge-button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>${escape(t('mergeTheme'))}</span></button>
-            <div class="tn-theme-actions">
-                <button id="tavern-notes-theme-preview-save" class="tn-export-choice"><i class="fa-solid fa-eye"></i><span>${escape(t('previewSave'))}</span></button>
-                <button id="tavern-notes-theme-save-as" class="tn-export-choice"><i class="fa-solid fa-copy"></i><span>${escape(t('saveAs'))}</span></button>
-                <button id="tavern-notes-theme-reset" class="tn-export-choice"><i class="fa-solid fa-rotate-left"></i><span>${escape(t('resetDefault'))}</span></button>
+        <div class="${classPrefix}-theme-studio" data-theme-studio>
+            <input id="${idPrefix}-theme-name-input" class="${classPrefix}-theme-input" type="text" placeholder="${escape(t('themeName'))}" />
+            <button id="${idPrefix}-theme-merge-st" class="${classPrefix}-theme-merge-button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>${escape(t('mergeTheme'))}</span></button>
+            <div class="${classPrefix}-theme-actions">
+                <button id="${idPrefix}-theme-preview-save" class="${classPrefix}-export-choice"><i class="fa-solid fa-eye"></i><span>${escape(t('previewSave'))}</span></button>
+                <button id="${idPrefix}-theme-save-as" class="${classPrefix}-export-choice"><i class="fa-solid fa-copy"></i><span>${escape(t('saveAs'))}</span></button>
+                <button id="${idPrefix}-theme-reset" class="${classPrefix}-export-choice"><i class="fa-solid fa-rotate-left"></i><span>${escape(t('resetDefault'))}</span></button>
             </div>
-            <details class="tn-theme-guide">
+            <details class="${classPrefix}-theme-guide">
                 <summary><i class="fa-solid fa-circle-info"></i><span>${escape(t('themeGuide'))}</span></summary>
                 <pre>${escape(t('themeGuideContent'))}</pre>
             </details>
-            <textarea id="tavern-notes-theme-code" spellcheck="false"></textarea>
+            <textarea id="${idPrefix}-theme-code" spellcheck="false"></textarea>
         </div>
     `;
 }
@@ -28,6 +33,7 @@ export function createThemeStudio({
     themeController,
     translate,
     notify,
+    idPrefix = 'tavern-notes',
 }) {
     const t = translate;
     let mounted = false;
@@ -35,15 +41,15 @@ export function createThemeStudio({
 
     function syncEditor(theme = themeController.getThemeState().theme || defaultTheme) {
         const clean = normalizeTheme(theme);
-        const nameInput = document.querySelector('#tavern-notes-theme-name-input');
-        const code = document.querySelector('#tavern-notes-theme-code');
+        const nameInput = document.querySelector(`#${idPrefix}-theme-name-input`);
+        const code = document.querySelector(`#${idPrefix}-theme-code`);
         if (nameInput) nameInput.value = clean.name || '';
         if (code) code.value = JSON.stringify(clean, null, 2);
     }
 
     function getThemeFromEditor() {
-        const code = document.querySelector('#tavern-notes-theme-code');
-        const nameInput = document.querySelector('#tavern-notes-theme-name-input');
+        const code = document.querySelector(`#${idPrefix}-theme-code`);
+        const nameInput = document.querySelector(`#${idPrefix}-theme-name-input`);
         const theme = JSON.parse(code?.value || '{}');
         if (nameInput?.value?.trim()) theme.name = nameInput.value.trim();
         if (theme.format && theme.format !== 'tavern-notes-theme') throw new Error(t('invalidThemeFile'));
@@ -243,7 +249,10 @@ export function createThemeStudio({
     }
 
     function previewFromEditor() {
-        themeController.previewTheme(getThemeFromEditor(), { notifyKey: 'previewedTheme' });
+        const theme = getThemeFromEditor();
+        themeController.setDraft(true);
+        syncEditor(theme);
+        return theme;
     }
 
     async function previewAndSaveFromEditor() {
@@ -260,15 +269,11 @@ export function createThemeStudio({
         theme.name = `${theme.name} - ${stamp}`;
         themeController.setDraft(true);
         syncEditor(theme);
-        themeController.previewTheme(theme, {
-            draft: true,
-            labelKey: 'tempMergedTheme',
-            notifyKey: 'mergedThemeDraft',
-        });
+        notify(t('mergedThemeDraft'), 'success');
     }
 
     function askThemeName(theme, actionLabel) {
-        const currentName = theme?.name || document.querySelector('#tavern-notes-theme-name-input')?.value || t('unnamedTheme');
+        const currentName = theme?.name || document.querySelector(`#${idPrefix}-theme-name-input`)?.value || t('unnamedTheme');
         const nextName = window.prompt(t('themeNamePrompt', { action: actionLabel }), currentName);
         if (nextName === null) return null;
         const cleanName = nextName.trim();
@@ -302,7 +307,11 @@ export function createThemeStudio({
         if (!name) return;
         theme.name = name;
         syncEditor(theme);
-        await themeController.saveTheme(theme, { id: null, notifyKey: 'savedAsTheme' });
+        await themeController.saveTheme(theme, {
+            id: null,
+            activate: false,
+            notifyKey: 'savedAsTheme',
+        });
     }
 
     function listen(selector, action) {
@@ -315,9 +324,9 @@ export function createThemeStudio({
 
     function mount() {
         destroy();
-        listen('#tavern-notes-theme-preview-save', previewAndSaveFromEditor);
-        listen('#tavern-notes-theme-merge-st', mergeCurrentSillyTavernTheme);
-        listen('#tavern-notes-theme-save-as', saveAsFromEditor);
+        listen(`#${idPrefix}-theme-preview-save`, previewAndSaveFromEditor);
+        listen(`#${idPrefix}-theme-merge-st`, mergeCurrentSillyTavernTheme);
+        listen(`#${idPrefix}-theme-save-as`, saveAsFromEditor);
         mounted = true;
     }
 
