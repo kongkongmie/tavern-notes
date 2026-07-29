@@ -94,6 +94,7 @@ const SETTINGS_KEY = 'tavern-notes-settings';
 const FULL_SETTINGS_PROFILE_KEY = 'tavern-notes-unified-full-settings';
 const LITE_SETTINGS_PROFILE_KEY = 'tavern-notes-unified-lite-settings';
 const LEGACY_LITE_SETTINGS_KEY = 'tavern-notes-lite-settings';
+const UNIFIED_ONBOARDING_KEY = 'tavern-notes-unified-onboarding-v1';
 const UPDATE_NOTICE_KEY = 'tavern-notes-update-notice';
 const EXTENSION_VERSION = '1.2.0';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/manifest.json';
@@ -385,8 +386,11 @@ const TEXT_ZH_CN = {
     updateAvailableTitle: '酒馆笔记有新版本',
     updateAvailable: '检测到 v{version}。请在 SillyTavern 扩展面板里更新；如果当初用黑窗安装，也可以重新运行安装器。',
     updateCenter: '版本与更新', updateCenterIntro: '查看当前版本、最新版本和更新日志。是否更新完全由你决定。', checkUpdates: '检查更新', checkingUpdates: '正在检查…', installedVersion: '当前版本', latestVersion: '最新版本', updateAvailableStatus: '发现新版本 v{version}', upToDateStatus: '已经是最新版本', updateCheckFailed: '暂时无法连接更新服务器', openExtensionManager: '打开扩展管理', openRepository: '打开项目页面', updateInstructions: '更新由 SillyTavern 扩展管理器执行；酒馆笔记不会静默安装或覆盖文件。', changelogTitle: '更新日志', latestBadge: '最新', noChangelog: '暂时没有取得更新日志。', viewUpdate: '查看更新', authorAnnotation: '作者中文注释',
-    backendInstallTitle: '酒馆笔记已就绪',
-    backendInstallMessage: '酒馆笔记已默认使用 Lite 浏览器存储，关闭此窗口即可直接使用。如果你想使用 Full 本地文件存储，请运行一次下面的后端安装器，重启 SillyTavern，然后在酒馆笔记的存储模式入口切换到 Full。',
+    backendInstallTitle: 'Lite 浏览器版已安装成功',
+    backendInstallMessage: '现在已经可以直接使用酒馆笔记。数据会保存在当前浏览器中，关闭此窗口即可开始。',
+    backendInstallFullTitle: '想把笔记保存为本地文件？',
+    backendInstallFullBenefits: 'Full 本地文件模式支持文件存储、自动备份和主题文件夹管理。请运行一次对应系统的后端安装器，重启 SillyTavern，再从“保存方式”切换到 Full。',
+    continueWithLite: '关闭并使用 Lite 浏览器版',
     backendInstallWindows: 'Windows：打开并运行这个文件',
     backendInstallOther: 'Mac / Linux / 安卓 Termux / 云服务器：在终端运行',
     storageChoiceTitle: '选择酒馆笔记的保存方式',
@@ -622,8 +626,11 @@ const TEXTS = {
         updateAvailableTitle: '酒館筆記有新版本',
         updateAvailable: '偵測到 v{version}。請在 SillyTavern 擴充面板裡更新；如果當初用黑窗安裝，也可以重新執行安裝器。',
         updateCenter: '版本與更新', updateCenterIntro: '查看目前版本、最新版本和更新日誌。是否更新完全由你決定。', checkUpdates: '檢查更新', checkingUpdates: '正在檢查…', installedVersion: '目前版本', latestVersion: '最新版本', updateAvailableStatus: '發現新版本 v{version}', upToDateStatus: '已經是最新版本', updateCheckFailed: '暫時無法連線更新伺服器', openExtensionManager: '開啟擴充管理', openRepository: '開啟專案頁面', updateInstructions: '更新由 SillyTavern 擴充管理器執行；酒館筆記不會靜默安裝或覆蓋檔案。', changelogTitle: '更新日誌', latestBadge: '最新', noChangelog: '暫時沒有取得更新日誌。', viewUpdate: '查看更新', authorAnnotation: '作者中文註釋',
-        backendInstallTitle: '酒館筆記已就緒',
-        backendInstallMessage: '酒館筆記已預設使用 Lite 瀏覽器儲存，關閉此視窗即可直接使用。如果你想使用 Full 本機檔案儲存，請執行一次下方的後端安裝器，重新啟動 SillyTavern，然後在酒館筆記的儲存模式入口切換到 Full。',
+        backendInstallTitle: 'Lite 瀏覽器版已安裝成功',
+        backendInstallMessage: '現在已經可以直接使用酒館筆記。資料會儲存在目前瀏覽器中，關閉此視窗即可開始。',
+        backendInstallFullTitle: '想把筆記儲存為本機檔案？',
+        backendInstallFullBenefits: 'Full 本機檔案模式支援檔案儲存、自動備份和主題資料夾管理。請執行一次對應系統的後端安裝器，重新啟動 SillyTavern，再從「儲存方式」切換到 Full。',
+        continueWithLite: '關閉並使用 Lite 瀏覽器版',
         backendInstallWindows: 'Windows：打開並執行這個檔案',
         backendInstallOther: 'Mac / Linux / Android Termux / 雲端伺服器：在終端執行',
         storageChoiceTitle: '選擇酒館筆記的儲存方式',
@@ -897,8 +904,11 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         updateAvailableTitle: 'Tavern Notes update available',
         updateAvailable: 'Version {version} is available. Update it in the SillyTavern extensions panel, or rerun the installer if you originally used the installer.',
         updateCenter: 'Version & updates', updateCenterIntro: 'View the installed version, latest version, and release notes. You decide whether to update.', checkUpdates: 'Check for updates', checkingUpdates: 'Checking…', installedVersion: 'Installed', latestVersion: 'Latest', updateAvailableStatus: 'Version {version} is available', upToDateStatus: 'You are up to date', updateCheckFailed: 'Could not reach the update server', openExtensionManager: 'Open extension manager', openRepository: 'Open project page', updateInstructions: 'Updates are performed by the SillyTavern extension manager. Tavern Notes never installs silently or overwrites files on its own.', changelogTitle: 'Release notes', latestBadge: 'Latest', noChangelog: 'Release notes are not available right now.', viewUpdate: 'View update', authorAnnotation: 'Author’s Chinese notes',
-        backendInstallTitle: 'Tavern Notes is ready',
-        backendInstallMessage: 'Tavern Notes now defaults to Lite browser storage, so you can close this dialog and start using it. To use Full local-file storage, run the backend installer below once, restart SillyTavern, then switch to Full from the storage-mode menu.',
+        backendInstallTitle: 'Lite browser edition installed successfully',
+        backendInstallMessage: 'Tavern Notes is ready to use. Your data will be stored in this browser; close this dialog to begin.',
+        backendInstallFullTitle: 'Want to save notes as local files?',
+        backendInstallFullBenefits: 'Full local-file mode adds file storage, automatic backups, and theme-folder management. Run the installer for your system once, restart SillyTavern, then switch to Full from Storage mode.',
+        continueWithLite: 'Close and use Lite browser edition',
         backendInstallWindows: 'Windows: open and run this file',
         backendInstallOther: 'Mac / Linux / Android Termux / cloud server: run this in a terminal',
         storageChoiceTitle: 'Choose how Tavern Notes stores notes',
@@ -1173,8 +1183,11 @@ Click Preview & save or Save as to create a theme file.`,
         updateAvailableTitle: 'Tavern Notes 업데이트 가능',
         updateAvailable: 'v{version} 버전이 있습니다. SillyTavern 확장 패널에서 업데이트하거나, 설치기로 설치했다면 설치기를 다시 실행하세요.',
         updateCenter: '버전 및 업데이트', updateCenterIntro: '현재 버전, 최신 버전과 변경 사항을 확인합니다. 업데이트 여부는 사용자가 결정합니다.', checkUpdates: '업데이트 확인', checkingUpdates: '확인 중…', installedVersion: '현재 버전', latestVersion: '최신 버전', updateAvailableStatus: '새 버전 v{version} 사용 가능', upToDateStatus: '최신 버전입니다', updateCheckFailed: '업데이트 서버에 연결할 수 없습니다', openExtensionManager: '확장 관리 열기', openRepository: '프로젝트 페이지 열기', updateInstructions: '업데이트는 SillyTavern 확장 관리자가 수행합니다. Tavern Notes는 자동으로 설치하거나 파일을 덮어쓰지 않습니다.', changelogTitle: '업데이트 기록', latestBadge: '최신', noChangelog: '현재 업데이트 기록을 가져올 수 없습니다.', viewUpdate: '업데이트 보기', authorAnnotation: '작성자 중국어 주석',
-        backendInstallTitle: 'Tavern Notes를 사용할 준비가 되었습니다',
-        backendInstallMessage: 'Tavern Notes는 기본적으로 Lite 브라우저 저장소를 사용하므로 이 창을 닫고 바로 사용할 수 있습니다. Full 로컬 파일 저장소를 사용하려면 아래 백엔드 설치기를 한 번 실행하고 SillyTavern을 다시 시작한 다음 저장 모드 메뉴에서 Full로 전환하세요.',
+        backendInstallTitle: 'Lite 브라우저 버전 설치 완료',
+        backendInstallMessage: '이제 Tavern Notes를 바로 사용할 수 있습니다. 데이터는 현재 브라우저에 저장되며, 이 창을 닫으면 시작할 수 있습니다.',
+        backendInstallFullTitle: '노트를 로컬 파일로 저장하고 싶나요?',
+        backendInstallFullBenefits: 'Full 로컬 파일 모드는 파일 저장, 자동 백업, 테마 폴더 관리를 지원합니다. 운영체제에 맞는 설치기를 한 번 실행하고 SillyTavern을 다시 시작한 다음 저장 방식에서 Full로 전환하세요.',
+        continueWithLite: '닫고 Lite 브라우저 버전 사용',
         backendInstallWindows: 'Windows: 이 파일을 열어 실행하세요',
         backendInstallOther: 'Mac / Linux / Android Termux / 클라우드 서버: 터미널에서 실행하세요',
         storageChoiceTitle: 'Tavern Notes 저장 방식을 선택하세요',
@@ -2960,6 +2973,7 @@ function setActiveFilter(filter) {
     document.querySelectorAll('.tn-filter').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.filter === filter);
     });
+    noteListRenderer.render();
     noteFilterController.setType(filter === 'characters' ? 'all' : filter);
 }
 
@@ -2976,6 +2990,7 @@ function setCharacterFilter(character) {
     document.querySelectorAll('.tn-filter').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.filter === 'all');
     });
+    noteListRenderer.render();
     noteFilterController.setCharacter(state.characterFilter.id);
 }
 
@@ -2985,6 +3000,7 @@ function clearCharacterFilter() {
     document.querySelectorAll('.tn-filter').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.filter === 'characters');
     });
+    noteListRenderer.render();
     noteFilterController.setCharacter(null);
 }
 
@@ -3405,17 +3421,31 @@ function closePanel() {
 
 async function init() {
     const loadedSettings = await settingsService.load();
-    const isFirstInstall = !loadedSettings.found;
+    const needsUnifiedOnboarding = localStorage.getItem(UNIFIED_ONBOARDING_KEY) !== 'done';
+    let showUnifiedOnboarding = false;
     hasLegacyFullSettings = loadedSettings.found && !loadedSettings.settings.storageMode;
     state.storageModeResolved = Boolean(state.storageMode);
     appStore.patch('theme', {
         appleMode: loadedSettings.settings.appleGlassMode,
         defaultMode: loadedSettings.settings.defaultThemeMode,
     });
-    if (isFirstInstall && !state.storageMode) {
-        const result = await settingsService.update({ storageMode: 'lite' });
-        if (!result.ok) throw result.error;
-        state.storageModeResolved = true;
+    if (needsUnifiedOnboarding) {
+        let fullBackendAvailable = false;
+        if (state.storageMode === 'full') {
+            try {
+                await fullSystemStatusRepository.getStatus();
+                fullBackendAvailable = true;
+            } catch {
+                fullBackendAvailable = false;
+            }
+        }
+        if (!fullBackendAvailable) {
+            const result = await settingsService.update({ storageMode: 'lite' });
+            if (!result.ok) throw result.error;
+            state.storageModeResolved = true;
+            showUnifiedOnboarding = true;
+        }
+        localStorage.setItem(UNIFIED_ONBOARDING_KEY, 'done');
     }
     const detectedStatus = await resolveInitialStorageMode();
     if (!state.storageMode) {
@@ -3431,7 +3461,7 @@ async function init() {
     setTimeout(() => checkForTavernNotesUpdate(), 5000);
 
     if (!detectedStatus) await systemStatusController.refresh().catch(() => {});
-    if (isFirstInstall) setTimeout(() => systemStatusController.showInstallGuide(), 500);
+    if (showUnifiedOnboarding) setTimeout(() => systemStatusController.showInstallGuide(), 500);
 
 }
 

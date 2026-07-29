@@ -16,11 +16,15 @@ export function createSystemStatusView({ statusSelector, classPrefix, translate,
             overlay.innerHTML = `
                 <div class="${classPrefix}-install-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(translate('backendInstallTitle'))}">
                     <button class="${classPrefix}-install-close" type="button" title="${escapeHtml(translate('close'))}" aria-label="${escapeHtml(translate('close'))}"><i class="fa-solid fa-xmark"></i></button>
-                    <h2>${escapeHtml(translate('backendInstallTitle'))}</h2>
-                    <p>${escapeHtml(translate('backendInstallMessage'))}</p>
+                    <h2 class="${classPrefix}-install-success-title"><i class="fa-solid fa-circle-check"></i><span>${escapeHtml(translate('backendInstallTitle'))}</span></h2>
+                    <p class="${classPrefix}-install-success-message">${escapeHtml(translate('backendInstallMessage'))}</p>
+                    <div class="${classPrefix}-install-full-intro">
+                        <b>${escapeHtml(translate('backendInstallFullTitle'))}</b>
+                        <p>${escapeHtml(translate('backendInstallFullBenefits'))}</p>
+                    </div>
                     <section><b>${escapeHtml(translate('backendInstallWindows'))}</b><code>${escapeHtml(install.windowsPath)}</code><button class="${classPrefix}-install-copy" data-copy-kind="windows" type="button"><i class="fa-solid fa-copy"></i><span>${escapeHtml(translate('copyWindowsPath'))}</span></button></section>
                     <section><b>${escapeHtml(translate('backendInstallOther'))}</b><code>${escapeHtml(install.shellCommand)}</code><button class="${classPrefix}-install-copy" data-copy-kind="shell" type="button"><i class="fa-solid fa-copy"></i><span>${escapeHtml(translate('copyShellCommand'))}</span></button></section>
-                    <button class="${classPrefix}-install-use-lite" type="button"><i class="fa-solid fa-window-maximize"></i><span>${escapeHtml(translate('storageLiteTitle'))}</span></button>
+                    <button class="${classPrefix}-install-use-lite" type="button"><i class="fa-solid fa-window-maximize"></i><span>${escapeHtml(translate('continueWithLite'))}</span></button>
                 </div>`;
             document.body.append(overlay);
             overlay.addEventListener('click', async event => {

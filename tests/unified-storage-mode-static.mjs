@@ -16,9 +16,9 @@ assert.match(source, /createFullHttpAdapter/, 'Full server adapter must remain a
 assert.match(httpAdapter, /async function request\(/);
 assert.match(source, /createModeNoteRepository\(\{[\s\S]*?lite:\s*createLiteNoteRepository/, 'Lite mode must route note operations through its IndexedDB Note Repository');
 assert.match(modeNoteRepository, /validated\[getMode\(\)\]/, 'storage-mode selection must stay inside the Repository adapter layer');
-assert.match(source, /const isFirstInstall = !loadedSettings\.found/);
-assert.match(source, /isFirstInstall && !state\.storageMode[\s\S]*?settingsService\.update\(\{ storageMode: 'lite' \}\)/, 'a fresh install must become usable in Lite mode without probing the Full backend');
-assert.match(source, /if \(isFirstInstall\) setTimeout\(\(\) => systemStatusController\.showInstallGuide\(\), 500\)/, 'a fresh install must explain the optional Full backend after Lite is ready');
+assert.match(source, /UNIFIED_ONBOARDING_KEY = 'tavern-notes-unified-onboarding-v1'/);
+assert.match(source, /needsUnifiedOnboarding[\s\S]*?fullSystemStatusRepository\.getStatus\(\)[\s\S]*?settingsService\.update\(\{ storageMode: 'lite' \}\)/, 'onboarding must silently fall back to Lite when the Full backend is unavailable');
+assert.match(source, /if \(showUnifiedOnboarding\) setTimeout\(\(\) => systemStatusController\.showInstallGuide\(\), 500\)/, 'the unified onboarding must explain the optional Full backend after Lite is ready');
 assert.match(source, /shouldResumeFullMode\(\{ hasLegacySettings: hasLegacyFullSettings, totalNotes: status\.totalNotes \}\)/, 'existing Full users must still reconnect to their Full storage');
 assert.match(source, /systemStatusController\.refresh\(\)/, 'install hook must check backend status through the System Status Controller');
 assert.match(storageModeView, /data-storage-mode="full"/);

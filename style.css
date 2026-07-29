@@ -8,7 +8,7 @@
 #tavern-notes-storage-choice {
     position: fixed;
     inset: 0;
-    z-index: 40000;
+    z-index: 120000;
     display: flex;
     align-items: flex-start;
     justify-content: center;
@@ -44,6 +44,40 @@
     margin: 0 0 18px;
     color: color-mix(in srgb, var(--SmartThemeBodyColor, #2f2d2a) 78%, transparent);
     line-height: 1.65;
+}
+
+.tn-install-success-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.tn-install-success-title i {
+    color: #63c98b;
+}
+
+.tn-install-success-message {
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, #63c98b 42%, transparent);
+    border-radius: 14px;
+    color: var(--SmartThemeBodyColor, #2f2d2a) !important;
+    background: color-mix(in srgb, #63c98b 12%, transparent);
+}
+
+.tn-install-full-intro {
+    margin: 20px 0 4px;
+    padding-top: 18px;
+    border-top: 1px solid rgba(244, 181, 31, 0.22);
+}
+
+.tn-install-full-intro b {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 17px;
+}
+
+.tn-install-full-intro p {
+    margin-bottom: 0;
 }
 
 .tn-install-card section {
