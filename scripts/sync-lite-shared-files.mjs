@@ -20,6 +20,7 @@ const sharedFiles = Object.freeze([
     'features/app-shell-markup.js',
     'features/tag-view.js',
     'features/capture-view.js',
+    'features/quick-reply-view.js',
     'features/share-card-view.js',
 ]);
 
