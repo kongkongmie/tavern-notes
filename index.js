@@ -12,15 +12,79 @@ import {
 } from '../../../../script.js';
 import { buildFloorExcludeSelector, extractFloorText, normalizeExcludedTagNames, stripExcludedTagsFromHtml } from './floor-capture.js';
 import { closeNoteActionMenus, renderNoteCards, toggleNoteActionMenu } from './core/note-card.js';
-import { normalizeThemeFlavor, replaceThemeVariables } from './core/theme-runtime.js';
-import { fetchUpdateInfo } from './core/update-center.js';
 import { createRepositoryRouter } from './core/repository-router.js';
 import { createLocalThemeRepository } from './core/local-theme-repository.js';
+import { createModeThemeRepository, createThemeRepository } from './core/theme-repository.js';
 import { prepareStorageModeSwitch, shouldResumeFullMode } from './core/storage-mode-settings.js';
+import { createBuiltInThemeRecords } from './core/theme-presets.js';
+import { createThemeModel } from './core/theme-model.js';
+import { createAppStore } from './core/app-store.js';
+import { createApplicationCapabilities } from './core/application-capabilities.js';
+import { DEFAULT_SETTINGS, normalizeSettings } from './core/settings-model.js';
+import { createSettingsRepository } from './core/settings-repository.js';
+import { NOTE_LIST_INITIAL_STATE, NOTE_UI_INITIAL_STATE, createNoteUiQuery } from './core/note-list-model.js';
 import { toFullThemeVariables } from './theme-compat.js';
+import { createThemeStudio, renderThemeStudioMarkup } from './features/theme-studio.js';
+import { createThemeController } from './features/theme-controller.js';
+import { createThemeView, renderThemeViewMarkup } from './features/theme-view.js';
+import { createNoteListController } from './features/note-list-controller.js';
+import { createNoteFilterController } from './features/note-filter-controller.js';
+import { createNoteMutationController } from './features/note-mutation-controller.js';
+import { createNoteExportController, prepareNoteForExport } from './features/note-export-controller.js';
+import { createNoteActionHandler, createNoteListRenderer, createNoteListView } from './features/note-list-view.js';
+import { createNoteFilterView } from './features/note-filter-view.js';
+import { createNoteEditorView } from './features/note-editor-view.js';
+import { createNoteImportExportView } from './features/note-import-export-view.js';
+import { createTagController } from './features/tag-controller.js';
+import { createTagView } from './features/tag-view.js';
+import { createCaptureController } from './features/capture-controller.js';
+import { createCaptureView, createSelectionSnapshotReader } from './features/capture-view.js';
+import { createUserInputCaptureController } from './features/user-input-capture-controller.js';
+import { createUserInputMaintenanceController } from './features/user-input-maintenance-controller.js';
+import { createUserInputMaintenanceView } from './features/user-input-maintenance-view.js';
+import { createShareCardRenderer } from './features/share-card-renderer.js';
+import { createShareCardView } from './features/share-card-view.js';
+import { createShareCardController } from './features/share-card-controller.js';
+import { createNoteDetailView, renderNoteDetailContent } from './features/note-detail-view.js';
+import { createNoteDetailController } from './features/note-detail-controller.js';
+import { createUpdateRepository } from './repositories/update-repository.js';
+import { createUpdateController } from './features/update-controller.js';
+import { createUpdateView } from './features/update-view.js';
+import { createFullFontRepository } from './repositories/full-font-repository.js';
+import { createFontController } from './features/font-controller.js';
+import { createFontView } from './features/font-view.js';
+import { stripFontQuotes } from './core/font-model.js';
+import { createFullSystemStatusRepository } from './repositories/full-system-status-repository.js';
+import { createLiteSystemStatusRepository } from './repositories/lite-system-status-repository.js';
+import { createSystemStatusController } from './features/system-status-controller.js';
+import { createSystemStatusView } from './features/system-status-view.js';
+import { createStorageModeController } from './features/storage-mode-controller.js';
+import { createStorageModeView } from './features/storage-mode-view.js';
+import { createQuickReplyView } from './features/quick-reply-view.js';
+import { createQuickReplyController } from './features/quick-reply-controller.js';
+import { createMutationObserverFactory, createObserverController, createResizeObserverFactory } from './features/observer-controller.js';
+import { createAppShellView, ensureAppMenuEntry, insertAppShellMarkup } from './features/app-shell-view.js';
+import { createApplication } from './services/application.js';
+import { bootstrapApplication } from './services/application-bootstrap.js';
+import { createSillyTavernEventAdapter } from './services/sillytavern-event-adapter.js';
+import { createLifecycleRegistry } from './services/lifecycle-registry.js';
+import { renderFullAppShellMarkup } from './repositories/full-app-shell-markup.js';
+import { createFullHttpAdapter } from './repositories/full-http-adapter.js';
+import { normalizeTagKey } from './core/tag-model.js';
+import { normalizeInputIgnoreRules } from './core/capture-model.js';
+import { createSettingsService } from './services/settings-service.js';
+import { createFullNoteRepository } from './repositories/full-note-repository.js';
+import { createLiteNoteRepository } from './repositories/lite-note-repository.js';
+import { createModeNoteRepository } from './repositories/mode-note-repository.js';
+import { createFullTagRepository } from './repositories/full-tag-repository.js';
+import { createLiteTagRepository } from './repositories/lite-tag-repository.js';
+import { createFullUserInputMaintenanceRepository } from './repositories/full-user-input-maintenance-repository.js';
+import { createLiteUserInputMaintenanceRepository } from './repositories/lite-user-input-maintenance-repository.js';
 import {
     getAllLiteNotes,
     getLiteExport,
+    getLiteStorageInfo,
+    importLiteExport,
     liteApi,
     markLiteExported,
 } from './storage.js';
@@ -46,6 +110,13 @@ const BACKEND_INSTALL_SHELL_COMMAND = 'node SillyTavern/public/scripts/extension
 const DEFAULT_OPEN_ICON_URL = '/scripts/extensions/third-party/tavern-notes/assets/tavern-notes-open.png';
 const DEFAULT_CAPTURE_ICON_URL = '/scripts/extensions/third-party/tavern-notes/assets/tavern-notes-capture.png';
 const APPLE_THEME_ID = 'apple-glass';
+const THEME_CAPABILITIES = Object.freeze({
+    themeStudio: true,
+    exportTheme: true,
+    openThemeFolder: true,
+});
+const APPLICATION_CAPABILITIES = createApplicationCapabilities({ coexistenceGuard: false });
+const sillyTavernEvents = createSillyTavernEventAdapter({ eventSource, eventTypes: event_types });
 const MOBILE_VIEWPORT_QUERY = '(max-width: 1000px)';
 const LEGACY_APPLE_THEME_DAY_ID = 'apple-glass-day';
 const LEGACY_APPLE_THEME_NIGHT_ID = 'apple-glass-night';
@@ -79,116 +150,83 @@ const FLOOR_CAPTURE_EXCLUDE_SELECTOR = [
     '[role="button"]',
 ].join(',');
 
-function loadLocalSettings() {
-    try {
-        return JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') || {};
-    } catch {
-        return {};
-    }
-}
-
-const localSettings = loadLocalSettings();
-const hasLegacyFullSettings = Object.keys(localSettings).length > 0 && !localSettings.storageMode;
-const savedLanguage = ['auto', 'zh-CN', 'zh-TW', 'en', 'ko'].includes(localSettings.language)
-    ? localSettings.language
-    : 'auto';
-const savedShareTheme = ['calendar', 'jianshu', 'dialogue', 'mobai'].includes(localSettings.shareCard?.theme)
-    ? localSettings.shareCard.theme
-    : 'calendar';
-const savedLauncherMode = ['toolbar', 'floating'].includes(localSettings.launcherMode)
-    ? localSettings.launcherMode
-    : 'toolbar';
-const savedStorageMode = ['full', 'lite'].includes(localSettings.storageMode)
-    ? localSettings.storageMode
-    : null;
-
-function sanitizeImportedFonts(fonts) {
-    if (!Array.isArray(fonts)) return [];
-    return fonts
-        .filter(font => font && font.id && font.name && (font.css || font.type === 'local'))
-        .map(font => ({ ...font, dataUrl: '' }))
-        .slice(0, 16);
-}
-
-function normalizeInputIgnoreRules(value) {
-    const items = Array.isArray(value) ? value : String(value || '').split(/\r?\n/);
-    return [...new Set(items.map(item => String(item || '').trim()).filter(Boolean))].slice(0, 1000);
-}
+const appStore = createAppStore({
+    app: {},
+    settings: normalizeSettings(DEFAULT_SETTINGS),
+    theme: {
+        theme: null,
+        previewTheme: null,
+        previewActive: false,
+        themes: [],
+        activeId: 'default',
+        draft: false,
+        appleMode: DEFAULT_SETTINGS.appleGlassMode,
+        defaultMode: DEFAULT_SETTINGS.defaultThemeMode,
+    },
+    ui: {},
+    noteList: NOTE_LIST_INITIAL_STATE,
+    noteQuery: createNoteUiQuery(),
+    noteUi: NOTE_UI_INITIAL_STATE,
+});
+const settingsRepository = createSettingsRepository({ storage: localStorage, key: SETTINGS_KEY });
+const settingsService = createSettingsService({ store: appStore, repository: settingsRepository });
+let hasLegacyFullSettings = false;
 
 const state = {
     open: false,
     filter: 'all',
-    query: '',
     tagFilter: '',
-    tags: [],
-    recentTags: Array.isArray(localSettings.recentTags) ? localSettings.recentTags.map(String).slice(0, 16) : [],
     tagManagerQuery: '',
     tagManagerSort: 'count',
     editingNote: null,
-    detailNote: null,
     editingTags: [],
-    notes: [],
-    characters: [],
     characterFilter: null,
-    totalNotes: 0,
-    counts: {},
-    page: 1,
-    pageSize: 15,
     status: null,
-    storageMode: savedStorageMode,
-    storageModeResolved: Boolean(savedStorageMode),
-    language: savedLanguage,
-    currentUserName: localSettings.currentUserName || '',
-    lastCapturedMessageId: null,
-    capturedUserInputs: {},
+    storageModeResolved: false,
     variantIndexByGroup: {},
-    lastSelection: null,
-    selectionButtonTimer: null,
-    selectionDismissedUntil: 0,
-    lastSelectionRoot: null,
-    selectionFrameObserver: null,
-    boundSelectionRoots: new WeakSet(),
-    floorCaptureObserver: null,
-    searchTimer: null,
-    qrBarObserver: null,
-    theme: null,
-    previewTheme: null,
-    themePreviewActive: false,
-    themes: [],
-    activeThemeId: 'default',
-    themeDraft: false,
     exportScope: 'all',
-    launcherMode: savedLauncherMode,
-    floatingPosition: localSettings.floatingPosition && typeof localSettings.floatingPosition === 'object' ? localSettings.floatingPosition : null,
     floatingDragMoved: false,
-    autoCaptureUserInput: localSettings.autoCaptureUserInput !== false,
-    collapseRepeatedUserInput: localSettings.collapseRepeatedUserInput !== false,
-    userInputIgnoreExact: normalizeInputIgnoreRules(localSettings.userInputIgnoreExact),
-    userInputIgnorePrefixes: normalizeInputIgnoreRules(localSettings.userInputIgnorePrefixes),
-    showSelectionCaptureButton: localSettings.showSelectionCaptureButton !== false,
-    showFloorCaptureButton: localSettings.showFloorCaptureButton !== false,
-    floorCaptureSelector: !localSettings.floorCaptureSelector || localSettings.floorCaptureSelector === LEGACY_FLOOR_CAPTURE_SELECTOR
-        ? DEFAULT_FLOOR_CAPTURE_SELECTOR
-        : localSettings.floorCaptureSelector,
-    floorCaptureExcludedTags: normalizeExcludedTagNames(localSettings.floorCaptureExcludedTags),
-    updateInfo: null,
-    updateChecking: false,
-    appleGlassMode: localSettings.appleGlassMode === 'night' ? 'night' : 'day',
-    defaultThemeMode: localSettings.defaultThemeMode === 'night' ? 'night' : 'day',
-    pendingUserInputDedupeIds: [],
-    shareCardNote: null,
-    shareCardSettings: {
-        theme: savedShareTheme,
-        background: localSettings.shareCard?.background || '#eef7f2',
-        textColor: localSettings.shareCard?.textColor || '',
-        fontFamily: localSettings.shareCard?.fontFamily || 'system-ui',
-        fontImport: localSettings.shareCard?.fontImport || '',
-        importedFonts: sanitizeImportedFonts(localSettings.shareCard?.importedFonts),
-        fontScale: Number(localSettings.shareCard?.fontScale || 0.8),
-        showCharacter: localSettings.shareCard?.showCharacter !== false,
-        showDate: localSettings.shareCard?.showDate !== false,
-    },
 };
+const NOTE_STATE_FIELDS = {
+    notes: ['noteList', 'items'],
+    characters: ['noteList', 'characters'],
+    tags: ['noteList', 'tags'],
+    totalNotes: ['noteList', 'total'],
+    counts: ['noteList', 'counts'],
+    query: ['noteQuery', 'search'],
+    page: ['noteQuery', 'page'],
+    pageSize: ['noteQuery', 'pageSize'],
+};
+for (const [field, [slice, key]] of Object.entries(NOTE_STATE_FIELDS)) {
+    Object.defineProperty(state, field, {
+        enumerable: true,
+        get: () => appStore.getSlice(slice)[key],
+    });
+}
+
+const SETTINGS_STATE_FIELDS = {
+    storageMode: 'storageMode',
+    language: 'language',
+    currentUserName: 'currentUserName',
+    recentTags: 'recentTags',
+    launcherMode: 'launcherMode',
+    floatingPosition: 'floatingPosition',
+    autoCaptureUserInput: 'autoCaptureUserInput',
+    collapseRepeatedUserInput: 'collapseRepeatedUserInput',
+    userInputIgnoreExact: 'userInputIgnoreExact',
+    userInputIgnorePrefixes: 'userInputIgnorePrefixes',
+    showSelectionCaptureButton: 'showSelectionCaptureButton',
+    showFloorCaptureButton: 'showFloorCaptureButton',
+    floorCaptureSelector: 'floorCaptureSelector',
+    floorCaptureExcludedTags: 'floorCaptureExcludedTags',
+    shareCardSettings: 'shareCard',
+};
+for (const [stateKey, settingsKey] of Object.entries(SETTINGS_STATE_FIELDS)) {
+    Object.defineProperty(state, stateKey, {
+        enumerable: true,
+        get: () => appStore.getSlice('settings')[settingsKey],
+    });
+}
 
 let mobileViewportMediaQuery = null;
 
@@ -1447,7 +1485,6 @@ const HEADER_ACTION_IDS = [
     'tavern-notes-reset-floating',
     'tavern-notes-apple-mode-main',
 ];
-let headerActionResizeObserver = null;
 let headerActionLayoutFrame = 0;
 
 const SHARE_CARD_THEMES = [
@@ -1586,6 +1623,17 @@ backgroundImage 可填空、url(...) 或 CSS 渐变。
 
 融合主题是临时预览，只有点击保存或另存为才会生成主题文件。`;
 
+const themeModel = createThemeModel({
+    defaultTheme: DEFAULT_THEME,
+    convertVariables: toFullThemeVariables,
+    variablePrefix: '--tn-',
+    appleThemeId: APPLE_THEME_ID,
+    legacyAppleThemeIds: [LEGACY_APPLE_THEME_DAY_ID, LEGACY_APPLE_THEME_NIGHT_ID],
+    defaultNightVariables: DEFAULT_NIGHT_VARIABLES,
+    appleDayVariables: APPLE_GLASS_DAY_VARIABLES,
+    appleNightVariables: APPLE_GLASS_NIGHT_VARIABLES,
+});
+
 function getCurrentCharacter() {
     const character = characters?.[this_chid] || {};
     return {
@@ -1606,22 +1654,14 @@ function getLiteUserName() {
 const RETIRED_LOCAL_THEME_IDS = new Set(['secret-files', 'archive']);
 
 function getLocalBuiltInThemes() {
-    const defaultTheme = normalizeTheme({ ...DEFAULT_THEME, id: 'default', name: 'Soft Neomorphism' });
-    const appleTheme = normalizeTheme({
-        ...DEFAULT_THEME,
-        id: APPLE_THEME_ID,
-        name: 'Apple Glass',
-        variables: {
-            ...DEFAULT_THEME.variables,
-            ...APPLE_GLASS_SHARED_VARIABLES,
-            ...APPLE_GLASS_DAY_VARIABLES,
-            '--tn-theme-flavor': 'apple',
-        },
+    return createBuiltInThemeRecords({
+        defaultTheme: DEFAULT_THEME,
+        appleDayVariables: APPLE_GLASS_DAY_VARIABLES,
+        normalizeTheme: themeModel.normalizeTheme,
+        variablePrefix: '--tn-',
+        appleThemeId: APPLE_THEME_ID,
+        author: 'Tavern Notes',
     });
-    return [
-        { id: 'default', name: defaultTheme.name, author: 'Tavern Notes', builtIn: true, theme: defaultTheme },
-        { id: APPLE_THEME_ID, name: appleTheme.name, author: 'Tavern Notes', builtIn: true, theme: appleTheme },
-    ];
 }
 
 function isRetiredLocalTheme(record) {
@@ -1641,56 +1681,17 @@ const localThemeApi = createLocalThemeRepository({
     activeThemeKey: LITE_ACTIVE_THEME_KEY,
     appleThemeId: APPLE_THEME_ID,
     getBuiltInThemes: getLocalBuiltInThemes,
-    normalizeTheme,
-    normalizeThemeId: normalizeAppleThemeId,
+    normalizeTheme: themeModel.normalizeTheme,
+    normalizeThemeId: themeModel.normalizeAppleThemeId,
     isRetiredTheme: isRetiredLocalTheme,
     translate: t,
 });
 
-async function serverApi(path, options = {}) {
-    let response;
-    try {
-        response = await fetch(`${API_BASE}${path}`, {
-            ...options,
-            headers: {
-                ...getRequestHeaders(),
-                'Content-Type': 'application/json',
-                ...(options.headers || {}),
-            },
-        });
-    } catch (error) {
-        const friendly = new Error(`${t('backendNetworkHelp')}\n\n${error.message}`);
-        friendly.code = 'backend_unreachable';
-        throw friendly;
-    }
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.ok === false) {
-        if (response.status === 404 && path === '/status') {
-            const friendly = new Error(t('backendMissingHelp'));
-            friendly.code = 'backend_missing';
-            throw friendly;
-        }
-        if (response.status === 404 && path === '/import') {
-            const friendly = new Error(t('backendOutdatedHelp'));
-            friendly.code = 'backend_outdated';
-            throw friendly;
-        }
-        if (response.status === 404 && path === '/user-input-dedupe') {
-            const friendly = new Error(t('cleanupBackendRestart'));
-            friendly.code = 'backend_restart_required';
-            throw friendly;
-        }
-        const raw = data.error || `${response.status} ${response.statusText || ''}`.trim();
-        const message = raw.includes('自动备份失败')
-            ? `${t('backupFailedHelp')}\n\n${raw}`
-            : t('backendRequestHelp', { message: raw });
-        const friendly = new Error(message);
-        friendly.code = 'backend_request_failed';
-        friendly.status = response.status;
-        throw friendly;
-    }
-    return data;
-}
+const { request: serverApi, requestFile: serverFileRequest } = createFullHttpAdapter({
+    apiBase: API_BASE,
+    getHeaders: getRequestHeaders,
+    translate: t,
+});
 
 const api = createRepositoryRouter({
     getMode: () => state.storageMode,
@@ -1699,6 +1700,675 @@ const api = createRepositoryRouter({
     localThemeRequest: localThemeApi,
     getLiteUser: getLiteUserName,
     getRuntimeVersion: () => EXTENSION_VERSION,
+});
+
+const noteRepository = createModeNoteRepository({
+    getMode: () => state.storageMode,
+    repositories: {
+        full: createFullNoteRepository({
+            request: serverApi,
+            requestFile: serverFileRequest,
+        }),
+        lite: createLiteNoteRepository({
+            request: (path, options) => liteApi(path, options, getLiteUserName(), EXTENSION_VERSION),
+            getAllNotes: getAllLiteNotes,
+            importData: importLiteExport,
+            exportData: getLiteExport,
+            markExported: markLiteExported,
+        }),
+    },
+});
+const noteStoreAdapter = {
+    getListState: () => appStore.getSlice('noteList'),
+    patchListState: patch => appStore.patch('noteList', patch),
+    getQueryState: () => appStore.getSlice('noteQuery'),
+    replaceQueryState: query => appStore.replace('noteQuery', query),
+    getNoteUiState: () => appStore.getSlice('noteUi'),
+    patchNoteUiState: patch => appStore.patch('noteUi', patch),
+};
+const noteListController = createNoteListController({
+    repository: noteRepository,
+    ...noteStoreAdapter,
+    getListOptions: () => {
+        const character = getCurrentCharacter();
+        return {
+            legacy: true,
+            currentCharacterId: character.id,
+            characterName: state.characterFilter?.name || '',
+        };
+    },
+    onStateChange: () => noteListRenderer.render(),
+    onSuccess: () => {
+        const directory = state.filter === 'characters' && !state.characterFilter;
+        setStatus(directory
+            ? t('shownCharacters', { count: state.characters.length })
+            : t('shownNotes', { shown: state.notes.length, total: state.totalNotes }));
+    },
+    onError: error => notify(error.message, 'error'),
+});
+const noteFilterController = createNoteFilterController({ ...noteStoreAdapter, listController: noteListController, debounceMs: 300 });
+const noteMutationController = createNoteMutationController({
+    repository: noteRepository,
+    listController: noteListController,
+    ...noteStoreAdapter,
+    onError: error => notify(error.message, 'error'),
+});
+const noteExportController = createNoteExportController({
+    repository: noteRepository,
+    listController: noteListController,
+    ...noteStoreAdapter,
+    prepareVisibleNote: note => prepareNoteForExport(note, {
+        getVariants: getNoteVariants,
+        getVariantIndex,
+        getActiveVariant,
+    }),
+    download: (...args) => noteTransferView.download(...args),
+    getExportOptions: () => ({ user: getLiteUserName() }),
+    getCurrentPageMeta: () => ({
+        filter: state.filter,
+        query: state.query,
+        characterFilter: state.characterFilter,
+    }),
+});
+[noteListController, noteFilterController, noteMutationController, noteExportController].forEach(controller => controller.mount());
+const tagRepositories = {
+    full: createFullTagRepository({ request: serverApi }),
+    lite: createLiteTagRepository({ request: (path, options) => liteApi(path, options, getLiteUserName(), EXTENSION_VERSION) }),
+};
+const tagRepository = {
+    renameTag: (...args) => tagRepositories[state.storageMode].renameTag(...args),
+    deleteTag: (...args) => tagRepositories[state.storageMode].deleteTag(...args),
+};
+const tagController = createTagController({
+    repository: tagRepository,
+    listController: noteListController,
+    getQueryState: () => noteStoreAdapter.getQueryState(),
+    replaceQueryState: query => noteStoreAdapter.replaceQueryState(query),
+    getRecentTags: () => state.recentTags,
+    updateRecentTags: recentTags => updateSettings({ recentTags }),
+    confirmRename: oldName => window.prompt(t('renameTagPrompt', { tag: oldName }), oldName),
+    confirmDelete: (tag, { count = 0 } = {}) => window.confirm(t('confirmDeleteTag', { tag, count })),
+    onQueryChange: tags => { state.tagFilter = tags[0] || ''; },
+    notify: (kind, value) => {
+        if (kind === 'error') return notify(value.message, 'error');
+        if (kind === 'renamed') notify(t('tagRenamed', { oldTag: value.oldName, newTag: value.newName, count: value.affectedNotes }), 'success');
+        if (kind === 'deleted') notify(t('tagDeleted', { tag: value.deletedTag, count: value.affectedNotes }), 'success');
+        tagView.renderLibrary();
+    },
+});
+tagController.mount();
+const maintenanceRepositories = {
+    full: createFullUserInputMaintenanceRepository({ request: serverApi }),
+    lite: createLiteUserInputMaintenanceRepository({ request: (path, options) => liteApi(path, options, getLiteUserName(), EXTENSION_VERSION) }),
+};
+const maintenanceRepository = {
+    preview: options => maintenanceRepositories[state.storageMode].preview(options),
+    apply: options => maintenanceRepositories[state.storageMode].apply(options),
+};
+const readCaptureSelection = createSelectionSnapshotReader({
+    ignoredSelector: '#tavern-notes-panel, #tavern-notes-selection-capture, select',
+    inputSelector: '#send_textarea, #send_form textarea',
+});
+const userInputMaintenanceController = createUserInputMaintenanceController({
+    repository: maintenanceRepository,
+    listController: noteListController,
+    notify: (kind, value) => {
+        if (kind === 'error') notify(value.message, 'error');
+        if (kind === 'applied') notify(t('cleanupDone', { ...value, duplicates: value.removed }), 'success');
+    },
+});
+userInputMaintenanceController.mount();
+const captureController = createCaptureController({
+    noteMutationController,
+    getCaptureSettings: () => ({
+        automatic: false,
+        selector: state.floorCaptureSelector,
+        excludedTags: state.floorCaptureExcludedTags,
+    }),
+    getSillyTavernContext: () => ({ character: getCurrentCharacter(), chatId: getChatName() }),
+    getSelectionSnapshot: readCaptureSelection,
+    getFloorText: messageElement => {
+        const messageId = getMessageIdFromElement(messageElement);
+        const message = messageId !== null ? chat?.[messageId] : null;
+        return {
+            content: getMessageTextFromElement(messageElement, message?.mes)
+                || htmlToPlainText(stripExcludedTagsFromHtml({ documentRef: document, html: message?.mes, excludedTagNames: state.floorCaptureExcludedTags })).trim(),
+            messageId,
+            character: getMessageCharacterForCapture(messageId),
+        };
+    },
+    notify: (kind, value) => {
+        if (kind === 'captured') notify(t('captured'), 'success');
+        else if (kind === 'selection-empty') notify(t('selectTextFirst'));
+        else if (kind === 'empty') notify(t('captureFloorEmpty'), 'warning');
+        else if (kind === 'error') notify(value.message, 'error');
+    },
+});
+captureController.mount();
+const userInputCaptureController = createUserInputCaptureController({
+    events: sillyTavernEvents,
+    noteMutationController,
+    getSettings: () => ({
+        enabled: state.autoCaptureUserInput,
+        ignoreExact: state.userInputIgnoreExact,
+        ignorePrefixes: state.userInputIgnorePrefixes,
+        collapseRepeated: state.collapseRepeatedUserInput,
+    }),
+    getContext: messageId => ({
+        message: chat?.[messageId],
+        messageId,
+        chatId: getChatName(),
+        character: getCurrentCharacter(),
+    }),
+    notify: (kind, error) => { if (kind === 'error') notify(error.message, 'error'); },
+});
+userInputCaptureController.mount();
+const noteActionHandler = createNoteActionHandler({
+    classPrefix: 'tn',
+    getNotes: () => state.notes,
+    getCharacters: () => state.characters,
+    getVariants: getNoteVariants,
+    getVariantIndex,
+    getActiveVariant,
+    setVariantIndex: (id, index) => { state.variantIndexByGroup[id] = index; },
+    render: () => noteListRenderer.render(),
+    setTag: setTagFilter,
+    setCharacter: setCharacterFilter,
+    clearCharacter: clearCharacterFilter,
+    openDetail: openFullNote,
+    copy: async note => {
+        await navigator.clipboard.writeText(note.content);
+        notify(t('copied'), 'success');
+    },
+    fill: async note => {
+        writeInput(note.content, false);
+        closePanel();
+        notify(t('filled'), 'success');
+    },
+    share: openShareCard,
+    edit: note => noteEditorView.open(note),
+    confirmDelete,
+    deleteNote: id => noteMutationController.deleteNote(id),
+    onDeleted: () => notify(t('deleted'), 'success'),
+    toggleActionMenu: toggleNoteActionMenu,
+    closeActionMenus: closeNoteActionMenus,
+});
+const noteListView = createNoteListView({
+    root: () => document.querySelector('#tavern-notes-panel'),
+    selectors: {
+        edit: '.__note-view-never',
+        delete: '.__note-view-never',
+        share: '.__note-view-never',
+        previous: '#tavern-notes-prev',
+        next: '#tavern-notes-next',
+        pageJump: '#tavern-notes-page-jump',
+        pageInput: '#tavern-notes-page-input',
+    },
+    renderContent: () => noteListRenderer.render(),
+    onPageChange: direction => noteListController.goToPage(state.page + direction),
+    onPageJump: page => noteListController.goToPage(page),
+    onAction: event => {
+        if (event.target.closest('#tavern-notes-list')) noteActionHandler(event).catch(error => notify(error.message, 'error'));
+    },
+});
+const noteFilterView = createNoteFilterView({
+    root: () => document.querySelector('#tavern-notes-panel'),
+    selectors: {
+        search: '#tavern-notes-search',
+        type: '.tn-filter',
+        character: '.__note-view-never',
+        chat: '.__note-view-never',
+        tag: '.tn-tag-filter[data-tag]',
+        sort: '.__note-view-never',
+        reset: '.__note-view-never',
+    },
+    onSearch: value => noteFilterController.setSearch(value),
+    onType: setActiveFilter,
+    onCharacter: id => noteFilterController.setCharacter(id),
+    onChat: id => noteFilterController.setChat(id),
+    onTag: setTagFilter,
+    onSort: (by, order) => noteFilterController.setSort(by, order),
+    onReset: () => noteFilterController.reset(),
+});
+const noteListRenderer = createNoteListRenderer({
+    classPrefix: 'tn',
+    panelId: 'tavern-notes-panel',
+    listId: 'tavern-notes-list',
+    pageLabelId: 'tavern-notes-page-label',
+    pageInputId: 'tavern-notes-page-input',
+    previousId: 'tavern-notes-prev',
+    nextId: 'tavern-notes-next',
+    getState: () => state,
+    translate: t,
+    escapeHtml: htmlEscape,
+    renderCards: renderNoteCards,
+    getVisibleFilters,
+    getCurrentCharacterSummary,
+    getCharacterAvatar,
+    getCharacterKey,
+    getCharacterInitial,
+    noteTypeClass,
+    noteTypeLabel,
+    renderQuotedText,
+    getVariants: getNoteVariants,
+    getVariantIndex,
+    getActiveVariant,
+    renderTagShelf: () => tagView.renderShelf(),
+});
+const noteEditorView = createNoteEditorView({
+    root: () => document.querySelector('#tavern-notes-panel'),
+    selectors: {
+        dialog: '#tavern-notes-edit-menu',
+        form: '#tavern-notes-edit-menu form',
+        content: '#tavern-notes-edit-content',
+        tags: '#tavern-notes-edit-tags',
+        submit: '.tn-edit-save',
+        close: '.tn-edit-close',
+    },
+    parseTags: parseTagsInput,
+    getTags: () => {
+        commitEditTagInput();
+        return [...state.editingTags];
+    },
+    onOpen: note => {
+        state.editingNote = note;
+        state.editingTags = parseTagsInput(note?.tags || []);
+        noteMutationController.openEditor(note);
+        renderEditTagChips();
+        renderTagSuggestions();
+    },
+    onClosed: () => {
+        state.editingNote = null;
+        state.editingTags = [];
+        noteMutationController.closeEditor();
+    },
+    onClose: () => {},
+    onError: error => notify(error.message, 'error'),
+    onSubmit: async ({ id, content, tags }) => {
+        if (!content) throw new Error(t('noteContentRequired'));
+        const result = await noteMutationController.updateNote(id, { content, tags });
+        if (!result.ok) throw result.error;
+        tags.forEach(rememberTag);
+        noteEditorView.close();
+        notify(t('noteUpdated'), 'success');
+    },
+});
+const newNoteView = createNoteEditorView({
+    root: () => document.querySelector('#tavern-notes-panel'),
+    selectors: {
+        dialog: '#tavern-notes-new-note-menu',
+        form: '#tavern-notes-new-note-menu form',
+        content: '#tavern-notes-new-note-content',
+        tags: '#tavern-notes-new-note-tags',
+        submit: '.tn-new-note-save',
+        close: '.tn-new-note-close',
+    },
+    parseTags: parseTagsInput,
+    getInitialTags: () => t('inspirationTag'),
+    onOpen: closeHeaderPopovers,
+    onClose: () => {},
+    onError: error => notify(error.message, 'error'),
+    onSubmit: async ({ content, tags }) => {
+        if (!content) throw new Error(t('noteContentRequired'));
+        const result = await noteMutationController.createNote({
+            type: 'user_input',
+            content,
+            tags,
+            character: getUserNoteCharacter(),
+            chat: { id: getChatName(), name: getChatName(), messageId: null },
+            source: 'manual_inspiration',
+            collapseRepeated: false,
+        }, { refresh: state.open });
+        if (!result.ok) throw result.error;
+        newNoteView.close();
+        notify(t('newNoteSaved'), 'success');
+    },
+});
+const noteTransferView = createNoteImportExportView({
+    root: () => document.querySelector('#tavern-notes-panel'),
+    selectors: {
+        scope: '#tavern-notes-export-menu .tn-export-scope-choice',
+        exportChoice: '#tavern-notes-export-menu .tn-export-choice[data-format]',
+        importButton: '#tavern-notes-import-json',
+        fileInput: '#tavern-notes-import-json-file',
+    },
+    getScope: () => state.exportScope,
+    onScopeChange: scope => { state.exportScope = scope; },
+    onImport: async file => {
+        const result = await noteExportController.importJson(file);
+        if (!result.ok) throw new Error(result.error?.message === 'INVALID_BACKUP' ? t('invalidBackup') : result.error?.message);
+        closeExportMenu();
+        notify(t('importDone', result.value), 'success');
+    },
+    onExport: async (format, scope) => {
+        const method = scope === 'page'
+            ? (format === 'json' ? 'exportCurrentPageJson' : 'exportCurrentPageTxt')
+            : (format === 'json' ? 'exportAllJson' : 'exportAllTxt');
+        const result = await noteExportController[method]();
+        if (!result.ok) throw new Error(result.error?.message === 'NO_PAGE_NOTES' ? t('noPageNotesToExport') : result.error?.message);
+        closeExportMenu();
+        notify(t('exportStarted'), 'success');
+    },
+    onError: error => notify(error.message || t('invalidBackup'), 'error'),
+});
+const tagView = createTagView({
+    root: () => document.querySelector('#tavern-notes-panel'),
+    selectors: {
+        prefix: 'tn',
+        shelf: '#tavern-notes-tag-shelf',
+        library: '#tavern-notes-tag-library',
+        list: '#tavern-notes-tag-library-list',
+        search: '#tavern-notes-tag-search',
+    },
+    getState: () => ({
+        tags: state.tags,
+        recentTags: state.recentTags,
+        activeTag: state.tagFilter,
+        query: state.tagManagerQuery,
+        sort: state.tagManagerSort,
+    }),
+    translate: t,
+    escapeHtml: htmlEscape,
+    normalizeKey: normalizeTagKey,
+    onSelect: setTagFilter,
+    onRename: (tag, count) => tagController.renameTag(tag, undefined, { count }),
+    onDelete: (tag, count) => tagController.deleteTag(tag, { count }),
+    onQuery: query => { state.tagManagerQuery = query; },
+    onSort: sort => { state.tagManagerSort = sort; },
+});
+const captureView = createCaptureView({
+    selectors: {
+        selectionButton: '#tavern-notes-selection-capture',
+        selectionClass: 'tn-selection-capture',
+        floorButton: '.tn-floor-capture',
+        chat: '#chat',
+        messages: '.mes[mesid], .mes[data-mesid]',
+        message: '.mes[mesid], .mes[data-mesid]',
+    },
+    translate: t,
+    escapeHtml: htmlEscape,
+    isSelectionEnabled: () => state.showSelectionCaptureButton,
+    isFloorEnabled: () => state.showFloorCaptureButton,
+    getSelectionSnapshot: readCaptureSelection,
+    onSelectionCapture: snapshot => captureController.handleManualCapture(snapshot),
+    onFloorCapture: message => captureController.captureWholeFloor(message),
+});
+const userInputMaintenanceView = createUserInputMaintenanceView({
+    root: () => document.querySelector('#tavern-notes-panel'),
+    selectors: {
+        menu: '#tavern-notes-user-input-cleanup-menu',
+        preview: '#tavern-notes-input-dedupe-preview',
+        summary: '.tn-dedupe-preview-summary',
+        list: '.tn-dedupe-preview-list',
+        itemClass: 'tn-dedupe-preview-item',
+        scan: '#tavern-notes-input-dedupe-scan',
+        apply: '#tavern-notes-input-dedupe-confirm',
+        cancel: '#tavern-notes-input-dedupe-cancel',
+    },
+    controller: userInputMaintenanceController,
+    translate: t,
+    escapeHtml: htmlEscape,
+    notify: kind => { if (kind === 'empty') notify(t('scanNoDuplicates'), 'success'); },
+});
+const noteFeatureLifecycle = createLifecycleRegistry();
+[noteListView, noteFilterView, noteEditorView, newNoteView, noteTransferView, tagView, captureView, userInputMaintenanceView,
+    noteListController, noteFilterController, noteMutationController, noteExportController, tagController, captureController,
+    userInputCaptureController, userInputMaintenanceController]
+    .forEach(resource => noteFeatureLifecycle.registerDestroy(() => resource.destroy()));
+function destroyNoteFeatureLayer() { noteFeatureLifecycle.destroyAll(); }
+const themeRepository = createModeThemeRepository({
+    getMode: () => state.storageMode,
+    repositories: {
+        full: createThemeRepository({ request: serverApi }),
+        lite: createThemeRepository({ request: localThemeApi }),
+    },
+});
+
+const themeView = createThemeView({
+    document,
+    window,
+    getComputedStyle: element => getComputedStyle(element),
+    requestAnimationFrame: callback => requestAnimationFrame(callback),
+    idPrefix: 'tavern-notes',
+    classPrefix: 'tn',
+    variablePrefix: '--tn-',
+    translate: t,
+    scheduleLayout: scheduleHeaderActionLayout,
+    exportFile,
+    iconConfig: {
+        defaultIconClass: 'tavern-notes-default-icon',
+        lightIconClass: 'tavern-notes-default-icon-light',
+        brandIconSelector: '.tn-brand-mark i',
+        useThemeBrandIcon: true,
+        openSelector: '#tavern-notes-open',
+        captureSelector: '#tavern-notes-capture',
+        floatingOpenSelector: '#tavern-notes-floating-open',
+        floatingCaptureSelector: '#tavern-notes-floating-capture',
+        openIconUrl: DEFAULT_OPEN_ICON_URL,
+        captureIconUrl: DEFAULT_CAPTURE_ICON_URL,
+    },
+});
+
+const themeController = createThemeController({
+    repository: themeRepository,
+    view: themeView,
+    renderer: themeView,
+    themeModel,
+    defaultTheme: DEFAULT_THEME,
+    appleThemeId: APPLE_THEME_ID,
+    capabilities: THEME_CAPABILITIES,
+    getThemeState: () => appStore.getSlice('theme'),
+    patchThemeState: patch => appStore.patch('theme', patch),
+    persistThemeSettings: async () => {
+        const themeState = appStore.getSlice('theme');
+        const result = await settingsService.update({
+            appleGlassMode: themeState.appleMode,
+            defaultThemeMode: themeState.defaultMode,
+        });
+        if (!result.ok) throw result.error;
+    },
+    translate: t,
+    notify,
+    confirm: message => window.confirm(message),
+    beforeOpen: closeHeaderPopovers,
+});
+
+const themeStudio = createThemeStudio({
+    document,
+    window,
+    getComputedStyle: element => getComputedStyle(element),
+    defaultTheme: DEFAULT_THEME,
+    normalizeTheme: themeModel.normalizeTheme,
+    themeController,
+    translate: t,
+    notify,
+});
+themeController.attachStudio(themeStudio);
+
+const fontRepository = createFullFontRepository({
+    getDatabaseName: () => state.storageMode === 'lite' ? LITE_FONT_DB_NAME : FULL_FONT_DB_NAME,
+    storeName: FONT_DB_STORE,
+    unsupportedError: () => new Error(t('localFontUnsupported')),
+});
+const fontView = createFontView({
+    getStyleElement: () => document.querySelector('#tavern-notes-share-font-style'),
+    translate: t,
+    stripQuotes: stripFontQuotes,
+    FontFaceImpl: globalThis.FontFace,
+    fontSet: document.fonts,
+    readFile: file => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(reader.error || new Error('File read failed.'));
+        reader.readAsDataURL(file);
+    }),
+});
+const fontController = createFontController({
+    repository: fontRepository,
+    view: fontView,
+    getSettings: () => state.shareCardSettings,
+    updateSettings: patch => updateSettings({ shareCard: patch }),
+    onChanged: () => shareCardController?.preview(),
+    notify: (kind, family) => {
+        if (kind === 'local-imported') notify(t('localFontImported', { name: family }), 'success');
+        else notify(kind === 'imported' ? t('importedFont', { name: family }) : t('importedFontCode'), 'success');
+    },
+    errors: { missing: () => new Error(t('savedFontMissing')) },
+});
+const updateRepository = createUpdateRepository({
+    installedManifestUrl: '/scripts/extensions/third-party/tavern-notes/manifest.json',
+    fallbackVersion: EXTENSION_VERSION,
+    manifestUrl: REMOTE_MANIFEST_URL,
+    changelogUrl: REMOTE_CHANGELOG_URL,
+    annotationUrl: REMOTE_CHANGELOG_ANNOTATION_URL,
+    noticeStorage: localStorage,
+    noticeKey: UPDATE_NOTICE_KEY,
+});
+const updateView = createUpdateView({
+    root: () => document.querySelector('#tavern-notes-update-menu'),
+    idPrefix: 'tavern-notes',
+    classPrefix: 'tn',
+    translate: t,
+    escapeHtml: htmlEscape,
+    openManager: openSillyTavernExtensionManager,
+    openRepository: openUpdateRepository,
+    closePopovers: closeHeaderPopovers,
+});
+const updateController = createUpdateController({
+    repository: updateRepository,
+    view: updateView,
+    fallbackVersion: EXTENSION_VERSION,
+    notify: info => {
+        const toastrApi = globalThis.toastr;
+        if (!toastrApi) return false;
+        toastrApi.info(t('updateAvailable', { version: info.latestVersion }), t('updateAvailableTitle'), { timeOut: 12000, extendedTimeOut: 16000 });
+        return true;
+    },
+    setStatus: info => setStatus(`${t('updateAvailableTitle')}: ${t('updateAvailable', { version: info.latestVersion })}`),
+});
+let storageModeController;
+const systemStatusView = createSystemStatusView({
+    statusSelector: '.tavern-notes-status',
+    classPrefix: 'tn',
+    translate: t,
+    escapeHtml: htmlEscape,
+    copyText: copyTextToClipboard,
+    notify,
+    install: { id: 'tavern-notes-install-guide', windowsPath: BACKEND_INSTALL_WINDOWS_PATH, shellCommand: BACKEND_INSTALL_SHELL_COMMAND },
+    chooseLite: () => storageModeController.select('lite'),
+});
+const fullSystemStatusRepository = createFullSystemStatusRepository({ request: serverApi });
+const liteSystemStatusRepository = createLiteSystemStatusRepository({
+    getStorageInfo: getLiteStorageInfo,
+    estimateStorage: () => navigator.storage?.estimate?.() || Promise.resolve({}),
+});
+const systemStatusController = createSystemStatusController({
+    repository: { getStatus: () => (state.storageMode === 'lite' ? liteSystemStatusRepository : fullSystemStatusRepository).getStatus() },
+    view: systemStatusView,
+    capabilities: { backendStatus: true, installGuide: true, storageModeSwitch: true, storageQuota: false },
+    formatStatus: status => `${t(state.storageMode === 'lite' ? 'storageModeLite' : 'storageModeFull')} · ${t('connected', { user: status.user, version: status.version || EXTENSION_VERSION, count: status.totalNotes })}`,
+    onStatus: status => { if (status.user) updateSettings({ currentUserName: status.user }); },
+    onError: error => {
+        notify(t('backendDisconnected', { message: error.message }), 'error');
+        if (['backend_missing', 'backend_unreachable'].includes(error.code)) systemStatusController.showInstallGuide();
+    },
+});
+const storageModeView = createStorageModeView({
+    overlayId: 'tavern-notes-storage-choice',
+    classPrefix: 'tn',
+    translate: t,
+    escapeHtml: htmlEscape,
+});
+storageModeController = createStorageModeController({
+    view: storageModeView,
+    getMode: () => state.storageMode,
+    prepareSwitch: (currentMode, targetMode) => prepareStorageModeSwitch({
+        storage: localStorage,
+        currentSettingsKey: SETTINGS_KEY,
+        fullProfileKey: FULL_SETTINGS_PROFILE_KEY,
+        liteProfileKey: LITE_SETTINGS_PROFILE_KEY,
+        legacyLiteSettingsKey: LEGACY_LITE_SETTINGS_KEY,
+        currentMode,
+        targetMode,
+        persistCurrent: false,
+    }),
+    replaceSettings: settings => settingsService.replace(settings),
+    confirmSwitch: () => window.confirm(t('changeStorageModeWarning')),
+    reload: () => window.location.reload(),
+});
+fontController.mount();
+systemStatusController.mount();
+storageModeController.mount();
+let shareCardController;
+const shareCardRenderer = createShareCardRenderer({
+    resolveFont: () => fontController.resolveFont(),
+    loadFont: async () => {},
+    waitForFont: font => fontController.waitForFont(font),
+    getCharacterAvatarUrl: getShareCardAvatarUrl,
+    getUserAvatarUrl: getShareCardUserAvatarUrl,
+    getUserName: getShareCardUserName,
+    translate: t,
+});
+const shareCardView = createShareCardView({
+    root: () => document.querySelector('#tavern-notes-share-menu'),
+    getSettings: () => state.shareCardSettings,
+    renderSavedFonts: select => fontView.renderSavedFonts(select, fontController.listFonts(), state.shareCardSettings.fontFamily),
+    onEvent: async (type, value) => {
+        if (type === 'close') shareCardController.close();
+        else if (type === 'settings') await shareCardController.updateSettings(value);
+        else if (type === 'font-import-input') await updateSettings({ shareCard: { fontImport: value } });
+        else if (type === 'saved-font') await fontController.select(value);
+        else if (type === 'import-font') await fontController.importCss(state.shareCardSettings.fontImport || '');
+        else if (type === 'import-local-font') {
+            const input = value.target;
+            const file = input.files?.[0];
+            input.value = '';
+            if (file) await fontController.importLocal(file);
+        }
+        else if (type === 'preview') await shareCardController.preview();
+        else if (type === 'export') await shareCardController.exportImage();
+        else if (type === 'error') notify(value.message, 'error');
+    },
+});
+shareCardController = createShareCardController({
+    view: shareCardView,
+    renderer: shareCardRenderer,
+    getSettings: () => state.shareCardSettings,
+    updateSettings: patch => updateSettings({ shareCard: patch }),
+    resetSettings: () => updateSettings({ shareCard: DEFAULT_SETTINGS.shareCard }),
+    downloadBlob: (blob, filename) => {
+        const url = URL.createObjectURL(blob);
+        exportFile(url, filename);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+    brand: t('brandForShare'),
+    onEvent: (type, value) => {
+        if (type === 'exported') notify(t('shareCardExported'), 'success');
+        else if (type === 'error') {
+            console.error('[Tavern Notes] share-card error', value);
+            notify(value?.message === 'shareCardExportFailed' ? t('shareCardExportFailed') : value.message, 'error');
+        }
+    },
+});
+const noteDetailView = createNoteDetailView({
+    root: () => document.querySelector('#tavern-notes-modal'),
+    escapeHtml: htmlEscape,
+    renderContent: model => renderNoteDetailContent(model, { escapeHtml: htmlEscape, renderText: renderQuotedText }),
+    onAction: action => noteDetailController.handleAction(action).catch(error => notify(error.message, 'error')),
+    onClose: () => noteDetailController.close(),
+});
+const noteDetailController = createNoteDetailController({
+    view: noteDetailView,
+    formatType: noteTypeLabel,
+    closeActionMenus: () => closeNoteActionMenus(document.querySelector('#tavern-notes-panel'), 'tn'),
+    copyText: copyTextToClipboard,
+    fillInput: content => writeInput(content, false),
+    editNote: note => noteEditorView.open(note),
+    confirmDelete,
+    deleteNote: id => noteMutationController.deleteNote(id),
+    shareNote: note => shareCardController.open(note),
+    closePanel,
+    notify: type => notify(t(type), 'success'),
 });
 
 function notify(message, kind = 'info') {
@@ -1729,227 +2399,55 @@ async function copyTextToClipboard(text) {
 async function resolveInitialStorageMode() {
     if (state.storageModeResolved && state.storageMode) return null;
     try {
-        const status = await serverApi('/status');
+        const status = await systemStatusController.refresh();
         if (shouldResumeFullMode({ hasLegacySettings: hasLegacyFullSettings, totalNotes: status.totalNotes })) {
-            state.storageMode = 'full';
+            const result = await settingsService.update({ storageMode: 'full', currentUserName: status.user || state.currentUserName || '' });
+            if (!result.ok) throw result.error;
             state.storageModeResolved = true;
-            state.currentUserName = status.user || state.currentUserName || '';
-            saveLocalSettings();
         }
         return status;
     } catch {
-        state.storageMode = null;
         state.storageModeResolved = false;
         return null;
     }
 }
 
-function selectStorageMode(mode) {
-    if (!['full', 'lite'].includes(mode)) return;
-    if (state.storageMode === mode) {
-        document.querySelector('#tavern-notes-storage-choice')?.remove();
-        return;
-    }
-    if (state.storageMode && state.storageMode !== mode
-        && !window.confirm(t('changeStorageModeWarning'))) return;
-    prepareStorageModeSwitch({
-        storage: localStorage,
-        currentSettingsKey: SETTINGS_KEY,
-        fullProfileKey: FULL_SETTINGS_PROFILE_KEY,
-        liteProfileKey: LITE_SETTINGS_PROFILE_KEY,
-        legacyLiteSettingsKey: LEGACY_LITE_SETTINGS_KEY,
-        currentMode: state.storageMode,
-        targetMode: mode,
-    });
-    window.location.reload();
-}
-
-function showStorageModeChooser({ allowClose = Boolean(state.storageMode) } = {}) {
-    document.querySelector('#tavern-notes-storage-choice')?.remove();
-    const overlay = document.createElement('div');
-    overlay.id = 'tavern-notes-storage-choice';
-    overlay.dataset.tnOverlay = 'storage-choice';
-    overlay.innerHTML = `
-        <div class="tn-install-card tn-storage-choice-card" role="dialog" aria-modal="true" aria-label="${htmlEscape(t('storageChoiceTitle'))}">
-            ${allowClose ? `<button class="tn-install-close" type="button" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>` : ''}
-            <h2>${htmlEscape(t('storageChoiceTitle'))}</h2>
-            <p>${htmlEscape(t('storageChoiceMessage'))}</p>
-            <div class="tn-storage-choice-grid">
-                <button class="tn-storage-choice ${state.storageMode === 'full' ? 'active' : ''}" data-storage-mode="full" type="button">
-                    <i class="fa-solid fa-hard-drive"></i>
-                    <span><b>${htmlEscape(t('storageFullTitle'))}</b><small>${htmlEscape(t('storageFullDescription'))}</small></span>
-                </button>
-                <button class="tn-storage-choice ${state.storageMode === 'lite' ? 'active' : ''}" data-storage-mode="lite" type="button">
-                    <i class="fa-solid fa-window-maximize"></i>
-                    <span><b>${htmlEscape(t('storageLiteTitle'))}</b><small>${htmlEscape(t('storageLiteDescription'))}</small></span>
-                </button>
-            </div>
-        </div>
-    `;
-    document.body.append(overlay);
-    overlay.querySelectorAll('[data-storage-mode]').forEach(button => {
-        button.addEventListener('click', () => selectStorageMode(button.dataset.storageMode));
-    });
-    if (allowClose) {
-        overlay.addEventListener('click', event => {
-            if (event.target === overlay || event.target.closest('.tn-install-close')) overlay.remove();
-        });
-    }
-}
-
-function showBackendInstallGuide() {
-    document.querySelector('#tavern-notes-install-guide')?.remove();
-    const overlay = document.createElement('div');
-    overlay.id = 'tavern-notes-install-guide';
-    overlay.dataset.tnOverlay = 'install';
-    overlay.innerHTML = `
-        <div class="tn-install-card" role="dialog" aria-modal="true" aria-label="${htmlEscape(t('backendInstallTitle'))}">
-            <button class="tn-install-close" type="button" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-            <h2>${htmlEscape(t('backendInstallTitle'))}</h2>
-            <p>${htmlEscape(t('backendInstallMessage'))}</p>
-            <section>
-                <b>${htmlEscape(t('backendInstallWindows'))}</b>
-                <code>${htmlEscape(BACKEND_INSTALL_WINDOWS_PATH)}</code>
-                <button class="tn-install-copy" data-copy-kind="windows" type="button">
-                    <i class="fa-solid fa-copy"></i><span>${htmlEscape(t('copyWindowsPath'))}</span>
-                </button>
-            </section>
-            <section>
-                <b>${htmlEscape(t('backendInstallOther'))}</b>
-                <code>${htmlEscape(BACKEND_INSTALL_SHELL_COMMAND)}</code>
-                <button class="tn-install-copy" data-copy-kind="shell" type="button">
-                    <i class="fa-solid fa-copy"></i><span>${htmlEscape(t('copyShellCommand'))}</span>
-                </button>
-            </section>
-            <button class="tn-install-use-lite" type="button"><i class="fa-solid fa-window-maximize"></i><span>${htmlEscape(t('storageLiteTitle'))}</span></button>
-        </div>
-    `;
-    document.body.append(overlay);
-    const close = () => overlay.remove();
-    overlay.addEventListener('click', event => {
-        if (event.target === overlay || event.target.closest('.tn-install-close')) close();
-    });
-    overlay.querySelectorAll('.tn-install-copy').forEach(button => {
-        button.addEventListener('click', async () => {
-            const text = button.dataset.copyKind === 'windows' ? BACKEND_INSTALL_WINDOWS_PATH : BACKEND_INSTALL_SHELL_COMMAND;
-            await copyTextToClipboard(text);
-            notify(t('copiedInstallCommand'), 'success');
-        });
-    });
-    overlay.querySelector('.tn-install-use-lite')?.addEventListener('click', () => selectStorageMode('lite'));
-}
-
 export function showInstallGuide() {
     setTimeout(async () => {
         if (!state.storageMode) await resolveInitialStorageMode();
-        if (!state.storageMode) {
-            showStorageModeChooser();
-            return;
-        }
-        if (state.storageMode === 'full') {
-            try { await serverApi('/status'); } catch { showBackendInstallGuide(); }
+        if (!state.storageMode) storageModeController.open();
+        else if (state.storageMode === 'full') {
+            try { await systemStatusController.refresh(); } catch { systemStatusController.showInstallGuide(); }
         }
     }, 500);
 }
 
 function setStatus(message) {
     state.status = message;
-    document.querySelectorAll('.tavern-notes-status').forEach(el => {
-        el.textContent = message;
-    });
+    systemStatusView.renderStatus(message);
 }
 
-async function getInstalledVersion() {
-    try {
-        const response = await fetch(`/scripts/extensions/third-party/tavern-notes/manifest.json?t=${Date.now()}`, { cache: 'no-store' });
-        if (!response.ok) return EXTENSION_VERSION;
-        const manifest = await response.json();
-        return manifest.version || EXTENSION_VERSION;
-    } catch {
-        return EXTENSION_VERSION;
-    }
+async function checkForTavernNotesUpdate(options) {
+    return updateController.check(options);
 }
 
-function shouldNotifyUpdate(version) {
-    const today = new Date().toDateString();
-    try {
-        const last = JSON.parse(localStorage.getItem(UPDATE_NOTICE_KEY) || '{}') || {};
-        if (last.version === version && last.date === today) return false;
-    } catch {
-        // Ignore malformed notice cache.
-    }
-    localStorage.setItem(UPDATE_NOTICE_KEY, JSON.stringify({ version, date: today }));
-    return true;
+async function updateSettings(patch) {
+    const result = await settingsService.update(patch);
+    if (!result.ok) notify(result.error.message, 'error');
+    return result;
 }
 
-async function checkForTavernNotesUpdate({ notifyAvailable = true, throwOnError = false } = {}) {
-    state.updateChecking = true;
-    renderUpdateCenter();
-    try {
-        const installedVersion = await getInstalledVersion();
-        const info = await fetchUpdateInfo({
-            installedVersion,
-            manifestUrl: REMOTE_MANIFEST_URL,
-            changelogUrl: REMOTE_CHANGELOG_URL,
-            annotationUrl: REMOTE_CHANGELOG_ANNOTATION_URL,
-        });
-        state.updateInfo = info;
-        if (!info.hasUpdate || !notifyAvailable || !shouldNotifyUpdate(info.latestVersion)) return info;
-        const message = t('updateAvailable', { version: info.latestVersion });
-        const title = t('updateAvailableTitle');
-        const toastrApi = globalThis.toastr;
-        if (toastrApi) {
-            toastrApi.info(message, title, { timeOut: 12000, extendedTimeOut: 16000 });
-        } else {
-            setStatus(`${title}: ${message}`);
-        }
-        return info;
-    } catch (error) {
-        state.updateInfo = { error: true, installedVersion: await getInstalledVersion(), changelog: [] };
-        console.debug('[Tavern Notes] Update check skipped:', error);
-        if (throwOnError) throw error;
-        return state.updateInfo;
-    } finally {
-        state.updateChecking = false;
-        renderUpdateCenter();
-    }
-}
-
-function saveLocalSettings() {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-        storageMode: state.storageMode,
-        language: state.language,
-        launcherMode: state.launcherMode,
-        floatingPosition: state.floatingPosition,
-        autoCaptureUserInput: state.autoCaptureUserInput,
-        collapseRepeatedUserInput: state.collapseRepeatedUserInput,
-        userInputIgnoreExact: state.userInputIgnoreExact,
-        userInputIgnorePrefixes: state.userInputIgnorePrefixes,
-        showSelectionCaptureButton: state.showSelectionCaptureButton,
-        showFloorCaptureButton: state.showFloorCaptureButton,
-        floorCaptureSelector: state.floorCaptureSelector,
-        floorCaptureExcludedTags: state.floorCaptureExcludedTags,
-        appleGlassMode: state.appleGlassMode,
-        defaultThemeMode: state.defaultThemeMode,
-        currentUserName: state.currentUserName,
-        recentTags: state.recentTags,
-        shareCard: state.shareCardSettings,
-    }));
-}
-
-function saveLanguageSetting(language) {
-    state.language = ['auto', 'zh-CN', 'zh-TW', 'en', 'ko'].includes(language) ? language : 'auto';
-    saveLocalSettings();
+async function saveLanguageSetting(language) {
+    const result = await updateSettings({ language });
+    if (!result.ok) return;
     updateAutoCaptureUserInputButton();
     updateSelectionCaptureButtonSetting();
     updateFloorCaptureButtonSetting();
     updateFloorCaptureSelectorInput();
-    updateAppleThemeModeButton();
+    themeController.render();
     applyStorageCapabilities();
-    updateLauncherModeButton();
-    updateFloatingLauncher();
+    quickReplyController.refresh();
+    quickReplyController.refresh();
     notify(t('languageSaved'), 'success');
 }
 
@@ -1967,12 +2465,12 @@ function updateAutoCaptureUserInputButton() {
     button.querySelector('span')?.replaceChildren(document.createTextNode(t('autoCaptureUserInput')));
 }
 
-function toggleAutoCaptureUserInput() {
-    state.autoCaptureUserInput = !state.autoCaptureUserInput;
-    saveLocalSettings();
+async function toggleAutoCaptureUserInput() {
+    const result = await updateSettings({ autoCaptureUserInput: !state.autoCaptureUserInput });
+    if (!result.ok) return;
     updateAutoCaptureUserInputButton();
     renderFilterTabs();
-    refreshNotes();
+    noteListController.refresh();
     notify(state.autoCaptureUserInput ? t('autoCaptureUserInputOn') : t('autoCaptureUserInputOff'), 'success');
 }
 
@@ -1986,11 +2484,11 @@ function updateSelectionCaptureButtonSetting() {
     button.querySelector('span')?.replaceChildren(document.createTextNode(t('selectionCaptureButton')));
 }
 
-function toggleSelectionCaptureButtonSetting() {
-    state.showSelectionCaptureButton = !state.showSelectionCaptureButton;
-    saveLocalSettings();
+async function toggleSelectionCaptureButtonSetting() {
+    const result = await updateSettings({ showSelectionCaptureButton: !state.showSelectionCaptureButton });
+    if (!result.ok) return;
     updateSelectionCaptureButtonSetting();
-    if (!state.showSelectionCaptureButton) hideSelectionCaptureButton();
+    if (!state.showSelectionCaptureButton) captureView.hideSelectionButton();
     notify(state.showSelectionCaptureButton ? t('selectionCaptureButtonOn') : t('selectionCaptureButtonOff'), 'success');
 }
 
@@ -2034,20 +2532,24 @@ function renderFloorCaptureExcludedTags() {
         : `<span class="tn-floor-exclude-empty">${htmlEscape(t('noExcludedTags'))}</span>`;
 }
 
-function addFloorCaptureExcludedTags() {
+async function addFloorCaptureExcludedTags() {
     const input = document.querySelector('#tavern-notes-floor-exclude-input');
     const additions = normalizeExcludedTagNames(input?.value);
     if (!additions.length) return notify(t('invalidExcludedTag'), 'warning');
-    state.floorCaptureExcludedTags = normalizeExcludedTagNames([...state.floorCaptureExcludedTags, ...additions]);
+    const result = await updateSettings({
+        floorCaptureExcludedTags: [...state.floorCaptureExcludedTags, ...additions],
+    });
+    if (!result.ok) return;
     if (input) input.value = '';
-    saveLocalSettings();
     renderFloorCaptureExcludedTags();
     notify(t('excludedTagsSaved'), 'success');
 }
 
-function removeFloorCaptureExcludedTag(tag) {
-    state.floorCaptureExcludedTags = state.floorCaptureExcludedTags.filter(item => item !== tag);
-    saveLocalSettings();
+async function removeFloorCaptureExcludedTag(tag) {
+    const result = await updateSettings({
+        floorCaptureExcludedTags: state.floorCaptureExcludedTags.filter(item => item !== tag),
+    });
+    if (!result.ok) return;
     renderFloorCaptureExcludedTags();
 }
 
@@ -2078,34 +2580,20 @@ function updateFloorCaptureSelectorSummary() {
         : t('floorCaptureSelectorCurrentCustom', { tag: getFloorCaptureTagName(), selector });
 }
 
-function removeFloorCaptureButtons() {
-    document.querySelectorAll('.tn-floor-capture').forEach(button => button.remove());
-}
-
-function stopFloorCaptureWatcher() {
-    state.floorCaptureObserver?.disconnect();
-    state.floorCaptureObserver = null;
-    removeFloorCaptureButtons();
-}
-
-function toggleFloorCaptureButtonSetting() {
-    state.showFloorCaptureButton = !state.showFloorCaptureButton;
-    saveLocalSettings();
+async function toggleFloorCaptureButtonSetting() {
+    const result = await updateSettings({ showFloorCaptureButton: !state.showFloorCaptureButton });
+    if (!result.ok) return;
     updateFloorCaptureButtonSetting();
-    if (state.showFloorCaptureButton) {
-        watchChatMessages();
-    } else {
-        stopFloorCaptureWatcher();
-    }
+    captureView.refreshFloorButtons();
     notify(state.showFloorCaptureButton ? t('floorCaptureButtonOn') : t('floorCaptureButtonOff'), 'success');
 }
 
-function saveFloorCaptureSelector(value, silent = false) {
+async function saveFloorCaptureSelector(value, silent = false) {
     const next = selectorFromFloorCaptureTag(value);
-    state.floorCaptureSelector = next;
-    saveLocalSettings();
+    const result = await updateSettings({ floorCaptureSelector: next });
+    if (!result.ok) return;
     updateFloorCaptureSelectorInput();
-    if (state.showFloorCaptureButton) addFloorCaptureButtons();
+    captureView.refreshFloorButtons();
     document.querySelector('.tn-floor-capture-advanced')?.removeAttribute('open');
     if (!silent) notify(t('floorCaptureSelectorSaved'), 'success');
 }
@@ -2127,68 +2615,8 @@ function closeFloorCaptureMenu() {
     menu.setAttribute('aria-hidden', 'true');
 }
 
-function renderUpdateCenter() {
-    const menu = document.querySelector('#tavern-notes-update-menu');
-    if (!menu) return;
-    const info = state.updateInfo;
-    const installed = menu.querySelector('[data-update-installed]');
-    const latest = menu.querySelector('[data-update-latest]');
-    const status = menu.querySelector('[data-update-status]');
-    const checkButton = menu.querySelector('#tavern-notes-update-check');
-    const indicator = document.querySelector('#tavern-notes-update-indicator');
-    const moreButton = document.querySelector('#tavern-notes-more-open');
-    const hasUpdate = Boolean(info?.hasUpdate);
-    indicator?.classList.toggle('tn-hidden', !hasUpdate);
-    moreButton?.classList.toggle('tn-has-update', hasUpdate);
-    const indicatorVersion = indicator?.querySelector('[data-update-indicator-version]');
-    if (indicatorVersion && hasUpdate) indicatorVersion.textContent = `v${info.latestVersion}`;
-    if (installed) installed.textContent = `v${info?.installedVersion || EXTENSION_VERSION}`;
-    if (latest) latest.textContent = info?.latestVersion ? `v${info.latestVersion}` : '—';
-    if (status) {
-        status.className = info?.hasUpdate ? 'has-update' : info && !info.error ? 'is-current' : '';
-        status.textContent = state.updateChecking
-            ? t('checkingUpdates')
-            : info?.error
-                ? t('updateCheckFailed')
-                : info?.hasUpdate
-                    ? t('updateAvailableStatus', { version: info.latestVersion })
-                    : info
-                        ? t('upToDateStatus')
-                        : t('checkUpdates');
-    }
-    if (checkButton) {
-        checkButton.disabled = state.updateChecking;
-        checkButton.classList.toggle('checking', state.updateChecking);
-        checkButton.querySelector('span')?.replaceChildren(document.createTextNode(t(state.updateChecking ? 'checkingUpdates' : 'checkUpdates')));
-    }
-    const log = menu.querySelector('#tavern-notes-update-log');
-    if (!log) return;
-    log.innerHTML = info?.changelog?.length
-        ? info.changelog.map((entry, index) => {
-            const annotation = info.annotations?.find(item => item.version === entry.version);
-            return `<article class="tn-update-entry"><header><b>v${htmlEscape(entry.version)}</b>${index === 0 ? `<span>${htmlEscape(t('latestBadge'))}</span>` : ''}</header>${annotation?.items?.length ? `<aside class="tn-update-annotation"><b>${htmlEscape(t('authorAnnotation'))}</b><ul>${annotation.items.map(item => `<li>${htmlEscape(item)}</li>`).join('')}</ul></aside>` : ''}${entry.items.length ? `<ul>${entry.items.map(item => `<li>${htmlEscape(item)}</li>`).join('')}</ul>` : ''}</article>`;
-        }).join('')
-        : `<div class="tn-update-empty">${htmlEscape(t('noChangelog'))}</div>`;
-}
-
-function openUpdateCenter() {
-    const menu = document.querySelector('#tavern-notes-update-menu');
-    if (!menu) return;
-    closeHeaderPopovers();
-    renderUpdateCenter();
-    menu.classList.add('open');
-    menu.setAttribute('aria-hidden', 'false');
-    if (!state.updateInfo && !state.updateChecking) checkForTavernNotesUpdate({ notifyAvailable: false });
-}
-
-function closeUpdateCenter() {
-    const menu = document.querySelector('#tavern-notes-update-menu');
-    menu?.classList.remove('open');
-    menu?.setAttribute('aria-hidden', 'true');
-}
-
 function openSillyTavernExtensionManager() {
-    closeUpdateCenter();
+    updateController.close();
     closePanel();
     document.querySelector('#extensions_details')?.click();
 }
@@ -2220,21 +2648,21 @@ function renderInputRuleLists() {
     }
 }
 
-function addInputRules(kind) {
+async function addInputRules(kind) {
     const input = document.querySelector(`[data-rule-input="${kind}"]`);
     const additions = normalizeInputIgnoreRules(input?.value);
     if (!additions.length) return;
     const key = inputRuleStateKey(kind);
-    state[key] = normalizeInputIgnoreRules([...state[key], ...additions]);
+    const result = await updateSettings({ [key]: [...state[key], ...additions] });
+    if (!result.ok) return;
     if (input) input.value = '';
-    saveLocalSettings();
     renderInputRuleLists();
 }
 
-function deleteInputRule(kind, value) {
+async function deleteInputRule(kind, value) {
     const key = inputRuleStateKey(kind);
-    state[key] = state[key].filter(rule => rule !== value);
-    saveLocalSettings();
+    const result = await updateSettings({ [key]: state[key].filter(rule => rule !== value) });
+    if (!result.ok) return;
     renderInputRuleLists();
 }
 
@@ -2254,41 +2682,13 @@ function closeUserInputCleanupMenu() {
     menu.setAttribute('aria-hidden', 'true');
 }
 
-function saveUserInputCleanupSettings() {
-    state.collapseRepeatedUserInput = document.querySelector('#tavern-notes-collapse-repeated-input')?.checked !== false;
-    saveLocalSettings();
+async function saveUserInputCleanupSettings() {
+    const result = await updateSettings({
+        collapseRepeatedUserInput: document.querySelector('#tavern-notes-collapse-repeated-input')?.checked !== false,
+    });
+    if (!result.ok) return;
     syncUserInputCleanupControls();
     notify(t('inputRulesSaved'), 'success');
-}
-
-async function scanAndCleanupUserInputs() {
-    const preview = await api('/user-input-dedupe');
-    if (!preview.duplicateNotes) {
-        closeUserInputDedupePreview();
-        notify(t('scanNoDuplicates'), 'success');
-        return;
-    }
-    const panel = document.querySelector('#tavern-notes-input-dedupe-preview');
-    const summary = panel?.querySelector('.tn-dedupe-preview-summary');
-    const list = panel?.querySelector('.tn-dedupe-preview-list');
-    if (summary) summary.textContent = t('scanPreview', { ...preview, duplicates: preview.duplicateNotes });
-    if (list) list.innerHTML = (preview.items || []).map(item => `<article class="tn-dedupe-preview-item"><div><b>${htmlEscape(item.characterName || t('unnamedCharacter'))}</b><span>${htmlEscape(item.chatName || '')}</span><em>${htmlEscape(t('dedupeOccurrences', { count: item.occurrences, duplicates: item.duplicateNotes }))}</em></div><pre>${htmlEscape(item.content)}</pre></article>`).join('');
-    state.pendingUserInputDedupeIds = (preview.items || []).map(item => item.id);
-    panel?.classList.remove('tn-hidden');
-    panel?.scrollIntoView({ block: 'nearest' });
-}
-
-function closeUserInputDedupePreview() {
-    document.querySelector('#tavern-notes-input-dedupe-preview')?.classList.add('tn-hidden');
-    state.pendingUserInputDedupeIds = [];
-}
-
-async function applyUserInputDedupe() {
-    if (!state.pendingUserInputDedupeIds.length) return;
-    const result = await api('/user-input-dedupe', { method: 'POST', body: JSON.stringify({ ids: state.pendingUserInputDedupeIds }) });
-    closeUserInputDedupePreview();
-    notify(t('cleanupDone', { ...result, duplicates: result.duplicateNotes }), 'success');
-    await refreshNotes();
 }
 
 function htmlEscape(value) {
@@ -2349,223 +2749,17 @@ function noteTypeClass(type) {
     return 'manual';
 }
 
-function getListPath() {
-    const params = new URLSearchParams();
-    params.set('limit', String(state.pageSize));
-    params.set('offset', String((state.page - 1) * state.pageSize));
-    if (state.query.trim()) params.set('q', state.query.trim());
-    if (state.tagFilter) params.set('tag', state.tagFilter);
-    const currentCharacter = getCurrentCharacter();
-    if (currentCharacter.id !== null) params.set('currentCharacterId', String(currentCharacter.id));
-    if (state.filter === 'user_input') params.set('type', 'user_input');
-    if (state.filter === 'excerpt') params.set('type', 'excerpt');
-    if (state.characterFilter) {
-        if (state.characterFilter.id !== null && state.characterFilter.id !== undefined && state.characterFilter.id !== '') {
-            params.set('characterId', String(state.characterFilter.id));
-        } else if (state.characterFilter.name) {
-            params.set('characterName', state.characterFilter.name);
-        }
-    }
-    return `/notes?${params.toString()}`;
-}
-
-function getCharactersPath() {
-    const params = new URLSearchParams();
-    if (state.query.trim()) params.set('q', state.query.trim());
-    if (state.tagFilter) params.set('tag', state.tagFilter);
-    return `/characters?${params.toString()}`;
-}
-
-function getTagsPath() {
-    const params = new URLSearchParams();
-    if (state.characterFilter) {
-        if (state.characterFilter.id !== null && state.characterFilter.id !== undefined && state.characterFilter.id !== '') {
-            params.set('characterId', String(state.characterFilter.id));
-        } else if (state.characterFilter.name) {
-            params.set('characterName', state.characterFilter.name);
-        }
-    }
-    return `/tags?${params.toString()}`;
-}
-
-async function refreshNotes() {
-    try {
-        const [data, characterData, tagData] = await Promise.all([
-            api(getListPath()),
-            api(getCharactersPath()),
-            api(getTagsPath()),
-        ]);
-        state.notes = data.notes || [];
-        state.characters = characterData.characters || [];
-        state.tags = tagData.tags || [];
-        const isCharacterDirectory = state.filter === 'characters' && !state.characterFilter;
-        state.totalNotes = isCharacterDirectory ? state.characters.length : Number(data.totalNotes || 0);
-        state.counts = data.counts || {};
-        const maxPage = getMaxPage();
-        if (state.page > maxPage) {
-            state.page = maxPage;
-            await refreshNotes();
-            return;
-        }
-        renderNotes();
-        if (isCharacterDirectory) {
-            setStatus(t('shownCharacters', { count: state.characters.length }));
-        } else {
-            setStatus(t('shownNotes', { shown: state.notes.length, total: state.totalNotes }));
-        }
-    } catch (error) {
-        notify(error.message, 'error');
-    }
-}
-
-function getMaxPage() {
-    return Math.max(1, Math.ceil(state.totalNotes / state.pageSize));
-}
-
-function renderNoteTags(note) {
-    const tags = Array.isArray(note?.tags) ? note.tags : [];
-    if (!tags.length) return '';
-    return `<div class="tn-note-tags">${tags.map(tag => `
-        <button class="tn-tag-chip ${state.tagFilter === tag ? 'active' : ''}" type="button" data-tag="${htmlEscape(tag)}" title="${htmlEscape(t('filterByTag', { tag }))}">
-            <i class="fa-solid fa-tag"></i><span>${htmlEscape(tag)}</span>
-        </button>
-    `).join('')}</div>`;
-}
-
-function renderTagShelf() {
-    const shelf = document.querySelector('#tavern-notes-tag-shelf');
-    if (!shelf) return;
-    shelf.classList.remove('tn-hidden');
-    const homeTags = getHomeTags();
-    shelf.innerHTML = `
-        <button class="tn-tag-filter tn-tag-library-open" type="button">
-            <i class="fa-solid fa-tags"></i><span>${htmlEscape(t('allTags'))}</span><small>${htmlEscape(state.tags.length)}</small>
-        </button>
-        ${state.tagFilter ? `
-            <button class="tn-tag-filter tn-tag-clear active" type="button" data-tag="">
-                <i class="fa-solid fa-xmark"></i><span>${htmlEscape(t('clearTagFilter'))}</span>
-            </button>
-        ` : ''}
-        ${homeTags.map(tag => `
-            <button class="tn-tag-filter ${state.tagFilter === tag.name ? 'active' : ''}" type="button" data-tag="${htmlEscape(tag.name)}">
-                <span>${htmlEscape(tag.name)}</span><small>${htmlEscape(tag.count)}</small>
-            </button>
-        `).join('')}
-        ${!state.tags.length ? `
-            <div class="tn-tag-shelf-empty"><i class="fa-solid fa-pen-to-square"></i><span>${htmlEscape(t('tagShelfEmpty'))}</span></div>
-        ` : ''}
-    `;
-}
-
-function normalizeTagKey(tag) {
-    return String(tag || '').trim().toLocaleLowerCase();
-}
-
 function rememberTag(tag) {
     const name = String(tag || '').trim();
     if (!name) return;
     const key = normalizeTagKey(name);
-    state.recentTags = [name, ...state.recentTags.filter(item => normalizeTagKey(item) !== key)].slice(0, 16);
-    saveLocalSettings();
-}
-
-function getHomeTags() {
-    const tagsByKey = new Map(state.tags.map(tag => [normalizeTagKey(tag.name), tag]));
-    const selected = [];
-    const append = tag => {
-        if (!tag || selected.some(item => normalizeTagKey(item.name) === normalizeTagKey(tag.name))) return;
-        selected.push(tag);
-    };
-    if (state.tagFilter) append(tagsByKey.get(normalizeTagKey(state.tagFilter)));
-    state.recentTags.forEach(name => append(tagsByKey.get(normalizeTagKey(name))));
-    [...state.tags].sort((a, b) => Number(b.count || 0) - Number(a.count || 0) || a.name.localeCompare(b.name)).forEach(append);
-    return selected.slice(0, 12);
-}
-
-function renderTagLibrary() {
-    const list = document.querySelector('#tavern-notes-tag-library-list');
-    if (!list) return;
-    const card = list.closest('.tn-tag-library-card');
-    card?.classList.toggle('is-empty', state.tags.length === 0);
-    const query = normalizeTagKey(state.tagManagerQuery);
-    const tags = state.tags
-        .filter(tag => !query || normalizeTagKey(tag.name).includes(query))
-        .sort((a, b) => state.tagManagerSort === 'name'
-            ? a.name.localeCompare(b.name)
-            : Number(b.count || 0) - Number(a.count || 0) || a.name.localeCompare(b.name));
-    list.innerHTML = tags.length ? tags.map(tag => `
-        <div class="tn-tag-library-row ${state.tagFilter === tag.name ? 'active' : ''}">
-            <button class="tn-tag-library-item ${state.tagFilter === tag.name ? 'active' : ''}" type="button" data-tag="${htmlEscape(tag.name)}">
-                <i class="fa-solid fa-tag"></i><span>${htmlEscape(tag.name)}</span><small>${htmlEscape(tag.count)}</small>
-            </button>
-            <button class="tn-tag-rename" type="button" data-rename-tag="${htmlEscape(tag.name)}" data-tag-count="${htmlEscape(tag.count)}" title="${htmlEscape(t('renameTag'))}"><i class="fa-solid fa-pen"></i></button>
-            <button class="tn-tag-delete" type="button" data-delete-tag="${htmlEscape(tag.name)}" data-tag-count="${htmlEscape(tag.count)}" title="${htmlEscape(t('deleteTag'))}" aria-label="${htmlEscape(t('deleteTag'))}"><i class="fa-solid fa-trash-can"></i></button>
-        </div>
-    `).join('') : state.tags.length ? `<div class="tn-tag-library-empty">${htmlEscape(t('noMatchingTags'))}</div>` : `
-        <div class="tn-tag-empty-guide">
-            <div class="tn-tag-empty-icon"><i class="fa-solid fa-tags"></i><i class="fa-solid fa-plus"></i></div>
-            <strong>${htmlEscape(t('tagEmptyTitle'))}</strong>
-            <p>${htmlEscape(t('tagEmptyIntro'))}</p>
-            <ol>
-                <li><b>1</b><span>${htmlEscape(t('tagEmptyStepEdit'))}</span></li>
-                <li><b>2</b><span>${htmlEscape(t('tagEmptyStepAdd'))}</span></li>
-                <li><b>3</b><span>${htmlEscape(t('tagEmptyStepSave'))}</span></li>
-            </ol>
-            <button class="tn-tag-library-back" type="button"><i class="fa-solid fa-arrow-left"></i><span>${htmlEscape(t('backToNotes'))}</span></button>
-        </div>`;
-    document.querySelectorAll('#tavern-notes-tag-library [data-tag-sort]').forEach(button => {
-        button.classList.toggle('active', button.dataset.tagSort === state.tagManagerSort);
-    });
-}
-
-function openTagLibrary() {
-    const menu = document.querySelector('#tavern-notes-tag-library');
-    if (!menu) return;
-    closeHeaderPopovers();
-    state.tagManagerQuery = '';
-    const search = document.querySelector('#tavern-notes-tag-search');
-    if (search) search.value = '';
-    renderTagLibrary();
-    menu.classList.add('open');
-    menu.setAttribute('aria-hidden', 'false');
-    setTimeout(() => search?.focus(), 0);
-}
-
-function closeTagLibrary() {
-    const menu = document.querySelector('#tavern-notes-tag-library');
-    menu?.classList.remove('open');
-    menu?.setAttribute('aria-hidden', 'true');
-}
-
-async function deleteTagEverywhere(tag, count) {
-    if (!window.confirm(t('confirmDeleteTag', { tag, count }))) return;
-    const result = await api(`/tags/${encodeURIComponent(tag)}`, { method: 'DELETE' });
-    state.recentTags = state.recentTags.filter(item => normalizeTagKey(item) !== normalizeTagKey(tag));
-    if (normalizeTagKey(state.tagFilter) === normalizeTagKey(tag)) state.tagFilter = '';
-    state.page = 1;
-    saveLocalSettings();
-    await refreshNotes();
-    renderTagLibrary();
-    notify(t('tagDeleted', { tag, count: result.updated ?? count }), 'success');
-}
-
-async function renameTagEverywhere(tag, count) {
-    const next = String(window.prompt(t('renameTagPrompt', { tag }), tag) || '').trim();
-    if (!next || normalizeTagKey(next) === normalizeTagKey(tag)) return;
-    const result = await api(`/tags/${encodeURIComponent(tag)}`, { method: 'PATCH', body: JSON.stringify({ name: next }) });
-    state.recentTags = state.recentTags.map(item => normalizeTagKey(item) === normalizeTagKey(tag) ? result.newTag : item);
-    if (normalizeTagKey(state.tagFilter) === normalizeTagKey(tag)) state.tagFilter = result.newTag;
-    saveLocalSettings();
-    await refreshNotes();
-    renderTagLibrary();
-    notify(t('tagRenamed', { oldTag: tag, newTag: result.newTag, count: result.updated ?? count }), 'success');
+    updateSettings({ recentTags: [name, ...state.recentTags.filter(item => normalizeTagKey(item) !== key)].slice(0, 16) });
 }
 
 function setTagFilter(tag = '') {
     state.tagFilter = String(tag || '');
     if (state.tagFilter) rememberTag(state.tagFilter);
-    state.page = 1;
-    refreshNotes();
+    noteFilterController.setTag(state.tagFilter);
 }
 
 function updateArchiveReadingMode() {
@@ -2640,165 +2834,6 @@ function getActiveVariant(note) {
     return variants[getVariantIndex(note)] || note;
 }
 
-function renderCharacterOverview() {
-    if (state.filter !== 'characters' || state.characterFilter) return '';
-    const current = getCurrentCharacterSummary();
-    const currentKey = getCharacterKey(current);
-    const userCharacter = state.characters.find(character => character.isUser || character.id === 'tavern-notes-user');
-    const restCharacters = state.characters.filter(character => getCharacterKey(character) !== currentKey && character !== userCharacter);
-
-    if (!state.characters.length && !current.name) {
-        const emptyHint = t('noCharacterNotesHint');
-        return `
-            <div class="tn-empty">
-                <div class="tn-empty-orb"><i class="fa-solid fa-user"></i></div>
-                <div class="tn-empty-title">${htmlEscape(t('noCharacterNotes'))}</div>
-                <small>${htmlEscape(emptyHint)}</small>
-            </div>
-        `;
-    }
-
-    const renderCard = (character, isCurrent = false) => {
-        const avatar = getCharacterAvatar(character);
-        const userInputPart = ` · ${htmlEscape(t('userInput'))} ${htmlEscape(character.userInput)}`;
-        return `
-            <button class="tn-character-card ${isCurrent ? 'tn-character-current' : ''}" type="button"
-                data-character-id="${htmlEscape(character.id ?? '')}"
-                data-character-name="${htmlEscape(character.name || '')}">
-                <span class="tn-character-avatar">
-                    ${avatar
-                        ? `<img src="${htmlEscape(avatar)}" alt="${htmlEscape(character.name || t('characterName'))}" loading="lazy" />`
-                        : `<span>${htmlEscape(getCharacterInitial(character.name))}</span>`}
-                </span>
-                <span class="tn-character-info">
-                    <b>${htmlEscape(character.name || t('unnamedCharacter'))}${isCurrent ? `<em>${htmlEscape(t('currentCharacter'))}</em>` : ''}</b>
-                    <small>${htmlEscape(character.total)}${userInputPart} · ${htmlEscape(t('excerpt'))} ${htmlEscape(character.excerpt)}</small>
-                </span>
-                <i class="fa-solid fa-chevron-right"></i>
-            </button>
-        `;
-    };
-
-    const cards = restCharacters.map(character => renderCard(character)).join('');
-
-    return `
-        <section class="tn-character-overview">
-            <div class="tn-section-title">
-                <span>${htmlEscape(t('currentCharacter'))}</span>
-                <small>${htmlEscape(t('priority'))}</small>
-            </div>
-            <div class="tn-character-featured">${userCharacter ? renderCard(userCharacter) : ''}${getCharacterKey(userCharacter) !== currentKey ? renderCard(current, true) : ''}</div>
-            <div class="tn-section-title">
-                <span>${htmlEscape(t('browseByCharacter'))}</span>
-                <small>${htmlEscape(t('characterCount', { count: state.characters.length }))}</small>
-            </div>
-            ${cards ? `<div class="tn-character-grid">${cards}</div>` : `<div class="tn-character-empty-line">${htmlEscape(t('otherCharactersEmpty'))}</div>`}
-        </section>
-    `;
-}
-
-function renderCharacterScope() {
-    if (!state.characterFilter) return '';
-    const avatar = getCharacterAvatar(state.characterFilter);
-    return `
-        <section class="tn-character-scope">
-            <span class="tn-character-avatar">
-                ${avatar
-                    ? `<img src="${htmlEscape(avatar)}" alt="${htmlEscape(state.characterFilter.name || t('characterName'))}" loading="lazy" />`
-                    : `<span>${htmlEscape(getCharacterInitial(state.characterFilter.name))}</span>`}
-            </span>
-            <div>
-                <b>${htmlEscape(state.characterFilter.name || t('unnamedCharacter'))}</b>
-                <small>${htmlEscape(t('viewingCharacter'))}</small>
-            </div>
-            <button class="tn-clear-character" type="button"><i class="fa-solid fa-arrow-left"></i><span>${htmlEscape(t('backCharacters'))}</span></button>
-        </section>
-    `;
-}
-
-function renderNoteArticles() {
-    if (!state.notes.length) {
-        const emptyHint = t('noNotesHint');
-        return `
-            <div class="tn-empty">
-                <div class="tn-empty-orb"><i class="fa-regular fa-note-sticky"></i></div>
-                <div class="tn-empty-title">${htmlEscape(t('noNotes'))}</div>
-                <small>${htmlEscape(emptyHint)}</small>
-            </div>
-        `;
-    }
-
-    return renderNoteCards(state.notes, {
-        classPrefix: 'tn',
-        escapeHtml: htmlEscape,
-        translate: t,
-        noteTypeClass,
-        noteTypeLabel,
-        renderQuotedText,
-        renderTags: renderNoteTags,
-        getVariants: getNoteVariants,
-        getVariantIndex,
-        getActiveVariant,
-    });
-}
-
-function renderNotes() {
-    const list = document.querySelector('#tavern-notes-list');
-    if (!list) return;
-
-    renderFilterTabs();
-    renderTagShelf();
-    updateFilterCounts();
-    updateCharacterScopeStyle();
-    const isCharacterDirectory = state.filter === 'characters' && !state.characterFilter;
-    list.innerHTML = isCharacterDirectory ? renderCharacterOverview() : `${renderCharacterScope()}${renderNoteArticles()}`;
-    renderPagination(!isCharacterDirectory);
-}
-
-function updateCharacterScopeStyle() {
-    const panel = document.querySelector('#tavern-notes-panel');
-    if (!panel) return;
-
-    const avatar = getCharacterAvatar(state.characterFilter);
-    panel.classList.toggle('tn-character-scoped', Boolean(state.characterFilter && avatar));
-    if (!state.characterFilter || !avatar) {
-        panel.style.removeProperty('--tn-scope-avatar');
-        return;
-    }
-
-    panel.style.setProperty('--tn-scope-avatar', `url("${avatar.replaceAll('"', '\\"')}")`);
-}
-
-function updateFilterCounts() {
-    const scopedCharacter = state.characterFilter;
-    const countMap = {
-        all: scopedCharacter ? scopedCharacter.total : (state.counts.all ?? state.totalNotes),
-        characters: state.characters.length,
-        user_input: scopedCharacter ? scopedCharacter.userInput : (state.counts.user_input ?? 0),
-        excerpt: scopedCharacter ? scopedCharacter.excerpt : (state.counts.excerpt ?? 0),
-    };
-    document.querySelectorAll('.tn-filter-count').forEach(el => {
-        const key = el.closest('.tn-filter')?.dataset.filter;
-        el.textContent = countMap[key] === '' ? '' : String(countMap[key] ?? '');
-    });
-}
-
-function renderFilterTabs() {
-    const nav = document.querySelector('.tn-filters');
-    if (!nav) return;
-    nav.innerHTML = getVisibleFilters().map(filter => `
-        <button class="tn-filter ${filter.id === state.filter ? 'active' : ''}" data-filter="${filter.id}">
-            <span class="tn-filter-icon"><i class="fa-solid ${filter.icon}"></i></span>
-            <span class="tn-filter-text">
-                <b>${htmlEscape(t(filter.label))}</b>
-                <small>${htmlEscape(t(filter.hint))}</small>
-            </span>
-            <span class="tn-filter-count"></span>
-        </button>
-    `).join('');
-    updateFilterCounts();
-}
-
 function findNoteGroupFromElement(element) {
     const article = element.closest('.tn-note');
     const id = article?.dataset.noteId;
@@ -2825,74 +2860,8 @@ function writeInput(text, append = false) {
     input.focus();
 }
 
-async function saveNote(payload) {
-    const data = await api('/notes', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-    });
-    if (state.open) await refreshNotes();
-    return data.note;
-}
-
-async function captureSelection() {
-    const currentSnapshot = getCurrentSelectionSnapshot();
-    const cached = state.lastSelection;
-    const canUseCached = cached?.text && Date.now() - cached.time < 10 * 60 * 1000;
-    const selected = currentSnapshot?.text || (canUseCached ? cached.text : '');
-    const messageId = currentSnapshot ? currentSnapshot.messageId : cached?.messageId;
-    const source = currentSnapshot?.source || cached?.source || 'selected_text';
-
-    if (!selected) {
-        notify(t('selectTextFirst'));
-        return;
-    }
-
-    await saveNote({
-        type: 'excerpt',
-        content: selected,
-        character: getCurrentCharacter(),
-        chat: {
-            id: getChatName(),
-            name: getChatName(),
-            messageId,
-        },
-        source,
-    });
-    notify(t('captured'), 'success');
-    dismissSelectionCaptureButton();
-}
-
 function getUserNoteCharacter() {
     return { id: 'tavern-notes-user', name: getShareCardUserName(), avatar: user_avatar || null, isUser: true };
-}
-
-function openNewNoteMenu() {
-    const menu = document.querySelector('#tavern-notes-new-note-menu');
-    const content = document.querySelector('#tavern-notes-new-note-content');
-    const tags = document.querySelector('#tavern-notes-new-note-tags');
-    if (!menu) return;
-    closeHeaderPopovers();
-    if (content) content.value = '';
-    if (tags) tags.value = t('inspirationTag');
-    menu.classList.add('open');
-    menu.setAttribute('aria-hidden', 'false');
-    setTimeout(() => content?.focus(), 0);
-}
-
-function closeNewNoteMenu() {
-    const menu = document.querySelector('#tavern-notes-new-note-menu');
-    menu?.classList.remove('open');
-    menu?.setAttribute('aria-hidden', 'true');
-}
-
-async function saveNewUserNote() {
-    const content = String(document.querySelector('#tavern-notes-new-note-content')?.value || '').trim();
-    if (!content) return notify(t('noteContentRequired'), 'warning');
-    const tags = parseTagsInput(document.querySelector('#tavern-notes-new-note-tags')?.value || t('inspirationTag'));
-    await saveNote({ type: 'user_input', content, tags, character: getUserNoteCharacter(), chat: { id: getChatName(), name: getChatName(), messageId: null }, source: 'manual_inspiration', collapseRepeated: false });
-    closeNewNoteMenu();
-    notify(t('newNoteSaved'), 'success');
-    await refreshNotes();
 }
 
 function layoutHeaderActions() {
@@ -2928,14 +2897,14 @@ function scheduleHeaderActionLayout() {
     });
 }
 
+const headerLayoutObserverController = createObserverController({
+    createObserver: createResizeObserverFactory(globalThis),
+    getTarget: () => typeof globalThis.ResizeObserver === 'function' ? document.querySelector('#tavern-notes-panel') : null,
+    onRefresh: scheduleHeaderActionLayout,
+});
+
 function observeHeaderActionLayout() {
-    headerActionResizeObserver?.disconnect();
-    const panel = document.querySelector('#tavern-notes-panel');
-    if (panel && typeof ResizeObserver === 'function') {
-        headerActionResizeObserver = new ResizeObserver(scheduleHeaderActionLayout);
-        headerActionResizeObserver.observe(panel);
-    }
-    scheduleHeaderActionLayout();
+    headerLayoutObserverController.mount();
 }
 
 function closeHeaderPopovers() {
@@ -2997,355 +2966,13 @@ function getMessageCharacterForCapture(messageId) {
     };
 }
 
-async function captureMessageFloor(messageElement) {
-    const messageId = getMessageIdFromElement(messageElement);
-    const message = messageId !== null ? chat?.[messageId] : null;
-    const content = getMessageTextFromElement(messageElement, message?.mes)
-        || htmlToPlainText(stripExcludedTagsFromHtml({ documentRef: document, html: message?.mes, excludedTagNames: state.floorCaptureExcludedTags })).trim();
-
-    if (!content) {
-        notify(t('captureFloorEmpty'), 'warning');
-        return;
-    }
-
-    await saveNote({
-        type: 'excerpt',
-        content,
-        character: getMessageCharacterForCapture(messageId),
-        chat: {
-            id: getChatName(),
-            name: getChatName(),
-            messageId,
-        },
-        source: 'message_floor',
-    });
-    notify(t('captured'), 'success');
-}
-
-function getSelectionMessageId(selection = window.getSelection()) {
-    if (!selection || selection.rangeCount === 0) return null;
-
-    const nodes = [selection.anchorNode, selection.focusNode];
-    for (const startNode of nodes) {
-        let node = startNode;
-        while (node && node !== document.body) {
-            const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-            const message = element?.closest?.('[mesid], .mes');
-            const id = message?.getAttribute?.('mesid') || message?.dataset?.mesid;
-            if (id !== undefined && id !== null) return Number(id);
-            node = node.parentNode;
-        }
-    }
-    return null;
-}
-
-function rememberSelection() {
-    if (!state.showSelectionCaptureButton) return;
-    const active = document.activeElement;
-    if (active && ['INPUT', 'TEXTAREA'].includes(active.tagName)
-        && active.selectionStart === active.selectionEnd) {
-        hideSelectionCaptureButton();
-        return;
-    }
-    const snapshot = getCurrentSelectionSnapshot();
-    if (!snapshot?.text) {
-        hideSelectionCaptureButton();
-        return;
-    }
-    state.lastSelection = {
-        ...snapshot,
-        time: Date.now(),
-    };
-    scheduleSelectionCaptureButton();
-}
-
-function selectionIsInsideIgnoredElement(selection = window.getSelection()) {
-    if (!selection || selection.rangeCount === 0) return true;
-    const nodes = [selection.anchorNode, selection.focusNode];
-    return nodes.some(startNode => {
-        let node = startNode;
-        while (node && node !== document.body) {
-            const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-            if (element?.closest?.('#tavern-notes-panel, #tavern-notes-selection-capture, select')) {
-                return true;
-            }
-            node = node.parentNode;
-        }
-        return false;
-    });
-}
-
-function getActiveInputSelection() {
-    return getInputSelectionFromElement(document.activeElement);
-}
-
-function getInputSelectionFromElement(element, frameRect = null) {
-    const tagName = String(element?.tagName || '').toUpperCase();
-    if (!['INPUT', 'TEXTAREA'].includes(tagName)) return null;
-    if (element.closest('#tavern-notes-panel, #tavern-notes-selection-capture')) return null;
-    if (typeof element.selectionStart !== 'number' || typeof element.selectionEnd !== 'number') return null;
-    const start = Math.min(element.selectionStart, element.selectionEnd);
-    const end = Math.max(element.selectionStart, element.selectionEnd);
-    const text = String(element.value || '').slice(start, end).trim();
-    if (!text) return null;
-    const rect = offsetRect(element.getBoundingClientRect(), frameRect);
-    return {
-        text,
-        messageId: null,
-        source: element === getInputBox() || element.closest('#send_form') ? 'input_selection' : 'selected_text',
-        rect,
-    };
-}
-
-function offsetRect(rect, offset = null) {
-    if (!rect || !offset) return rect;
-    return {
-        left: rect.left + offset.left,
-        right: rect.right + offset.left,
-        top: rect.top + offset.top,
-        bottom: rect.bottom + offset.top,
-        width: rect.width,
-        height: rect.height,
-    };
-}
-
-function getSelectionRect(selection = window.getSelection(), offset = null) {
-    if (!selection || selection.rangeCount === 0) return null;
-    const range = selection.getRangeAt(selection.rangeCount - 1);
-    const rects = Array.from(range.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0);
-    return offsetRect(rects.at(-1) || range.getBoundingClientRect(), offset);
-}
-
-function getRootSelection(root) {
-    try {
-        if (!root) return null;
-        if (typeof root.getSelection === 'function') return root.getSelection();
-        if (root.defaultView?.getSelection) return root.defaultView.getSelection();
-        if (root.ownerDocument?.defaultView?.getSelection) return root.ownerDocument.defaultView.getSelection();
-    } catch {
-        return null;
-    }
-    return null;
-}
-
-function getSelectionSnapshotFromSelection(selection, offset = null) {
-    const text = selection?.toString()?.trim();
-    if (!text || selectionIsInsideIgnoredElement(selection)) return null;
-    return {
-        text,
-        messageId: getSelectionMessageId(selection),
-        source: 'selected_text',
-        rect: getSelectionRect(selection, offset),
-    };
-}
-
-function getFrameSelectionSnapshot(frame) {
-    try {
-        const frameRect = frame.getBoundingClientRect();
-        const doc = frame.contentDocument;
-        const win = frame.contentWindow;
-        const inputSelection = getInputSelectionFromElement(doc?.activeElement, frameRect);
-        if (inputSelection) return inputSelection;
-        return getSelectionSnapshotFromSelection(win?.getSelection?.(), frameRect);
-    } catch {
-        return null;
-    }
-}
-
-function getCurrentSelectionSnapshot() {
-    const inputSelection = getActiveInputSelection();
-    if (inputSelection) return inputSelection;
-
-    const roots = [
-        state.lastSelectionRoot,
-        document,
-        window,
-    ].filter(Boolean);
-    for (const root of roots) {
-        const snapshot = getSelectionSnapshotFromSelection(getRootSelection(root));
-        if (snapshot) return snapshot;
-    }
-
-    for (const frame of document.querySelectorAll('iframe')) {
-        const snapshot = getFrameSelectionSnapshot(frame);
-        if (snapshot) return snapshot;
-    }
-    return null;
-}
-
-function ensureSelectionCaptureButton() {
-    let button = document.querySelector('#tavern-notes-selection-capture');
-    if (button) return button;
-    button = document.createElement('button');
-    button.id = 'tavern-notes-selection-capture';
-    button.className = 'tn-selection-capture';
-    button.type = 'button';
-    button.innerHTML = `<i class="fa-solid fa-highlighter"></i><span>${htmlEscape(t('captureSelected'))}</span>`;
-    button.addEventListener('mousedown', event => event.preventDefault());
-    button.addEventListener('click', event => {
-        event.preventDefault();
-        captureSelection().catch(error => notify(error.message, 'error'));
-        dismissSelectionCaptureButton();
-    });
-    document.body.append(button);
-    return button;
-}
-
-function hideSelectionCaptureButton() {
-    document.querySelector('#tavern-notes-selection-capture')?.classList.remove('show');
-}
-
-function dismissSelectionCaptureButton() {
-    state.lastSelection = null;
-    state.selectionDismissedUntil = Date.now() + 1000;
-    clearTimeout(state.selectionButtonTimer);
-    hideSelectionCaptureButton();
-    const selections = [getRootSelection(state.lastSelectionRoot), window.getSelection?.()];
-    for (const frame of document.querySelectorAll('iframe')) {
-        try { selections.push(frame.contentWindow?.getSelection?.()); } catch { /* cross-origin */ }
-    }
-    for (const selection of new Set(selections.filter(Boolean))) {
-        try { selection.removeAllRanges(); } catch { /* embedded selection may reject clearing */ }
-    }
-    setTimeout(hideSelectionCaptureButton, 120);
-}
-
-function updateSelectionCaptureButton() {
-    if (Date.now() < state.selectionDismissedUntil) {
-        hideSelectionCaptureButton();
-        return;
-    }
-    if (!state.showSelectionCaptureButton) {
-        hideSelectionCaptureButton();
-        return;
-    }
-    const snapshot = getCurrentSelectionSnapshot();
-    if (!snapshot?.text) {
-        hideSelectionCaptureButton();
-        return;
-    }
-    const rect = snapshot.rect;
-    if (!rect || (!rect.width && !rect.height)) {
-        hideSelectionCaptureButton();
-        return;
-    }
-    const button = ensureSelectionCaptureButton();
-    button.title = t('captureSelectedTitle');
-    button.setAttribute('aria-label', t('captureSelectedTitle'));
-    button.querySelector('span')?.replaceChildren(document.createTextNode(t('captureSelected')));
-
-    const margin = 8;
-    const buttonWidth = button.offsetWidth || 92;
-    const buttonHeight = button.offsetHeight || 34;
-    const left = Math.min(
-        Math.max(rect.right + margin, margin),
-        window.innerWidth - buttonWidth - margin,
-    );
-    const top = Math.min(
-        Math.max(rect.bottom + margin, margin),
-        window.innerHeight - buttonHeight - margin,
-    );
-    button.style.left = `${left}px`;
-    button.style.top = `${top}px`;
-    button.classList.add('show');
-}
-
-function scheduleSelectionCaptureButton(event = null) {
-    if (!state.showSelectionCaptureButton) {
-        hideSelectionCaptureButton();
-        return;
-    }
-    const root = event?.target?.getRootNode?.();
-    if (root) state.lastSelectionRoot = root;
-    clearTimeout(state.selectionButtonTimer);
-    state.selectionButtonTimer = setTimeout(updateSelectionCaptureButton, 80);
-}
-
-function bindSelectionListeners(root) {
-    if (!root || state.boundSelectionRoots.has(root)) return;
-    state.boundSelectionRoots.add(root);
-    root.addEventListener('selectionchange', rememberSelection);
-    root.addEventListener('mouseup', scheduleSelectionCaptureButton);
-    root.addEventListener('select', scheduleSelectionCaptureButton, true);
-    root.addEventListener('touchend', scheduleSelectionCaptureButton, { passive: true });
-}
-
-function bindIframeSelectionListeners() {
-    for (const frame of document.querySelectorAll('iframe')) {
-        try {
-            if (frame.contentDocument) bindSelectionListeners(frame.contentDocument);
-        } catch {
-            // Cross-origin frames cannot be inspected; skip quietly.
-        }
-    }
-}
-
-function bindShadowSelectionListeners(root = document) {
-    const elements = root.querySelectorAll?.('*') || [];
-    for (const element of elements) {
-        if (!element.shadowRoot) continue;
-        bindSelectionListeners(element.shadowRoot);
-        bindShadowSelectionListeners(element.shadowRoot);
-    }
-}
-
-function watchSelectionFrames() {
-    bindSelectionListeners(document);
-    bindIframeSelectionListeners();
-    bindShadowSelectionListeners();
-    if (state.selectionFrameObserver) return;
-    state.selectionFrameObserver = new MutationObserver(records => {
-        for (const record of records) {
-            for (const node of record.addedNodes) {
-                if (!(node instanceof Element)) continue;
-                if (node.matches('iframe')) {
-                    try { if (node.contentDocument) bindSelectionListeners(node.contentDocument); } catch { /* cross-origin */ }
-                }
-                node.querySelectorAll?.('iframe').forEach(frame => {
-                    try { if (frame.contentDocument) bindSelectionListeners(frame.contentDocument); } catch { /* cross-origin */ }
-                });
-                bindShadowSelectionListeners(node);
-            }
-        }
-    });
-    state.selectionFrameObserver.observe(document.body, { childList: true, subtree: true });
-}
-
-async function captureUserMessage(messageId) {
-    if (!state.autoCaptureUserInput) return;
-    const message = chat?.[messageId];
-    if (!message || !message.is_user || !String(message.mes || '').trim()) return;
-    const content = String(message.mes || '').trim();
-    if (state.userInputIgnoreExact.includes(content)
-        || state.userInputIgnorePrefixes.some(prefix => content.startsWith(prefix))) return;
-    const cacheKey = `${getChatName()}::${messageId}`;
-    if (messageId === state.lastCapturedMessageId && state.capturedUserInputs[cacheKey] === content) return;
-    if (state.capturedUserInputs[cacheKey] === content) return;
-    state.lastCapturedMessageId = messageId;
-    state.capturedUserInputs[cacheKey] = content;
-
-    await saveNote({
-        type: 'user_input',
-        content,
-        character: getCurrentCharacter(),
-        chat: {
-            id: getChatName(),
-            name: getChatName(),
-            messageId,
-        },
-        source: 'message_sent',
-        collapseRepeated: state.collapseRepeatedUserInput,
-    }).catch(error => notify(error.message, 'error'));
-}
-
 function setActiveFilter(filter) {
     state.filter = filter;
     if (filter === 'characters') state.characterFilter = null;
-    state.page = 1;
     document.querySelectorAll('.tn-filter').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.filter === filter);
     });
-    refreshNotes();
+    noteFilterController.setType(filter === 'characters' ? 'all' : filter);
 }
 
 function setCharacterFilter(character) {
@@ -3358,21 +2985,19 @@ function setCharacterFilter(character) {
         userInput: Number(character.userInput || 0),
         excerpt: Number(character.excerpt || 0),
     };
-    state.page = 1;
     document.querySelectorAll('.tn-filter').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.filter === 'all');
     });
-    refreshNotes();
+    noteFilterController.setCharacter(state.characterFilter.id);
 }
 
 function clearCharacterFilter() {
     state.characterFilter = null;
     state.filter = 'characters';
-    state.page = 1;
     document.querySelectorAll('.tn-filter').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.filter === 'characters');
     });
-    refreshNotes();
+    noteFilterController.setCharacter(null);
 }
 
 function applyStorageCapabilities() {
@@ -3384,283 +3009,25 @@ function applyStorageCapabilities() {
         badge.textContent = t(isLite ? 'storageModeLite' : 'storageModeFull');
         badge.title = t('storageModeCurrent', { mode: badge.textContent });
     }
-    document.querySelector('#tavern-notes-theme-merge-st')?.classList.toggle('tn-hidden', isLite);
-    document.querySelector('#tavern-notes-theme-open-folder')?.classList.toggle('tn-hidden', isLite);
 }
 
 function buildPanel() {
     if (document.querySelector('#tavern-notes-panel')) return;
 
-    document.body.insertAdjacentHTML('beforeend', `
-        <section id="tavern-notes-panel" aria-label="${htmlEscape(t('appName'))}">
-            <header class="tn-header">
-                <div class="tn-brand-mark"><i class="fa-solid fa-book-open"></i></div>
-                <div class="tn-heading">
-                    <div class="tn-title">${htmlEscape(t('appName'))} <span>@KKM</span><button id="tavern-notes-update-indicator" class="tn-update-indicator tn-hidden" type="button" title="${htmlEscape(t('viewUpdate'))}" aria-label="${htmlEscape(t('viewUpdate'))}"><i></i><span data-update-indicator-version></span></button></div>
-                    <div class="tn-subtitle">${htmlEscape(t('subtitle'))}<button id="tavern-notes-storage-mode" class="tn-storage-mode-badge" type="button" title="${htmlEscape(t('chooseStorageMode'))}">${htmlEscape(t(state.storageMode === 'lite' ? 'storageModeLite' : 'storageModeFull'))}</button></div>
-                </div>
-                <div class="tn-window-actions">
-                    <button id="tavern-notes-launcher-mode" class="tn-soft-button tn-window-soft-button" title="${htmlEscape(t('switchLauncherMode'))}" aria-label="${htmlEscape(t('switchLauncherMode'))}">
-                        <i class="fa-solid fa-circle-dot"></i><span>${htmlEscape(t(state.launcherMode === 'floating' ? 'floatingBall' : 'toolbarButtons'))}</span>
-                    </button>
-                    <label class="tn-language-select" title="${htmlEscape(t('language'))}">
-                        <i class="fa-solid fa-language"></i>
-                        <select id="tavern-notes-language" aria-label="${htmlEscape(t('language'))}">
-                            ${LANGUAGE_OPTIONS.map(option => `<option value="${option.id}" ${option.id === state.language ? 'selected' : ''}>${option.id === 'auto' ? htmlEscape(t('autoLanguage')) : htmlEscape(option.label)}</option>`).join('')}
-                        </select>
-                    </label>
-                    <button id="tavern-notes-theme" class="tn-icon-button" title="${htmlEscape(t('openThemePanel'))}" aria-label="${htmlEscape(t('openThemePanel'))}"><i class="fa-solid fa-palette"></i></button>
-                    <button class="tn-icon-button tn-close" title="${htmlEscape(t('closeNotes'))}" aria-label="${htmlEscape(t('closeNotes'))}">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                </div>
-                <div class="tn-header-actions">
-                    <button id="tavern-notes-new-note-open" class="tn-soft-button" title="${htmlEscape(t('newNote'))}" aria-label="${htmlEscape(t('newNote'))}"><i class="fa-solid fa-pen-to-square"></i><span>${htmlEscape(t('newNote'))}</span></button>
-                    <button id="tavern-notes-selection-capture-setting" class="tn-soft-button ${state.showSelectionCaptureButton ? 'active' : ''}" title="${htmlEscape(t('selectionCaptureButtonTitle'))}"><i class="fa-solid fa-highlighter"></i><span>${htmlEscape(t('captureSelected'))}</span></button>
-                    <button id="tavern-notes-floor-capture-open" class="tn-soft-button ${state.showFloorCaptureButton ? 'active' : ''}" title="${htmlEscape(t('floorCaptureEntryTitle'))}"><i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('captureFloor'))}</span></button>
-                    <button id="tavern-notes-more-open" class="tn-soft-button" title="${htmlEscape(t('more'))}" aria-label="${htmlEscape(t('more'))}"><i class="fa-solid fa-ellipsis"></i><span>${htmlEscape(t('more'))}</span></button>
-                    <div id="tavern-notes-more-menu" class="tn-header-popover tn-header-secondary"><button id="tavern-notes-auto-user-input" class="tn-soft-button ${state.autoCaptureUserInput ? 'active' : ''}" title="${htmlEscape(t('autoCaptureUserInputTitle'))}"><i class="fa-solid fa-keyboard"></i><span>${htmlEscape(t('autoCaptureUserInput'))}</span></button><button id="tavern-notes-user-input-cleanup-open" class="tn-soft-button" title="${htmlEscape(t('userInputCleanupIntro'))}"><i class="fa-solid fa-filter-circle-xmark"></i><span>${htmlEscape(t('userInputCleanup'))}</span></button><button id="tavern-notes-export" class="tn-soft-button" title="${htmlEscape(t('exportNotes'))}"><i class="fa-solid fa-download"></i><span>${htmlEscape(t('exportNotes'))}</span></button><button id="tavern-notes-storage-mode-open" class="tn-soft-button" title="${htmlEscape(t('chooseStorageMode'))}"><i class="fa-solid fa-database"></i><span>${htmlEscape(t('chooseStorageMode'))}</span></button><button id="tavern-notes-update-open" class="tn-soft-button" title="${htmlEscape(t('updateCenter'))}"><i class="fa-solid fa-clock-rotate-left"></i><span>${htmlEscape(t('updateCenter'))}</span></button><button id="tavern-notes-reset-floating" class="tn-soft-button" title="${htmlEscape(t('resetFloatingPosition'))}"><i class="fa-solid fa-location-crosshairs"></i><span>${htmlEscape(t('resetFloatingPosition'))}</span></button><button id="tavern-notes-apple-mode-main" class="tn-soft-button tn-hidden"><i class="fa-solid fa-moon"></i><span>${htmlEscape(t('appleThemeNight'))}</span></button></div>
-                </div>
-            </header>
-            <div class="tn-search-row">
-                <i class="fa-solid fa-magnifying-glass"></i>
-                <input id="tavern-notes-search" class="text_pole" type="search" placeholder="${htmlEscape(t('searchPlaceholder'))}" />
-            </div>
-            <div id="tavern-notes-tag-shelf" class="tn-tag-shelf tn-hidden" aria-label="${htmlEscape(t('tags'))}"></div>
-            <div class="tn-shell">
-                <nav class="tn-filters">
-                    ${getVisibleFilters().map(filter => `
-                        <button class="tn-filter ${filter.id === 'all' ? 'active' : ''}" data-filter="${filter.id}">
-                            <span class="tn-filter-icon"><i class="fa-solid ${filter.icon}"></i></span>
-                            <span class="tn-filter-text">
-                                <b>${htmlEscape(t(filter.label))}</b>
-                                <small>${htmlEscape(t(filter.hint))}</small>
-                            </span>
-                            <span class="tn-filter-count"></span>
-                        </button>
-                    `).join('')}
-                </nav>
-                <main id="tavern-notes-list" class="tn-list"></main>
-            </div>
-            <footer class="tn-footer">
-                <span class="tavern-notes-status">${htmlEscape(t('connecting'))}</span>
-                <div class="tn-pagination">
-                    <button id="tavern-notes-prev" class="tn-page-button" title="${htmlEscape(t('prevPage'))}"><i class="fa-solid fa-chevron-left"></i></button>
-                    <span id="tavern-notes-page-label">1 / 1</span>
-                    <button id="tavern-notes-next" class="tn-page-button" title="${htmlEscape(t('nextPage'))}"><i class="fa-solid fa-chevron-right"></i></button>
-                    <input id="tavern-notes-page-input" type="number" min="1" value="1" />
-                    <button id="tavern-notes-page-jump" class="tn-page-button">${htmlEscape(t('jumpPage'))}</button>
-                </div>
-            </footer>
-            <div id="tavern-notes-new-note-menu" aria-hidden="true"><form class="tn-edit-card tn-new-note-card"><button class="tn-icon-button tn-new-note-close" type="button"><i class="fa-solid fa-xmark"></i></button><div class="tn-export-title">${htmlEscape(t('newNote'))}</div><p class="tn-floor-capture-intro">${htmlEscape(t('newNoteUserHelp'))}</p><label class="tn-edit-field"><span>${htmlEscape(t('noteContent'))}</span><textarea id="tavern-notes-new-note-content" class="text_pole" maxlength="200000" required></textarea></label><label class="tn-edit-field"><span>${htmlEscape(t('tags'))}</span><input id="tavern-notes-new-note-tags" class="text_pole" value="${htmlEscape(t('inspirationTag'))}"></label><button class="menu_button tn-new-note-save" type="submit"><i class="fa-solid fa-floppy-disk"></i><span>${htmlEscape(t('saveNote'))}</span></button></form></div>
-            <div id="tavern-notes-modal" aria-hidden="true">
-                <div class="tn-modal-card">
-                    <button class="tn-icon-button tn-modal-close" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>
-                    <div class="tn-modal-kicker"></div>
-                    <div class="tn-modal-title"></div>
-                    <div class="tn-modal-content"></div>
-                    <div class="tn-modal-actions">
-                        <button type="button" data-modal-action="fill" title="${htmlEscape(t('fillInput'))}" aria-label="${htmlEscape(t('fillInput'))}"><i class="fa-solid fa-arrow-turn-down"></i><span>${htmlEscape(t('fillInput'))}</span></button>
-                        <button type="button" data-modal-action="copy" title="${htmlEscape(t('copy'))}" aria-label="${htmlEscape(t('copy'))}"><i class="fa-solid fa-copy"></i><span>${htmlEscape(t('copy'))}</span></button>
-                        <button type="button" data-modal-action="share" title="${htmlEscape(t('share'))}" aria-label="${htmlEscape(t('share'))}"><i class="fa-solid fa-share-nodes"></i><span>${htmlEscape(t('share'))}</span></button>
-                        <button type="button" data-modal-action="edit" title="${htmlEscape(t('edit'))}" aria-label="${htmlEscape(t('edit'))}"><i class="fa-solid fa-pen"></i><span>${htmlEscape(t('edit'))}</span></button>
-                        <button type="button" data-modal-action="delete" title="${htmlEscape(t('delete'))}" aria-label="${htmlEscape(t('delete'))}"><i class="fa-solid fa-trash"></i><span>${htmlEscape(t('delete'))}</span></button>
-                    </div>
-                </div>
-            </div>
-            <div id="tavern-notes-edit-menu" aria-hidden="true">
-                <form class="tn-edit-card">
-                    <button class="tn-icon-button tn-edit-close" type="button" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>
-                    <div class="tn-export-title">${htmlEscape(t('editNote'))}</div>
-                    <label class="tn-edit-field">
-                        <span>${htmlEscape(t('noteContent'))}</span>
-                        <textarea id="tavern-notes-edit-content" class="text_pole" maxlength="200000" required></textarea>
-                    </label>
-                    <div class="tn-edit-field">
-                        <span>${htmlEscape(t('tags'))}</span>
-                        <div class="tn-tag-editor">
-                            <div id="tavern-notes-edit-tag-chips" class="tn-edit-tag-chips"></div>
-                            <input id="tavern-notes-edit-tags" type="text" maxlength="820" placeholder="${htmlEscape(t('tagsPlaceholder'))}" autocomplete="off" />
-                        </div>
-                        <small>${htmlEscape(t('tagsHelp'))}</small>
-                    </div>
-                    <div class="tn-tag-suggestions-wrap">
-                        <small>${htmlEscape(t('tagSuggestions'))}</small>
-                        <div id="tavern-notes-tag-suggestions" class="tn-tag-suggestions"></div>
-                    </div>
-                    <button class="menu_button tn-edit-save" type="submit"><i class="fa-solid fa-floppy-disk"></i><span>${htmlEscape(t('saveChanges'))}</span></button>
-                </form>
-            </div>
-            <div id="tavern-notes-tag-library" aria-hidden="true">
-                <section class="tn-tag-library-card">
-                    <button class="tn-icon-button tn-tag-library-close" type="button" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>
-                    <div class="tn-tag-library-heading">
-                        <span class="tn-tag-library-mark"><i class="fa-solid fa-tags"></i></span>
-                        <div><div class="tn-export-title">${htmlEscape(t('tagLibrary'))}</div><p class="tn-tag-library-intro">${htmlEscape(t('tagLibraryIntro'))}</p></div>
-                    </div>
-                    <label class="tn-tag-library-search">
-                        <i class="fa-solid fa-magnifying-glass"></i>
-                        <input id="tavern-notes-tag-search" class="text_pole" type="search" placeholder="${htmlEscape(t('searchTags'))}" />
-                    </label>
-                    <div class="tn-tag-sort" role="group">
-                        <button class="tn-tag-sort-button active" type="button" data-tag-sort="count"><i class="fa-solid fa-arrow-down-wide-short"></i><span>${htmlEscape(t('sortByCount'))}</span></button>
-                        <button class="tn-tag-sort-button" type="button" data-tag-sort="name"><i class="fa-solid fa-arrow-down-a-z"></i><span>${htmlEscape(t('sortByName'))}</span></button>
-                    </div>
-                    <div id="tavern-notes-tag-library-list" class="tn-tag-library-list"></div>
-                </section>
-            </div>
-            <div id="tavern-notes-export-menu" aria-hidden="true">
-                <div class="tn-export-card">
-                    <div class="tn-export-title">${htmlEscape(t('exportNotes'))}</div>
-                    <div class="tn-export-scope">
-                        <div class="tn-export-scope-label">${htmlEscape(t('exportScope'))}</div>
-                        <div class="tn-export-scope-options" role="group" aria-label="${htmlEscape(t('exportScope'))}">
-                            <button class="tn-export-scope-choice active" data-scope="all" type="button">${htmlEscape(t('allNotes'))}</button>
-                            <button class="tn-export-scope-choice" data-scope="page" type="button">${htmlEscape(t('currentPage'))}</button>
-                        </div>
-                        <small class="tn-export-hint">${htmlEscape(t('exportHint'))}</small>
-                    </div>
-                    <button class="tn-export-choice" data-format="json" title="JSON"><i class="fa-solid fa-file-code"></i><span>${htmlEscape(t('exportJson'))}</span></button>
-                    <button class="tn-export-choice" data-format="txt" title="TXT"><i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('exportTxt'))}</span></button>
-                    <button id="tavern-notes-import-json" class="tn-export-choice" type="button"><i class="fa-solid fa-file-import"></i><span>${htmlEscape(t('importJson'))}</span></button>
-                    <input id="tavern-notes-import-json-file" type="file" accept=".json,application/json" hidden />
-                </div>
-            </div>
-            <div id="tavern-notes-floor-capture-menu" aria-hidden="true">
-                <div class="tn-floor-capture-card">
-                    <button class="tn-icon-button tn-floor-capture-close" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>
-                    <div class="tn-export-title">${htmlEscape(t('floorCaptureSettingsTitle'))}</div>
-                    <p class="tn-floor-capture-intro">${htmlEscape(t('floorCaptureSettingsIntro'))}</p>
-                    <button id="tavern-notes-floor-capture-setting" class="tn-soft-button tn-floor-capture-toggle ${state.showFloorCaptureButton ? 'active' : ''}" title="${htmlEscape(t('floorCaptureButtonTitle'))}" aria-label="${htmlEscape(t('floorCaptureButtonTitle'))}">
-                        <i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('floorCaptureButton'))}</span>
-                    </button>
-                    <div class="tn-floor-capture-help">
-                        <b>${htmlEscape(t('floorCaptureStepsTitle'))}</b>
-                        <small>${htmlEscape(t('floorCaptureSteps'))}</small>
-                    </div>
-                    <div class="tn-floor-capture-help">
-                        <b>${htmlEscape(t('floorCaptureContentTitle'))}</b>
-                        <small>${htmlEscape(t('floorCaptureContentHelp'))}</small>
-                        <code>${htmlEscape(t('floorCaptureExample'))}</code>
-                    </div>
-                    <div class="tn-floor-capture-help">
-                        <b>${htmlEscape(t('floorCaptureTroubleTitle'))}</b>
-                        <small>${htmlEscape(t('floorCaptureTroubleHelp'))}</small>
-                    </div>
-                    <section class="tn-floor-exclude-section">
-                        <div><b>${htmlEscape(t('excludeTagsTitle'))}</b><small>${htmlEscape(t('excludeTagsHelp'))}</small></div>
-                        <div class="tn-floor-exclude-add"><input id="tavern-notes-floor-exclude-input" class="text_pole" type="text" placeholder="${htmlEscape(t('excludeTagPlaceholder'))}"><button id="tavern-notes-floor-exclude-add" type="button" title="${htmlEscape(t('addExcludedTag'))}" aria-label="${htmlEscape(t('addExcludedTag'))}"><i class="fa-solid fa-plus"></i><span>${htmlEscape(t('addExcludedTag'))}</span></button></div>
-                        <div id="tavern-notes-floor-exclude-tags" class="tn-floor-exclude-tags"></div>
-                    </section>
-                    <section class="tn-floor-content-tag-section">
-                        <div><b>${htmlEscape(t('floorCaptureAdvanced'))}</b><small>${htmlEscape(t('floorCaptureSelectorHelp'))}</small></div>
-                        <div id="tavern-notes-floor-capture-selector-summary" class="tn-floor-capture-selector-summary"></div>
-                        <div class="tn-floor-selector-add">
-                            <input id="tavern-notes-floor-capture-selector" class="text_pole" type="text" value="${htmlEscape(getFloorCaptureTagName())}" placeholder="${htmlEscape(t('floorCaptureSelectorPlaceholder'))}" />
-                            <button id="tavern-notes-floor-capture-selector-save" type="button"><i class="fa-solid fa-floppy-disk"></i><span>${htmlEscape(t('save'))}</span></button>
-                        </div>
-                    </section>
-                </div>
-            </div>
-            <div id="tavern-notes-update-menu" aria-hidden="true">
-                <section class="tn-update-card">
-                    <button class="tn-icon-button tn-update-close" type="button" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>
-                    <div class="tn-update-heading"><span><i class="fa-solid fa-clock-rotate-left"></i></span><div><div class="tn-export-title">${htmlEscape(t('updateCenter'))}</div><p>${htmlEscape(t('updateCenterIntro'))}</p></div></div>
-                    <div class="tn-update-summary"><div><small>${htmlEscape(t('installedVersion'))}</small><b data-update-installed>v${htmlEscape(EXTENSION_VERSION)}</b></div><i class="fa-solid fa-arrow-right"></i><div><small>${htmlEscape(t('latestVersion'))}</small><b data-update-latest>—</b></div><strong data-update-status>${htmlEscape(t('checkUpdates'))}</strong></div>
-                    <div class="tn-update-actions"><button id="tavern-notes-update-check" type="button"><i class="fa-solid fa-rotate"></i><span>${htmlEscape(t('checkUpdates'))}</span></button><button id="tavern-notes-update-manager" type="button"><i class="fa-solid fa-cubes"></i><span>${htmlEscape(t('openExtensionManager'))}</span></button><button id="tavern-notes-update-repository" type="button"><i class="fa-brands fa-github"></i><span>${htmlEscape(t('openRepository'))}</span></button></div>
-                    <small class="tn-update-instructions">${htmlEscape(t('updateInstructions'))}</small>
-                    <div class="tn-update-log-heading"><i class="fa-regular fa-clipboard"></i><b>${htmlEscape(t('changelogTitle'))}</b></div>
-                    <div id="tavern-notes-update-log" class="tn-update-log"><div class="tn-update-empty">${htmlEscape(t('noChangelog'))}</div></div>
-                </section>
-            </div>
-            <div id="tavern-notes-user-input-cleanup-menu" aria-hidden="true">
-                <div class="tn-user-input-cleanup-card">
-                    <button class="tn-icon-button tn-user-input-cleanup-close" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>
-                    <div class="tn-export-title">${htmlEscape(t('userInputCleanupTitle'))}</div>
-                    <p class="tn-floor-capture-intro">${htmlEscape(t('userInputCleanupIntro'))}</p>
-                    <label class="tn-input-cleanup-toggle"><input id="tavern-notes-collapse-repeated-input" type="checkbox" ${state.collapseRepeatedUserInput ? 'checked' : ''}><span><b>${htmlEscape(t('collapseRepeatedInput'))}</b><small>${htmlEscape(t('collapseRepeatedHelp'))}</small></span></label>
-                    <div class="tn-input-rule-search"><i class="fa-solid fa-magnifying-glass"></i><input id="tavern-notes-input-rule-search" type="search" placeholder="${htmlEscape(t('filterInputRules'))}"></div>
-                    <div class="tn-input-rule-columns">
-                        ${['exact', 'prefix'].map(kind => `<section class="tn-input-rule-section"><div class="tn-input-rule-heading"><b>${htmlEscape(t(kind === 'exact' ? 'ignoreExactLabel' : 'ignorePrefixLabel'))}</b><span data-rule-count="${kind}">0</span></div><div class="tn-input-rule-add"><textarea data-rule-input="${kind}" rows="2" placeholder="${htmlEscape(t(kind === 'exact' ? 'ignoreExactPlaceholder' : 'ignorePrefixPlaceholder'))}"></textarea><button type="button" data-rule-add="${kind}" title="${htmlEscape(t('addInputRules'))}"><i class="fa-solid fa-plus"></i></button></div><div class="tn-input-rule-list" data-rule-list="${kind}"></div></section>`).join('')}
-                    </div>
-                    <section id="tavern-notes-input-dedupe-preview" class="tn-dedupe-preview tn-hidden"><div class="tn-dedupe-preview-summary"></div><div class="tn-dedupe-preview-list"></div><div class="tn-dedupe-preview-actions"><button id="tavern-notes-input-dedupe-cancel" type="button">${htmlEscape(t('cancelCleanup'))}</button><button id="tavern-notes-input-dedupe-confirm" type="button"><i class="fa-solid fa-broom"></i><span>${htmlEscape(t('confirmCleanup'))}</span></button></div></section>
-                    <div class="tn-input-cleanup-actions"><button id="tavern-notes-input-rules-save" class="tn-soft-button"><i class="fa-solid fa-floppy-disk"></i><span>${htmlEscape(t('saveInputRules'))}</span></button><button id="tavern-notes-input-dedupe-scan" class="tn-history-cleanup-button"><i class="fa-solid fa-broom"></i><span>${htmlEscape(t('scanDuplicates'))}</span></button></div>
-                </div>
-            </div>
-            <div id="tavern-notes-theme-menu" aria-hidden="true">
-                <div class="tn-theme-card">
-                    <button class="tn-icon-button tn-theme-close" title="${htmlEscape(t('closeThemePanel'))}" aria-label="${htmlEscape(t('closeThemePanel'))}"><i class="fa-solid fa-xmark"></i></button>
-                    <div class="tn-export-title">${htmlEscape(t('themeFiles'))}</div>
-                    <div class="tn-theme-name">${htmlEscape(t('currentTheme', { name: 'Soft Neomorphism' }))}</div>
-                    <div class="tn-theme-picker">
-                        <select id="tavern-notes-theme-select" title="${htmlEscape(t('switchTheme'))}"></select>
-                        <button id="tavern-notes-theme-import" class="tn-theme-icon-button" title="${htmlEscape(t('importTheme'))}" aria-label="${htmlEscape(t('importTheme'))}"><i class="fa-solid fa-file-import"></i></button>
-                        <button id="tavern-notes-theme-export" class="tn-theme-icon-button" title="${htmlEscape(t('exportCurrentTheme'))}" aria-label="${htmlEscape(t('exportCurrentTheme'))}"><i class="fa-solid fa-file-export"></i></button>
-                        <button id="tavern-notes-theme-open-folder" class="tn-theme-icon-button" title="${htmlEscape(t('openThemeFolder'))}" aria-label="${htmlEscape(t('openThemeFolder'))}"><i class="fa-solid fa-folder-open"></i></button>
-                        <button id="tavern-notes-theme-delete" class="tn-theme-icon-button" title="${htmlEscape(t('deleteTheme'))}" aria-label="${htmlEscape(t('deleteTheme'))}"><i class="fa-solid fa-trash-can"></i></button>
-                    </div>
-                    <input id="tavern-notes-theme-name-input" class="tn-theme-input" type="text" placeholder="${htmlEscape(t('themeName'))}" />
-                    <button id="tavern-notes-theme-merge-st" class="tn-theme-merge-button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>${htmlEscape(t('mergeTheme'))}</span></button>
-                    <div class="tn-theme-actions">
-                        <button id="tavern-notes-theme-preview-save" class="tn-export-choice"><i class="fa-solid fa-eye"></i><span>${htmlEscape(t('previewSave'))}</span></button>
-                        <button id="tavern-notes-theme-save-as" class="tn-export-choice"><i class="fa-solid fa-copy"></i><span>${htmlEscape(t('saveAs'))}</span></button>
-                        <button id="tavern-notes-theme-reset" class="tn-export-choice"><i class="fa-solid fa-rotate-left"></i><span>${htmlEscape(t('resetDefault'))}</span></button>
-                    </div>
-                    <details class="tn-theme-guide">
-                        <summary><i class="fa-solid fa-circle-info"></i><span>${htmlEscape(t('themeGuide'))}</span></summary>
-                        <pre>${htmlEscape(t('themeGuideContent'))}</pre>
-                    </details>
-                    <textarea id="tavern-notes-theme-code" spellcheck="false"></textarea>
-                    <input id="tavern-notes-theme-file" type="file" accept=".json,application/json" hidden />
-                </div>
-            </div>
-            <div id="tavern-notes-share-menu" aria-hidden="true">
-                <div class="tn-share-card">
-                    <button class="tn-icon-button tn-share-close" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>
-                    <div class="tn-share-preview-wrap">
-                        <canvas id="tavern-notes-share-canvas" width="900" height="1400"></canvas>
-                    </div>
-                    <div class="tn-share-controls">
-                        <div class="tn-export-title">${htmlEscape(t('shareCard'))}</div>
-                        <label class="tn-share-label">${htmlEscape(t('theme'))}</label>
-                        <div class="tn-share-theme-row">
-                            ${SHARE_CARD_THEMES.map(theme => `<button class="tn-share-choice" data-share-theme="${theme.id}" type="button">${htmlEscape(t(theme.labelKey))}</button>`).join('')}
-                        </div>
-                        <label class="tn-share-label">${htmlEscape(t('font'))}</label>
-                        <input id="tavern-notes-share-font" class="tn-theme-input" type="text" placeholder='例如 STDongGuanTi, 思源宋体, serif' />
-                        <label class="tn-share-label">${htmlEscape(t('savedFonts'))}</label>
-                        <select id="tavern-notes-share-saved-fonts" class="tn-theme-input"></select>
-                        <label class="tn-share-label">${htmlEscape(t('fontSize'))} <span id="tavern-notes-share-font-size-value">80%</span></label>
-                        <input id="tavern-notes-share-font-size" type="range" min="65" max="110" step="5" value="80" />
-                        <label class="tn-share-label">${htmlEscape(t('fontImport'))}</label>
-                        <textarea id="tavern-notes-share-font-import" class="tn-share-font-import" spellcheck="false" placeholder='https://fontsapi.zeoseven.com/488/main/result.css'></textarea>
-                        <div class="tn-share-help">
-                            ${htmlEscape(t('fontHelp'))}
-                            <a href="https://fonts.zeoseven.com/" target="_blank" rel="noopener noreferrer">${htmlEscape(t('findFonts'))}</a>
-                        </div>
-                        <button id="tavern-notes-share-import-font" class="tn-export-choice tn-share-wide-action" type="button"><i class="fa-solid fa-font"></i><span>${htmlEscape(t('importFont'))}</span></button>
-                        <label class="tn-share-label">${htmlEscape(t('importLocalFont'))}</label>
-                        <button id="tavern-notes-share-import-local-font" class="tn-export-choice tn-share-wide-action" type="button"><i class="fa-solid fa-file-import"></i><span>${htmlEscape(t('importLocalFont'))}</span></button>
-                        <label class="tn-share-label">${htmlEscape(t('background'))}</label>
-                        <div class="tn-share-bg-row">
-                            ${SHARE_CARD_BACKGROUNDS.map(color => `<button class="tn-share-bg" data-share-bg="${color}" type="button" style="--share-bg:${color}"></button>`).join('')}
-                        </div>
-                        <label class="tn-share-label">${htmlEscape(t('display'))}</label>
-                        <div class="tn-share-toggle-row">
-                            <label><input id="tavern-notes-share-show-character" type="checkbox" />${htmlEscape(t('characterName'))}</label>
-                            <label><input id="tavern-notes-share-show-date" type="checkbox" />${htmlEscape(t('date'))}</label>
-                        </div>
-                        <div class="tn-share-actions">
-                            <button id="tavern-notes-share-redraw" class="tn-export-choice" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>${htmlEscape(t('redrawPreview'))}</span></button>
-                            <button id="tavern-notes-share-download" class="tn-export-choice" type="button"><i class="fa-solid fa-download"></i><span>${htmlEscape(t('exportPng'))}</span></button>
-                        </div>
-                        <input id="tavern-notes-share-local-font-file" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" hidden />
-                    </div>
-                    <style id="tavern-notes-share-font-style"></style>
-                </div>
-            </div>
-        </section>
-    `);
+    insertAppShellMarkup(document, renderFullAppShellMarkup({
+        state,
+        translate: t,
+        escapeHtml: htmlEscape,
+        languageOptions: LANGUAGE_OPTIONS,
+        getVisibleFilters,
+        getFloorCaptureTagName,
+        extensionVersion: EXTENSION_VERSION,
+        renderThemeViewMarkup,
+        themeCapabilities: THEME_CAPABILITIES,
+        renderThemeStudioMarkup,
+        shareCardThemes: SHARE_CARD_THEMES,
+        shareCardBackgrounds: SHARE_CARD_BACKGROUNDS,
+    }));
 
     const dialogIds = [
         'tavern-notes-new-note-menu',
@@ -3677,7 +3044,7 @@ function buildPanel() {
     dialogIds.forEach(id => document.getElementById(id)?.setAttribute('data-tn-overlay', 'dialog'));
     document.querySelector('#tavern-notes-more-menu')?.setAttribute('data-tn-overlay', 'popover');
 
-    addInputToolbar();
+    quickReplyController.refresh();
     addExtensionsMenuEntry();
     updateSelectionCaptureButtonSetting();
     updateFloorCaptureButtonSetting();
@@ -3686,30 +3053,42 @@ function buildPanel() {
     applyStorageCapabilities();
 }
 
+const appShellView = createAppShellView({
+    mountShell: buildPanel,
+    getRoot: () => document.querySelector('#tavern-notes-panel'),
+    openShell: openPanel,
+    closeShell: closePanel,
+    removeShell: () => document.querySelector('#tavern-notes-panel')?.remove(),
+});
+
 function bindEvents() {
-    window.addEventListener('resize', () => applyFloatingLauncherPosition(document.querySelector('#tavern-notes-floating-launcher')), { passive: true });
-    document.querySelector('#tavern-notes-new-note-open')?.addEventListener('click', openNewNoteMenu);
+    noteListView.mount();
+    noteFilterView.mount();
+    noteEditorView.mount();
+    newNoteView.mount();
+    noteTransferView.mount();
+    tagView.mount();
+    captureView.mount();
+    userInputMaintenanceView.mount();
+    themeController.mount();
+    shareCardController.mount();
+    noteDetailController.mount();
+    fontController.mount();
+    updateController.mount();
+    systemStatusController.mount();
+    storageModeController.mount();
+    window.addEventListener('resize', () => quickReplyController.refresh(), { passive: true });
+    document.querySelector('#tavern-notes-new-note-open')?.addEventListener('click', () => newNoteView.open());
     document.querySelector('#tavern-notes-more-open')?.addEventListener('click', () => toggleHeaderPopover('tavern-notes-more-menu'));
-    document.querySelector('#tavern-notes-storage-mode')?.addEventListener('click', () => showStorageModeChooser({ allowClose: true }));
+    document.querySelector('#tavern-notes-storage-mode')?.addEventListener('click', () => storageModeController.open({ allowClose: true }));
     document.querySelector('#tavern-notes-storage-mode-open')?.addEventListener('click', () => {
         closeHeaderPopovers();
-        showStorageModeChooser({ allowClose: true });
+        storageModeController.open({ allowClose: true });
     });
-    document.querySelector('#tavern-notes-update-open')?.addEventListener('click', openUpdateCenter);
-    document.querySelector('#tavern-notes-update-indicator')?.addEventListener('click', openUpdateCenter);
-    document.querySelector('.tn-update-close')?.addEventListener('click', closeUpdateCenter);
-    document.querySelector('#tavern-notes-update-check')?.addEventListener('click', () => checkForTavernNotesUpdate({ notifyAvailable: false, throwOnError: true }).catch(() => notify(t('updateCheckFailed'), 'warning')));
-    document.querySelector('#tavern-notes-update-manager')?.addEventListener('click', openSillyTavernExtensionManager);
-    document.querySelector('#tavern-notes-update-repository')?.addEventListener('click', openUpdateRepository);
-    document.querySelector('#tavern-notes-reset-floating')?.addEventListener('click', resetFloatingLauncherPosition);
-    document.querySelector('.tn-new-note-close')?.addEventListener('click', closeNewNoteMenu);
-    document.querySelector('#tavern-notes-new-note-menu')?.addEventListener('click', event => { if (event.target.id === 'tavern-notes-new-note-menu') closeNewNoteMenu(); });
-    document.querySelector('#tavern-notes-new-note-menu form')?.addEventListener('submit', event => { event.preventDefault(); saveNewUserNote().catch(error => notify(error.message, 'error')); });
+    document.querySelector('#tavern-notes-reset-floating')?.addEventListener('click', () => quickReplyController.resetPosition());
+    document.querySelector('#tavern-notes-new-note-menu')?.addEventListener('click', event => { if (event.target.id === 'tavern-notes-new-note-menu') newNoteView.close(); });
     document.querySelector('#tavern-notes-language')?.addEventListener('change', event => saveLanguageSetting(event.target.value));
-    document.querySelector('#tavern-notes-launcher-mode')?.addEventListener('click', toggleLauncherMode);
-    document.querySelector('#tavern-notes-apple-mode-main')?.addEventListener('click', () => {
-        toggleAppleThemeMode().catch(error => notify(error.message, 'error'));
-    });
+    document.querySelector('#tavern-notes-launcher-mode')?.addEventListener('click', () => quickReplyController.toggle());
     document.querySelector('#tavern-notes-auto-user-input')?.addEventListener('click', toggleAutoCaptureUserInput);
     document.querySelector('#tavern-notes-user-input-cleanup-open')?.addEventListener('click', openUserInputCleanupMenu);
     document.querySelector('.tn-user-input-cleanup-close')?.addEventListener('click', closeUserInputCleanupMenu);
@@ -3721,42 +3100,17 @@ function bindEvents() {
         const remove = event.target.closest?.('[data-rule-delete]');
         if (remove) deleteInputRule(remove.dataset.ruleDelete, remove.dataset.ruleValue || '');
     });
-    document.querySelector('#tavern-notes-input-dedupe-scan')?.addEventListener('click', () => scanAndCleanupUserInputs().catch(error => notify(error.message, 'error')));
-    document.querySelector('#tavern-notes-input-dedupe-cancel')?.addEventListener('click', closeUserInputDedupePreview);
-    document.querySelector('#tavern-notes-input-dedupe-confirm')?.addEventListener('click', () => applyUserInputDedupe().catch(error => notify(error.message, 'error')));
     document.querySelector('#tavern-notes-selection-capture-setting')?.addEventListener('click', toggleSelectionCaptureButtonSetting);
     document.querySelector('#tavern-notes-floor-capture-open')?.addEventListener('click', openFloorCaptureMenu);
     document.querySelector('#tavern-notes-floor-capture-setting')?.addEventListener('click', toggleFloorCaptureButtonSetting);
-    document.querySelector('#tavern-notes-theme')?.addEventListener('click', toggleThemeMenu);
     document.querySelector('.tn-floor-capture-close')?.addEventListener('click', closeFloorCaptureMenu);
-    document.querySelector('.tn-theme-close')?.addEventListener('click', closeThemeMenu);
     document.querySelector('.tn-close')?.addEventListener('click', closePanel);
     document.querySelector('#tavern-notes-export')?.addEventListener('click', toggleExportMenu);
-    document.querySelector('#tavern-notes-search')?.addEventListener('input', event => {
-        state.query = event.target.value;
-        state.page = 1;
-        clearTimeout(state.searchTimer);
-        state.searchTimer = setTimeout(refreshNotes, 300);
-    });
-    document.querySelector('#tavern-notes-tag-shelf')?.addEventListener('click', event => {
-        if (event.target.closest?.('.tn-tag-library-open')) {
-            openTagLibrary();
-            return;
-        }
-        const button = event.target.closest?.('.tn-tag-filter');
-        if (button) setTagFilter(button.dataset.tag || '');
-    });
     document.querySelector('#tavern-notes-floor-capture-selector-save')?.addEventListener('click', () => saveFloorCaptureSelector(document.querySelector('#tavern-notes-floor-capture-selector')?.value));
     document.querySelector('#tavern-notes-floor-capture-selector')?.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); saveFloorCaptureSelector(event.target.value); } });
     document.querySelector('#tavern-notes-floor-exclude-add')?.addEventListener('click', addFloorCaptureExcludedTags);
     document.querySelector('#tavern-notes-floor-exclude-input')?.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); addFloorCaptureExcludedTags(); } });
     document.querySelector('#tavern-notes-floor-exclude-tags')?.addEventListener('click', event => { const button = event.target.closest?.('[data-floor-exclude-remove]'); if (button) removeFloorCaptureExcludedTag(button.dataset.floorExcludeRemove || ''); });
-    document.querySelector('.tn-filters')?.addEventListener('click', event => {
-        const tab = event.target.closest?.('.tn-filter');
-        if (!tab) return;
-        setActiveFilter(tab.dataset.filter || 'all');
-    });
-    document.querySelector('#tavern-notes-list')?.addEventListener('click', handleNoteAction);
     document.querySelector('#tavern-notes-list')?.addEventListener('keydown', event => {
         if (!['Enter', ' '].includes(event.key) || !event.target.matches?.('.tn-note')) return;
         event.preventDefault();
@@ -3764,20 +3118,8 @@ function bindEvents() {
         if (note) openFullNote(note);
     });
     document.querySelector('#tavern-notes-list')?.addEventListener('scroll', updateArchiveReadingMode, { passive: true });
-    document.querySelector('.tn-modal-close')?.addEventListener('click', closeFullNote);
-    document.querySelector('.tn-modal-actions')?.addEventListener('click', event => {
-        handleModalNoteAction(event).catch(error => notify(error.message, 'error'));
-    });
-    document.querySelector('#tavern-notes-modal')?.addEventListener('click', event => {
-        if (event.target.id === 'tavern-notes-modal') closeFullNote();
-    });
-    document.querySelector('.tn-edit-close')?.addEventListener('click', closeEditNote);
     document.querySelector('#tavern-notes-edit-menu')?.addEventListener('click', event => {
-        if (event.target.id === 'tavern-notes-edit-menu') closeEditNote();
-    });
-    document.querySelector('#tavern-notes-edit-menu form')?.addEventListener('submit', event => {
-        event.preventDefault();
-        saveEditedNote().catch(error => notify(error.message, 'error'));
+        if (event.target.id === 'tavern-notes-edit-menu') noteEditorView.close();
     });
     document.querySelector('#tavern-notes-edit-tags')?.addEventListener('input', renderTagSuggestions);
     document.querySelector('#tavern-notes-edit-tags')?.addEventListener('keydown', event => {
@@ -3793,36 +3135,6 @@ function bindEvents() {
         const button = event.target.closest?.('[data-suggest-tag]');
         if (button) addSuggestedTag(button.dataset.suggestTag || '');
     });
-    document.querySelector('.tn-tag-library-close')?.addEventListener('click', closeTagLibrary);
-    document.querySelector('#tavern-notes-tag-library')?.addEventListener('click', event => {
-        if (event.target.id === 'tavern-notes-tag-library') closeTagLibrary();
-        if (event.target.closest?.('.tn-tag-library-back')) closeTagLibrary();
-        const deleteButton = event.target.closest?.('[data-delete-tag]');
-        if (deleteButton) {
-            deleteTagEverywhere(deleteButton.dataset.deleteTag || '', Number(deleteButton.dataset.tagCount || 0))
-                .catch(error => notify(error.message, 'error'));
-            return;
-        }
-        const renameButton = event.target.closest?.('[data-rename-tag]');
-        if (renameButton) {
-            renameTagEverywhere(renameButton.dataset.renameTag || '', Number(renameButton.dataset.tagCount || 0)).catch(error => notify(error.message, 'error'));
-            return;
-        }
-        const tag = event.target.closest?.('.tn-tag-library-item');
-        if (tag) {
-            setTagFilter(tag.dataset.tag || '');
-            closeTagLibrary();
-        }
-        const sort = event.target.closest?.('[data-tag-sort]');
-        if (sort) {
-            state.tagManagerSort = sort.dataset.tagSort === 'name' ? 'name' : 'count';
-            renderTagLibrary();
-        }
-    });
-    document.querySelector('#tavern-notes-tag-search')?.addEventListener('input', event => {
-        state.tagManagerQuery = event.target.value || '';
-        renderTagLibrary();
-    });
     document.querySelector('#tavern-notes-export-menu')?.addEventListener('click', event => {
         if (event.target.id === 'tavern-notes-export-menu') closeExportMenu();
     });
@@ -3835,188 +3147,17 @@ function bindEvents() {
     document.querySelector('#tavern-notes-user-input-cleanup-menu')?.addEventListener('click', event => {
         if (event.target.id === 'tavern-notes-user-input-cleanup-menu') closeUserInputCleanupMenu();
     });
-    document.querySelector('#tavern-notes-theme-menu')?.addEventListener('click', event => {
-        if (event.target.id === 'tavern-notes-theme-menu') closeThemeMenu();
-    });
-    document.querySelector('#tavern-notes-share-menu')?.addEventListener('click', event => {
-        if (event.target.id === 'tavern-notes-share-menu') closeShareCard();
-    });
-    document.querySelector('.tn-share-close')?.addEventListener('click', closeShareCard);
-    document.querySelectorAll('.tn-share-choice').forEach(button => {
-        button.addEventListener('click', () => updateShareCardSetting({ theme: button.dataset.shareTheme || 'calendar' }));
-    });
-    document.querySelectorAll('.tn-share-bg').forEach(button => {
-        button.addEventListener('click', () => updateShareCardSetting({ background: button.dataset.shareBg || '#f7f4ef' }));
-    });
-    document.querySelector('#tavern-notes-share-font')?.addEventListener('input', event => updateShareCardSetting({ fontFamily: event.target.value || 'system-ui' }));
-    document.querySelector('#tavern-notes-share-saved-fonts')?.addEventListener('change', event => {
-        applySavedShareFont(event.target.value).catch(error => notify(error.message, 'error'));
-    });
-    document.querySelector('#tavern-notes-share-font-size')?.addEventListener('input', event => {
-        updateShareCardSetting({ fontScale: Math.min(Math.max(Number(event.target.value || 80) / 100, 0.65), 1.1) });
-    });
-    document.querySelector('#tavern-notes-share-font-import')?.addEventListener('input', event => {
-        state.shareCardSettings = {
-            ...state.shareCardSettings,
-            fontImport: event.target.value || '',
-        };
-        saveLocalSettings();
-    });
-    document.querySelector('#tavern-notes-share-show-character')?.addEventListener('change', event => updateShareCardSetting({ showCharacter: event.target.checked }));
-    document.querySelector('#tavern-notes-share-show-date')?.addEventListener('change', event => updateShareCardSetting({ showDate: event.target.checked }));
-    document.querySelector('#tavern-notes-share-import-font')?.addEventListener('click', () => importShareCardFont().catch(error => notify(error.message, 'error')));
-    document.querySelector('#tavern-notes-share-import-local-font')?.addEventListener('click', () => document.querySelector('#tavern-notes-share-local-font-file')?.click());
-    document.querySelector('#tavern-notes-share-local-font-file')?.addEventListener('change', event => {
-        importLocalShareCardFont(event).catch(error => notify(error.message, 'error'));
-    });
-    document.querySelector('#tavern-notes-share-redraw')?.addEventListener('click', () => drawShareCard().catch(error => notify(error.message, 'error')));
-    document.querySelector('#tavern-notes-share-download')?.addEventListener('click', () => downloadShareCard().catch(error => notify(error.message, 'error')));
-    document.querySelectorAll('#tavern-notes-export-menu .tn-export-choice[data-format]').forEach(button => {
-        button.addEventListener('click', () => exportNotes(button.dataset.format).catch(error => notify(error.message, 'error')));
-    });
-    document.querySelectorAll('#tavern-notes-export-menu .tn-export-scope-choice').forEach(button => {
-        button.addEventListener('click', () => setExportScope(button.dataset.scope || 'all'));
-    });
-    document.querySelector('#tavern-notes-import-json')?.addEventListener('click', () => {
-        document.querySelector('#tavern-notes-import-json-file')?.click();
-    });
-    document.querySelector('#tavern-notes-import-json-file')?.addEventListener('change', event => {
-        importNotesJson(event).catch(error => notify(error.message || t('invalidBackup'), 'error'));
-    });
-    document.querySelector('#tavern-notes-prev')?.addEventListener('click', () => goToPage(state.page - 1));
-    document.querySelector('#tavern-notes-next')?.addEventListener('click', () => goToPage(state.page + 1));
-    document.querySelector('#tavern-notes-page-jump')?.addEventListener('click', jumpToInputPage);
-    document.querySelector('#tavern-notes-page-input')?.addEventListener('keydown', event => {
-        if (event.key === 'Enter') jumpToInputPage();
-    });
-    document.querySelector('#tavern-notes-theme-export')?.addEventListener('click', exportTheme);
-    document.querySelector('#tavern-notes-theme-preview-save')?.addEventListener('click', () => previewAndSaveThemeFromEditor().catch(error => notify(error.message, 'error')));
-    document.querySelector('#tavern-notes-theme-merge-st')?.addEventListener('click', () => {
-        mergeCurrentSillyTavernTheme().catch(error => notify(error.message, 'error'));
-    });
-    document.querySelector('#tavern-notes-theme-save-as')?.addEventListener('click', () => saveThemeAsFromEditor().catch(error => notify(error.message, 'error')));
-    document.querySelector('#tavern-notes-theme-import')?.addEventListener('click', () => document.querySelector('#tavern-notes-theme-file')?.click());
-    document.querySelector('#tavern-notes-theme-open-folder')?.addEventListener('click', () => openThemeFolder().catch(error => notify(error.message, 'error')));
-    document.querySelector('#tavern-notes-theme-delete')?.addEventListener('click', () => deleteSelectedTheme().catch(error => notify(error.message, 'error')));
-    document.querySelector('#tavern-notes-theme-reset')?.addEventListener('click', () => activateTheme('default').catch(error => notify(error.message, 'error')));
-    document.querySelector('#tavern-notes-theme-select')?.addEventListener('change', event => {
-        activateTheme(event.target.value).catch(error => notify(error.message, 'error'));
-    });
-    document.querySelector('#tavern-notes-theme-file')?.addEventListener('change', event => {
-        importThemeFile(event).catch(error => notify(error.message, 'error'));
-    });
     document.addEventListener('pointerdown', closeHeaderPopoverFromOutside, true);
     document.addEventListener('keydown', event => {
         if (event.key !== 'Escape') return;
         closeFullNote();
-        closeEditNote();
-        closeTagLibrary();
+        noteEditorView.close();
+        tagView.close();
         closeExportMenu();
         closeUpdateCenter();
-        closeThemeMenu();
+        themeController.close();
         closeShareCard();
     });
-}
-
-async function handleNoteAction(event) {
-    const button = event.target.closest('button');
-    const article = event.target.closest('.tn-note');
-    if (!button) {
-        const note = article ? findNoteFromButton(article) : null;
-        if (note) openFullNote(note);
-        return;
-    }
-
-    if (button.classList.contains('tn-note-menu-toggle')) {
-        toggleNoteActionMenu(article, 'tn');
-        return;
-    }
-
-    if (button.classList.contains('tn-tag-chip')) {
-        setTagFilter(button.dataset.tag || '');
-        return;
-    }
-
-    if (button.classList.contains('tn-character-card')) {
-        const id = button.dataset.characterId || null;
-        const name = button.dataset.characterName || '未命名角色';
-        const character = state.characters.find(item => String(item.id ?? '') === String(id ?? '') && item.name === name)
-            || state.characters.find(item => item.name === name)
-            || { id, name };
-        setCharacterFilter(character);
-        return;
-    }
-
-    if (button.classList.contains('tn-clear-character')) {
-        clearCharacterFilter();
-        return;
-    }
-
-    const noteGroup = findNoteGroupFromElement(button);
-    if (!noteGroup) return;
-
-    if (button.classList.contains('tn-variant-prev') || button.classList.contains('tn-variant-next')) {
-        const variants = getNoteVariants(noteGroup);
-        const direction = button.classList.contains('tn-variant-prev') ? -1 : 1;
-        state.variantIndexByGroup[noteGroup.id] = Math.min(Math.max(getVariantIndex(noteGroup) + direction, 0), variants.length - 1);
-        renderNotes();
-        return;
-    }
-
-    const note = findNoteFromButton(button);
-    if (!note) return;
-    closeNoteActionMenus(article, 'tn');
-
-    if (button.classList.contains('tn-copy')) {
-        await navigator.clipboard.writeText(note.content);
-        notify(t('copied'), 'success');
-    } else if (button.classList.contains('tn-fill')) {
-        writeInput(note.content, false);
-        closePanel();
-        notify(t('filled'), 'success');
-    } else if (button.classList.contains('tn-share')) {
-        openShareCard(note);
-    } else if (button.classList.contains('tn-edit')) {
-        openEditNote(note);
-    } else if (button.classList.contains('tn-delete')) {
-        const confirmed = await confirmDelete(note);
-        if (!confirmed) return;
-        await api(`/notes/${encodeURIComponent(note.id)}`, { method: 'DELETE' });
-        await refreshNotes();
-        notify(t('deleted'), 'success');
-    }
-}
-
-function renderPagination(visible = true) {
-    const pagination = document.querySelector('.tn-pagination');
-    if (pagination) pagination.classList.toggle('tn-hidden', !visible);
-    if (!visible) return;
-
-    const maxPage = getMaxPage();
-    const label = document.querySelector('#tavern-notes-page-label');
-    const input = document.querySelector('#tavern-notes-page-input');
-    const prev = document.querySelector('#tavern-notes-prev');
-    const next = document.querySelector('#tavern-notes-next');
-    if (label) label.textContent = `${state.page} / ${maxPage}`;
-    if (input) {
-        input.max = String(maxPage);
-        input.value = String(state.page);
-    }
-    if (prev) prev.disabled = state.page <= 1;
-    if (next) next.disabled = state.page >= maxPage;
-}
-
-function goToPage(page) {
-    const maxPage = getMaxPage();
-    const nextPage = Math.min(Math.max(Number(page) || 1, 1), maxPage);
-    if (nextPage === state.page) return;
-    state.page = nextPage;
-    refreshNotes();
-}
-
-function jumpToInputPage() {
-    const input = document.querySelector('#tavern-notes-page-input');
-    goToPage(input?.value || 1);
 }
 
 function exportFile(url, filename) {
@@ -4028,67 +3169,11 @@ function exportFile(url, filename) {
     link.remove();
 }
 
-async function downloadApiFile(path, filename, type) {
-    const response = await fetch(`${API_BASE}${path}`, {
-        headers: getRequestHeaders(),
-    });
-    if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        throw new Error(text || t('exportFailed', { status: response.status }));
-    }
-    const blob = await response.blob();
-    const url = URL.createObjectURL(type ? new Blob([blob], { type }) : blob);
-    exportFile(url, filename);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-function downloadTextFile(content, filename, type) {
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    exportFile(url, filename);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-async function importNotesJson(event) {
-    const input = event.currentTarget;
-    const file = input?.files?.[0];
-    if (input) input.value = '';
-    if (!file) return;
-    let payload;
-    try {
-        payload = JSON.parse(await file.text());
-    } catch {
-        throw new Error(t('invalidBackup'));
-    }
-    if (payload?.format !== 'tavern-notes-export' || !Array.isArray(payload.notes)) {
-        throw new Error(t('invalidBackup'));
-    }
-    let imported = 0;
-    let skipped = 0;
-    const chunkSize = 100;
-    for (let offset = 0; offset < payload.notes.length; offset += chunkSize) {
-        const data = await api('/import', {
-            method: 'POST',
-            body: JSON.stringify({
-                format: 'tavern-notes-export',
-                version: payload.version || 1,
-                notes: payload.notes.slice(offset, offset + chunkSize),
-            }),
-        });
-        imported += Number(data.imported || 0);
-        skipped += Number(data.skipped || 0);
-    }
-    state.page = 1;
-    await refreshNotes();
-    closeExportMenu();
-    notify(t('importDone', { imported, skipped }), 'success');
-}
-
 function toggleExportMenu() {
     const menu = document.querySelector('#tavern-notes-export-menu');
     if (!menu) return;
     closeHeaderPopovers();
-    setExportScope(state.exportScope);
+    noteTransferView.syncScope();
     menu.classList.toggle('open');
     menu.setAttribute('aria-hidden', menu.classList.contains('open') ? 'false' : 'true');
 }
@@ -4099,199 +3184,12 @@ function closeExportMenu() {
     menu?.setAttribute('aria-hidden', 'true');
 }
 
-function setExportScope(scope = 'all') {
-    state.exportScope = scope === 'page' ? 'page' : 'all';
-    document.querySelectorAll('#tavern-notes-export-menu .tn-export-scope-choice').forEach(button => {
-        button.classList.toggle('active', button.dataset.scope === state.exportScope);
-    });
-}
-
-function toggleThemeMenu() {
-    const menu = document.querySelector('#tavern-notes-theme-menu');
-    if (!menu) return;
-    closeHeaderPopovers();
-    if (menu.classList.contains('open')) {
-        closeThemeMenu();
-        return;
-    }
-    syncThemeEditor();
-    refreshThemeList().catch(() => {});
-    menu.classList.add('open');
-    menu.setAttribute('aria-hidden', 'false');
-}
-
-function closeThemeMenu() {
-    const menu = document.querySelector('#tavern-notes-theme-menu');
-    revertThemePreview();
-    menu?.classList.remove('open');
-    menu?.setAttribute('aria-hidden', 'true');
-}
-
-function getExportNote(note) {
-    const activeNote = getActiveVariant(note);
-    return {
-        ...note,
-        ...activeNote,
-        id: activeNote.id || note.id,
-        type: activeNote.type || note.type,
-        character: activeNote.character || note.character,
-        chat: activeNote.chat || note.chat,
-        tags: activeNote.tags || note.tags || [],
-        variant: getNoteVariants(note).length > 1 ? {
-            groupId: note.id,
-            activeIndex: getVariantIndex(note),
-            count: getNoteVariants(note).length,
-        } : undefined,
-    };
-}
-
-function buildCurrentPageExport() {
-    return {
-        ok: true,
-        format: 'tavern-notes-export',
-        version: 1,
-        scope: 'current-page',
-        exportedAt: new Date().toISOString(),
-        page: state.page,
-        pageSize: state.pageSize,
-        filter: state.filter,
-        query: state.query,
-        characterFilter: state.characterFilter,
-        totalNotes: state.totalNotes,
-        notes: state.notes.map(getExportNote),
-    };
-}
-
-function groupNotesByCharacterForText(notes) {
-    const groups = new Map();
-    for (const note of notes) {
-        const characterName = note.character?.name || '未命名角色';
-        const key = [
-            note.character?.id ?? '',
-            note.character?.avatar ?? '',
-            characterName,
-        ].map(value => String(value).replaceAll('|', '\\|')).join('|');
-
-        if (!groups.has(key)) {
-            groups.set(key, {
-                characterName,
-                notes: [],
-            });
-        }
-        groups.get(key).notes.push(note);
-    }
-    return Array.from(groups.values());
-}
-
-function formatNoteForText(note, index) {
-    const created = note.createdAt ? new Date(note.createdAt).toLocaleString('zh-CN', { hour12: false }) : '';
-    const chatName = note.chat?.name || '';
-    const message = note.chat?.messageId === null || note.chat?.messageId === undefined ? '' : `#${note.chat.messageId}`;
-    const source = [created, chatName, message].filter(Boolean).join(' · ');
-    const tags = Array.isArray(note.tags) ? note.tags : [];
-    return [
-        `${index + 1}. ${note.content || ''}`,
-        tags.length ? `   #${tags.join(' #')}` : '',
-        source ? `   ${source}` : '',
-    ].filter(Boolean).join('\n');
-}
-
-function buildTextSection(title, notes, emptyText) {
-    const lines = [`【${title}】`, ''];
-    if (!notes.length) {
-        lines.push(emptyText, '');
-        return lines;
-    }
-
-    for (const group of groupNotesByCharacterForText(notes)) {
-        lines.push(`《${group.characterName}》`);
-        lines.push(`共 ${group.notes.length} 条${title}`);
-        lines.push('');
-        lines.push(group.notes.map(formatNoteForText).join('\n\n'));
-        lines.push('');
-    }
-    return lines;
-}
-
-function textExportCountLine(notes) {
-    const userInputCount = notes.filter(note => note.type === 'user_input').length;
-    const excerptCount = notes.filter(note => note.type === 'excerpt').length;
-    if (userInputCount === notes.length) return `共 ${notes.length} 条User 输入`;
-    if (excerptCount === notes.length) return `共 ${notes.length} 条摘抄`;
-    return `共 ${notes.length} 条笔记（User 输入 ${userInputCount} · 摘抄 ${excerptCount}）`;
-}
-
-function buildPlainTextExport(notes) {
-    const groups = groupNotesByCharacterForText(notes);
-    if (!groups.length) return '暂无笔记\n\n——来自酒馆笔记\n';
-
-    const body = groups.map(group => [
-        `《${group.characterName}》`,
-        textExportCountLine(group.notes),
-        '',
-        group.notes
-            .map(note => String(note.content || '').trim())
-            .filter(Boolean)
-            .join('\n\n'),
-    ].filter(line => line !== '').join('\n')).join('\n\n');
-
-    return `${body}\n\n——来自酒馆笔记\n`;
-}
-
-function buildCurrentPageTxtExport(exportData) {
-    return buildPlainTextExport(exportData.notes || []);
-}
-
-async function exportNotes(format = 'json') {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const scope = state.exportScope === 'page' ? 'page' : 'all';
-    if (scope === 'page') {
-        const exportData = buildCurrentPageExport();
-        if (!exportData.notes.length) throw new Error(t('noPageNotesToExport'));
-        if (format === 'json') {
-            downloadTextFile(JSON.stringify(exportData, null, 2), `tavern-notes-current-page-${stamp}.json`, 'application/json;charset=utf-8');
-        }
-        if (format === 'txt') {
-            downloadTextFile(buildCurrentPageTxtExport(exportData), `tavern-notes-current-page-${stamp}.txt`, 'text/plain;charset=utf-8');
-        }
-    } else {
-        if (state.storageMode === 'lite') {
-            const notes = await getAllLiteNotes();
-            if (format === 'json') {
-                const exportData = await getLiteExport(getLiteUserName());
-                downloadTextFile(JSON.stringify(exportData, null, 2), `tavern-notes-lite-all-${stamp}.json`, 'application/json;charset=utf-8');
-            }
-            if (format === 'txt') {
-                downloadTextFile(buildPlainTextExport(notes), `tavern-notes-lite-all-${stamp}.txt`, 'text/plain;charset=utf-8');
-            }
-            await markLiteExported();
-        } else {
-            if (format === 'json') {
-                await downloadApiFile('/export.json', `tavern-notes-all-${stamp}.json`, 'application/json;charset=utf-8');
-            }
-            if (format === 'txt') {
-                await downloadApiFile('/export.txt', `tavern-notes-all-${stamp}.txt`, 'text/plain;charset=utf-8');
-            }
-        }
-    }
-    closeExportMenu();
-    notify(t('exportStarted'), 'success');
-}
-
 function openShareCard(note) {
-    state.shareCardNote = note;
-    const menu = document.querySelector('#tavern-notes-share-menu');
-    if (!menu) return;
-    syncShareCardControls();
-    menu.classList.add('open');
-    menu.setAttribute('aria-hidden', 'false');
-    drawShareCard().catch(error => notify(error.message, 'error'));
+    shareCardController.open(note);
 }
 
 function closeShareCard() {
-    const menu = document.querySelector('#tavern-notes-share-menu');
-    menu?.classList.remove('open');
-    menu?.setAttribute('aria-hidden', 'true');
+    shareCardController.close();
 }
 
 function syncShareCardControls() {
@@ -4317,299 +3215,7 @@ function syncShareCardControls() {
     if (fontImport) fontImport.value = settings.fontImport || '';
     if (showCharacter) showCharacter.checked = settings.showCharacter;
     if (showDate) showDate.checked = settings.showDate;
-    applyShareFontImport();
-}
-
-function stripFontQuotes(value) {
-    return String(value || '').trim().replace(/^['"]|['"]$/g, '');
-}
-
-function quoteFontFamily(value) {
-    const clean = stripFontQuotes(value);
-    if (!clean) return '';
-    return `"${clean.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
-}
-
-function getImportedFonts() {
-    state.shareCardSettings.importedFonts = sanitizeImportedFonts(state.shareCardSettings.importedFonts);
-    return state.shareCardSettings.importedFonts;
-}
-
-function renderSavedShareFonts(select) {
-    if (!select) return;
-    const fonts = getImportedFonts();
-    select.replaceChildren();
-    const placeholder = document.createElement('option');
-    placeholder.value = '';
-    placeholder.textContent = fonts.length ? t('savedFontsPlaceholder') : t('noSavedFonts');
-    select.append(placeholder);
-    fonts.forEach(font => {
-        const option = document.createElement('option');
-        option.value = font.id;
-        option.textContent = font.type === 'local' ? `${font.name} · local` : font.name;
-        select.append(option);
-    });
-    const currentName = stripFontQuotes(state.shareCardSettings.fontFamily);
-    const current = fonts.find(font => stripFontQuotes(font.name) === currentName);
-    select.value = current?.id || '';
-}
-
-function rememberImportedFont(entry) {
-    if (!entry?.name || (!entry.css && entry.type !== 'local')) return;
-    const id = entry.id || `${entry.type || 'css'}:${stripFontQuotes(entry.name)}:${Date.now()}`;
-    const next = {
-        id,
-        type: entry.type || 'css',
-        name: stripFontQuotes(entry.name),
-        css: entry.css || '',
-        dataUrl: entry.dataUrl || '',
-    };
-    const fonts = getImportedFonts()
-        .filter(font => font.id !== id && !(font.type === next.type && stripFontQuotes(font.name) === next.name));
-    state.shareCardSettings.importedFonts = [next, ...fonts].slice(0, 16);
-}
-
-async function applySavedShareFont(fontId) {
-    const font = getImportedFonts().find(item => item.id === fontId);
-    if (!font) return;
-    if (font.type === 'local') {
-        await loadLocalShareFont(font);
-        state.shareCardSettings = {
-            ...state.shareCardSettings,
-            fontFamily: quoteFontFamily(font.name),
-            fontImport: '',
-        };
-    } else {
-        state.shareCardSettings = {
-            ...state.shareCardSettings,
-            fontFamily: quoteFontFamily(font.name),
-            fontImport: font.css || '',
-        };
-    }
-    saveLocalSettings();
-    syncShareCardControls();
-    await drawShareCard();
-}
-
-function updateShareCardSetting(next) {
-    state.shareCardSettings = {
-        ...state.shareCardSettings,
-        ...next,
-    };
-    saveLocalSettings();
-    syncShareCardControls();
-    drawShareCard().catch(error => notify(error.message, 'error'));
-}
-
-async function importShareCardFont() {
-    const raw = String(state.shareCardSettings.fontImport || '').trim();
-    if (!raw) {
-        notify(t('pasteFontFirst'), 'warning');
-        return;
-    }
-    const css = await buildShareFontCss(raw);
-    const family = parseShareFontFamilyFromCss(css);
-    if (family) rememberImportedFont({ type: 'css', name: stripFontQuotes(family), css });
-    state.shareCardSettings = {
-        ...state.shareCardSettings,
-        fontImport: css,
-        fontFamily: family || state.shareCardSettings.fontFamily || 'system-ui',
-    };
-    saveLocalSettings();
-    syncShareCardControls();
-    await drawShareCard();
-    notify(family ? t('importedFont', { name: stripFontQuotes(family) }) : t('importedFontCode'), 'success');
-}
-
-function readFileAsDataUrl(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(reader.error || new Error('File read failed.'));
-        reader.readAsDataURL(file);
-    });
-}
-
-function openFontDb() {
-    return new Promise((resolve, reject) => {
-        if (!window.indexedDB) {
-            reject(new Error(t('localFontUnsupported')));
-            return;
-        }
-        const databaseName = state.storageMode === 'lite' ? LITE_FONT_DB_NAME : FULL_FONT_DB_NAME;
-        const request = indexedDB.open(databaseName, 1);
-        request.onupgradeneeded = () => {
-            request.result.createObjectStore(FONT_DB_STORE, { keyPath: 'id' });
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error || new Error('IndexedDB open failed.'));
-    });
-}
-
-async function putLocalFontData(id, dataUrl) {
-    const db = await openFontDb();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(FONT_DB_STORE, 'readwrite');
-        transaction.objectStore(FONT_DB_STORE).put({ id, dataUrl });
-        transaction.oncomplete = () => {
-            db.close();
-            resolve();
-        };
-        transaction.onerror = () => {
-            db.close();
-            reject(transaction.error || new Error('IndexedDB write failed.'));
-        };
-    });
-}
-
-async function getLocalFontData(id) {
-    const db = await openFontDb();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(FONT_DB_STORE, 'readonly');
-        const request = transaction.objectStore(FONT_DB_STORE).get(id);
-        request.onsuccess = () => resolve(request.result?.dataUrl || '');
-        request.onerror = () => reject(request.error || new Error('IndexedDB read failed.'));
-        transaction.oncomplete = () => db.close();
-    });
-}
-
-async function loadLocalShareFont(font) {
-    if (!window.FontFace || !document.fonts) throw new Error(t('localFontUnsupported'));
-    const dataUrl = font.dataUrl || await getLocalFontData(font.id);
-    if (!dataUrl) throw new Error(t('savedFontMissing'));
-    const family = stripFontQuotes(font.name);
-    const face = new FontFace(family, `url(${dataUrl})`);
-    await face.load();
-    document.fonts.add(face);
-}
-
-async function ensureSelectedLocalShareFontLoaded() {
-    const family = stripFontQuotes(state.shareCardSettings.fontFamily);
-    if (!family) return;
-    const font = getImportedFonts().find(item => item.type === 'local' && stripFontQuotes(item.name) === family && item.dataUrl);
-    if (font) await loadLocalShareFont(font);
-}
-
-async function importLocalShareCardFont(event) {
-    const input = event.target;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
-    const family = file.name.replace(/\.(ttf|otf|woff2?)$/i, '').trim() || 'Local Font';
-    const dataUrl = await readFileAsDataUrl(file);
-    const font = {
-        id: `local:${family}:${Date.now()}`,
-        type: 'local',
-        name: family,
-        dataUrl,
-    };
-    await loadLocalShareFont(font);
-    await putLocalFontData(font.id, dataUrl);
-    state.shareCardSettings = {
-        ...state.shareCardSettings,
-        fontFamily: quoteFontFamily(family),
-        fontImport: '',
-    };
-    rememberImportedFont({ ...font, dataUrl: '' });
-    saveLocalSettings();
-    syncShareCardControls();
-    await drawShareCard();
-    notify(t('localFontImported', { name: family }), 'success');
-}
-
-function applyShareFontImport() {
-    const style = document.querySelector('#tavern-notes-share-font-style');
-    if (!style) return;
-    const css = sanitizeShareFontCss(state.shareCardSettings.fontImport || '');
-    if (!css) {
-        style.textContent = '';
-        return;
-    }
-    style.textContent = css;
-}
-
-async function buildShareFontCss(raw) {
-    const normalized = normalizeShareFontCss(raw);
-    const url = extractShareFontCssUrl(normalized);
-    let remoteCss = '';
-    if (url) {
-        try {
-            const response = await fetch(url);
-            if (response.ok) remoteCss = resolveShareFontCssUrls(await response.text(), url);
-        } catch {
-            remoteCss = '';
-        }
-    }
-    const safeCss = sanitizeShareFontCss(`${normalized}\n${remoteCss}`);
-    const family = parseShareFontFamilyFromCss(safeCss)
-        || parseShareFontFamilyFromCss(normalized)
-        || parseShareFontFamilyFromCss(remoteCss);
-    return [
-        safeCss,
-        family ? `.tavern-notes-share-font-probe { font-family: ${family}; }` : '',
-    ].filter(Boolean).join('\n');
-}
-
-function normalizeShareFontCss(value) {
-    const text = String(value || '').trim();
-    if (/^https?:\/\/\S+$/i.test(text)) return `@import url("${text}");`;
-    return text
-        .split(/\r?\n/)
-        .map(line => {
-            const text = line.trim();
-            if (/^https?:\/\/\S+$/i.test(text)) return `@import url("${text}");`;
-            if (/^@import\b/i.test(text) && !/[;{}]\s*$/.test(text)) return `${text};`;
-            return line;
-        })
-        .join('\n');
-}
-
-function sanitizeShareFontCss(value) {
-    const css = String(value || '').replace(/\/\*[\s\S]*?\*\//g, '');
-    const rules = css.match(/@font-face\s*\{[^{}]*\}/gi) || [];
-    return rules
-        .filter(rule => !/<\/?script|javascript\s*:|expression\s*\(/i.test(rule))
-        .join('\n');
-}
-
-function resolveShareFontCssUrls(value, stylesheetUrl) {
-    return String(value || '').replace(/url\(\s*(['"]?)([^'"\)]+)\1\s*\)/gi, (match, quote, rawUrl) => {
-        const fontUrl = String(rawUrl || '').trim();
-        if (!fontUrl || /^(?:data:|blob:|https?:|\/\/|#)/i.test(fontUrl)) return match;
-        try {
-            return `url("${new URL(fontUrl, stylesheetUrl).href}")`;
-        } catch {
-            return match;
-        }
-    });
-}
-
-function extractShareFontCssUrl(css) {
-    const importUrl = String(css || '').match(/@import\s+url\((['"]?)(.*?)\1\)/i);
-    if (importUrl?.[2]) return importUrl[2].trim();
-    const plainUrl = String(css || '').match(/https?:\/\/[^\s'")]+/i);
-    return plainUrl?.[0] || '';
-}
-
-function shareCardFontStack() {
-    const family = String(state.shareCardSettings.fontFamily || parseShareFontFamilyFromCss(state.shareCardSettings.fontImport) || '').trim();
-    if (!family || family === 'system-ui') return 'system-ui, "Noto Serif SC", serif';
-    return `${family}, "Noto Serif SC", "Microsoft YaHei", serif`;
-}
-
-function parseShareFontFamilyFromCss(css) {
-    const match = String(css || '').match(/font-family\s*:\s*([^;}\n]+)/i);
-    if (!match) return '';
-    return match[1].trim();
-}
-
-async function waitForShareCardFonts(font) {
-    if (!document.fonts) return;
-    const timeout = new Promise(resolve => setTimeout(resolve, 900));
-    const tasks = [];
-    if (document.fonts.load) tasks.push(document.fonts.load(`32px ${font}`, '酒馆笔记分享卡'));
-    if (document.fonts.ready) tasks.push(document.fonts.ready);
-    await Promise.race([Promise.allSettled(tasks), timeout]);
+    fontController.applyCss();
 }
 
 function getShareCardAvatarUrl(note) {
@@ -4633,582 +3239,6 @@ function getShareCardUserAvatarUrl() {
     }
 }
 
-function loadShareCardImage(url) {
-    return new Promise(resolve => {
-        if (!url) {
-            resolve(null);
-            return;
-        }
-        const image = new Image();
-        image.onload = () => resolve(image);
-        image.onerror = () => resolve(null);
-        image.src = url;
-    });
-}
-
-function shareCardDateParts(note) {
-    const date = note?.createdAt ? new Date(note.createdAt) : new Date();
-    const month = date.toLocaleString('en-US', { month: 'long' }).toUpperCase();
-    const weekday = date.toLocaleDateString('zh-CN', { weekday: 'long' });
-    const zhDate = date.toLocaleDateString('zh-CN', {
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric',
-    });
-    const zhDigits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
-    const zhYearDigits = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
-    const toZhNumber = value => {
-        const number = Number(value);
-        if (number <= 10) return number === 10 ? '十' : zhDigits[number];
-        if (number < 20) return `十${zhDigits[number - 10]}`;
-        const tens = Math.floor(number / 10);
-        const ones = number % 10;
-        return `${zhDigits[tens]}十${ones ? zhDigits[ones] : ''}`;
-    };
-    const zhYear = String(date.getFullYear()).split('').map(item => zhYearDigits[Number(item)] || item).join('');
-    const zhMonth = toZhNumber(date.getMonth() + 1);
-    const zhDay = toZhNumber(date.getDate());
-
-    return {
-        day: String(date.getDate()),
-        month,
-        year: String(date.getFullYear()),
-        weekday,
-        full: zhDate,
-        vertical: `${date.getFullYear()}年 · ${date.getMonth() + 1}月 · ${date.getDate()}日`,
-        verticalZh: `${zhYear}年·${zhMonth}月·${zhDay}日`,
-    };
-}
-
-function isDarkShareCardColor(color) {
-    const hex = String(color || '').replace('#', '');
-    if (!/^[0-9a-f]{6}$/i.test(hex)) return false;
-    const r = parseInt(hex.slice(0, 2), 16);
-    const g = parseInt(hex.slice(2, 4), 16);
-    const b = parseInt(hex.slice(4, 6), 16);
-    return (r * 299 + g * 587 + b * 114) / 1000 < 145;
-}
-
-function wrapCanvasText(ctx, text, maxWidth) {
-    const paragraphs = String(text || '').split(/\n+/).map(item => item.trim()).filter(Boolean);
-    const lines = [];
-    for (const paragraph of paragraphs) {
-        let line = '';
-        for (const char of Array.from(paragraph)) {
-            const test = line + char;
-            if (line && ctx.measureText(test).width > maxWidth) {
-                lines.push(line);
-                line = char;
-            } else {
-                line = test;
-            }
-        }
-        if (line) lines.push(line);
-        lines.push('');
-    }
-    if (lines[lines.length - 1] === '') lines.pop();
-    return lines;
-}
-
-function roundedRectPath(ctx, x, y, width, height, radius) {
-    const r = Math.min(radius, width / 2, height / 2);
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + width, y, x + width, y + height, r);
-    ctx.arcTo(x + width, y + height, x, y + height, r);
-    ctx.arcTo(x, y + height, x, y, r);
-    ctx.arcTo(x, y, x + width, y, r);
-    ctx.closePath();
-}
-
-function drawMultiline(ctx, lines, x, y, lineHeight, maxLines) {
-    const visible = maxLines ? lines.slice(0, maxLines) : lines;
-    visible.forEach((line, index) => {
-        ctx.fillText(line, x, y + index * lineHeight);
-    });
-    if (maxLines && lines.length > maxLines) {
-        ctx.fillText('...', x, y + visible.length * lineHeight);
-    }
-}
-
-function drawMultilineFit(ctx, lines, x, y, lineHeight, maxY) {
-    const maxLines = Math.max(1, Math.floor((maxY - y) / lineHeight));
-    drawMultiline(ctx, lines, x, y, lineHeight, maxLines);
-}
-
-function hasLatinText(text) {
-    return /[a-z]/i.test(String(text || ''));
-}
-
-function drawShareTitle(ctx, title, x, y, options = {}) {
-    const {
-        font,
-        color,
-        maxWidth = 360,
-        largeSize = 72,
-        smallSize = 38,
-        verticalLine = false,
-        lineColor = color,
-    } = options;
-    ctx.save();
-    ctx.fillStyle = color;
-
-    if (hasLatinText(title)) {
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
-        ctx.font = `600 ${smallSize}px ${font}`;
-        const lines = wrapCanvasText(ctx, title, maxWidth).filter(Boolean).slice(0, 3);
-        drawMultiline(ctx, lines, x, y, Math.round(smallSize * 1.35), 3);
-        if (verticalLine) {
-            ctx.strokeStyle = lineColor;
-            ctx.globalAlpha = 0.26;
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(x - 28, y - smallSize);
-            ctx.lineTo(x - 28, y + lines.length * smallSize * 1.35 + 12);
-            ctx.stroke();
-        }
-    } else {
-        ctx.font = `500 ${largeSize}px ${font}`;
-        drawVerticalText(ctx, title, x + 34, y - largeSize, Math.round(largeSize * 1.04), verticalLine ? { lineRight: 64, lineColor } : {});
-    }
-
-    ctx.restore();
-}
-
-function drawVerticalText(ctx, text, x, y, lineHeight, options = {}) {
-    const chars = Array.from(String(text || ''));
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    const baseFont = ctx.font;
-    let offset = 0;
-    chars.forEach(char => {
-        const isDot = char === '·' || char === '?' || char === '。';
-        if (isDot) {
-            ctx.save();
-            ctx.font = baseFont.replace(/(\d+(?:\.\d+)?)px/, (_, size) => `${Math.max(10, Math.round(Number(size) * 0.48))}px`);
-            ctx.fillText('·', x, y + offset + lineHeight * 0.18);
-            ctx.restore();
-            offset += lineHeight * 0.42;
-            return;
-        }
-        ctx.font = baseFont;
-        ctx.fillText(char, x, y + offset);
-        offset += lineHeight;
-    });
-    if (options.lineLeft || options.lineRight) {
-        const height = offset;
-        ctx.strokeStyle = options.lineColor || ctx.fillStyle;
-        ctx.lineWidth = options.lineWidth || 1;
-        ctx.globalAlpha = options.lineAlpha ?? 0.34;
-        if (options.lineLeft) {
-            ctx.beginPath();
-            ctx.moveTo(x - options.lineLeft, y - 8);
-            ctx.lineTo(x - options.lineLeft, y + height + 2);
-            ctx.stroke();
-        }
-        if (options.lineRight) {
-            ctx.beginPath();
-            ctx.moveTo(x + options.lineRight, y - 8);
-            ctx.lineTo(x + options.lineRight, y + height + 2);
-            ctx.stroke();
-        }
-    }
-    ctx.restore();
-}
-
-function drawMobaiUserColumn(ctx, text, x, y, fontSize, font, color, lineColor) {
-    ctx.save();
-    ctx.fillStyle = color;
-    ctx.font = `400 ${fontSize}px ${font}`;
-    if (hasLatinText(text)) {
-        ctx.translate(x, y);
-        ctx.rotate(Math.PI / 2);
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(text, 0, 0);
-        ctx.restore();
-
-        ctx.save();
-        ctx.strokeStyle = lineColor;
-        ctx.globalAlpha = 0.34;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(x - 34, y - 28);
-        ctx.lineTo(x - 34, y + 220);
-        ctx.moveTo(x + 34, y - 28);
-        ctx.lineTo(x + 34, y + 220);
-        ctx.stroke();
-        ctx.restore();
-        return;
-    }
-    drawVerticalText(ctx, text, x, y, Math.round(fontSize * 1.42), { lineLeft: 32, lineRight: 32, lineColor });
-    ctx.restore();
-}
-
-function drawCircleImage(ctx, image, x, y, size) {
-    ctx.save();
-    roundedRectPath(ctx, x, y, size, size, size / 2);
-    ctx.clip();
-    const scale = Math.max(size / image.width, size / image.height);
-    const drawW = image.width * scale;
-    const drawH = image.height * scale;
-    ctx.drawImage(image, x + (size - drawW) / 2, y + (size - drawH) / 2, drawW, drawH);
-    ctx.restore();
-}
-
-function drawCoverImage(ctx, image, x, y, width, height, radius = 0) {
-    ctx.save();
-    roundedRectPath(ctx, x, y, width, height, radius);
-    ctx.clip();
-    const scale = Math.max(width / image.width, height / image.height);
-    const drawW = image.width * scale;
-    const drawH = image.height * scale;
-    ctx.drawImage(image, x + (width - drawW) / 2, y + (height - drawH) / 2, drawW, drawH);
-    ctx.restore();
-}
-
-function drawShareAvatarBox(ctx, image, x, y, size, color, font, label) {
-    ctx.save();
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = 0.26;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x, y, size, size);
-    ctx.globalAlpha = 1;
-    if (image) {
-        drawCoverImage(ctx, image, x + 6, y + 6, size - 12, size - 12, 2);
-    } else {
-        ctx.fillStyle = 'rgba(10, 69, 38, 0.08)';
-        ctx.fillRect(x + 6, y + 6, size - 12, size - 12);
-        ctx.fillStyle = color;
-        ctx.font = `700 34px ${font}`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(getCharacterInitial(label), x + size / 2, y + size / 2);
-    }
-    ctx.restore();
-}
-
-function drawShareCardFooter(ctx, layout) {
-    const {
-        width,
-        height,
-        font,
-        userName,
-        dateText,
-        avatar,
-        character,
-        textColor,
-        muted,
-        lineColor,
-        left = 88,
-        right = width - 88,
-        footerY = height - 244,
-        avatarSize = 124,
-        showMeta = true,
-    } = layout;
-
-    ctx.save();
-    ctx.strokeStyle = lineColor;
-    ctx.globalAlpha = 0.26;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(left, footerY);
-    ctx.lineTo(right, footerY);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-    if (showMeta) {
-        ctx.fillStyle = textColor;
-        ctx.font = `600 28px ${font}`;
-        ctx.fillText(`${userName} · ${t('excerptedAt')} ${dateText}`, left, footerY + 94);
-    }
-    ctx.fillStyle = muted;
-    ctx.font = `600 29px ${font}`;
-    ctx.fillText(t('brandForShare'), left, footerY + (showMeta ? 148 : 112));
-
-    drawShareAvatarBox(ctx, avatar, right - avatarSize, footerY + 44, avatarSize, textColor, font, character);
-    ctx.restore();
-}
-
-function shareCardSourceLine(note, character) {
-    const chatName = String(note?.chat?.name || '').trim();
-    return ` / ${chatName || character}`;
-}
-
-async function drawShareCard() {
-    const canvas = document.querySelector('#tavern-notes-share-canvas');
-    const note = state.shareCardNote;
-    if (!canvas || !note) return;
-
-    await ensureSelectedLocalShareFontLoaded();
-    applyShareFontImport();
-    const font = shareCardFontStack();
-    await waitForShareCardFonts(font);
-    const [characterAvatar, userAvatar] = await Promise.all([
-        loadShareCardImage(getShareCardAvatarUrl(note)),
-        loadShareCardImage(getShareCardUserAvatarUrl()),
-    ]);
-
-    const ctx = canvas.getContext('2d');
-    const width = canvas.width;
-    const height = canvas.height;
-    const settings = state.shareCardSettings;
-    const background = settings.background || '#eef7f2';
-    const themeId = settings.theme || 'calendar';
-    const darkBackground = isDarkShareCardColor(background);
-    const textColor = settings.textColor || (darkBackground ? '#f6f3ed' : '#103f25');
-    const muted = darkBackground ? 'rgba(246,243,237,0.62)' : 'rgba(16,63,37,0.64)';
-    const lineColor = darkBackground ? 'rgba(246,243,237,0.42)' : 'rgba(16,63,37,0.26)';
-    const dates = shareCardDateParts(note);
-    const character = note.character?.name || '未命名角色';
-    const content = String(note.content || '').trim();
-    const userName = getShareCardUserName();
-    const readFont = font;
-    const fontScale = Math.min(Math.max(Number(settings.fontScale || 0.8), 0.65), 1.1);
-    const s = size => Math.round(size * fontScale);
-
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = background;
-    ctx.fillRect(0, 0, width, height);
-
-    if (themeId === 'calendar') {
-        const calendarText = settings.textColor || (darkBackground ? '#f6f3ed' : '#211d19');
-        const calendarMuted = darkBackground ? 'rgba(246,243,237,0.62)' : 'rgba(33,29,25,0.58)';
-        const left = 126;
-        const right = width - 126;
-        let y = 180;
-
-        ctx.textAlign = 'center';
-        ctx.fillStyle = calendarText;
-        ctx.font = `800 164px ${font}`;
-        ctx.fillText(dates.day, width / 2, y + 48);
-        ctx.font = `800 44px ${font}`;
-        ctx.fillText(`${dates.month} ${dates.year}`, width / 2, y + 140);
-        ctx.font = `400 27px ${font}`;
-        ctx.fillStyle = calendarMuted;
-        ctx.fillText(dates.weekday, width / 2, y + 196);
-        ctx.strokeStyle = calendarMuted;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(width / 2 - 56, y + 275);
-        ctx.lineTo(width / 2 + 56, y + 275);
-        ctx.stroke();
-        y += 360;
-
-        ctx.textAlign = 'left';
-        ctx.fillStyle = calendarText;
-        ctx.font = `800 36px ${font}`;
-        if (settings.showCharacter) {
-            ctx.fillText(`《${character}》`, left, y);
-            y += 76;
-        }
-
-        ctx.font = `700 34px ${font}`;
-        const lines = wrapCanvasText(ctx, content, right - left);
-        drawMultiline(ctx, lines, left, y, 68, 11);
-
-        const footerY = height - 112;
-        const avatarSize = 58;
-        if (characterAvatar) {
-            drawCircleImage(ctx, characterAvatar, right - avatarSize, footerY - avatarSize + 18, avatarSize);
-        } else {
-            ctx.save();
-            roundedRectPath(ctx, right - avatarSize, footerY - avatarSize + 18, avatarSize, avatarSize, avatarSize / 2);
-            ctx.fillStyle = darkBackground ? 'rgba(255,255,255,0.13)' : 'rgba(0,0,0,0.08)';
-            ctx.fill();
-            ctx.fillStyle = calendarMuted;
-            ctx.font = `700 26px ${font}`;
-            ctx.textAlign = 'center';
-            ctx.fillText(getCharacterInitial(character), right - avatarSize / 2, footerY - 2);
-            ctx.restore();
-        }
-
-        ctx.textAlign = 'right';
-        ctx.fillStyle = calendarMuted;
-        ctx.font = `400 22px ${font}`;
-        ctx.fillText(t('fromTavernNotes'), right - avatarSize - 18, footerY);
-        return;
-    }
-
-    const left = 88;
-    const right = width - 88;
-
-    if (themeId === 'dialogue') {
-        const avatarSize = 118;
-        if (userAvatar) {
-            drawCircleImage(ctx, userAvatar, left, 122, avatarSize);
-        } else {
-            ctx.save();
-            roundedRectPath(ctx, left, 122, avatarSize, avatarSize, avatarSize / 2);
-            ctx.fillStyle = 'rgba(18,63,37,0.12)';
-            ctx.fill();
-            ctx.fillStyle = textColor;
-            ctx.font = `600 ${s(42)}px ${readFont}`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(getCharacterInitial(userName), left + avatarSize / 2, 122 + avatarSize / 2);
-            ctx.restore();
-        }
-
-        ctx.fillStyle = darkBackground ? '#fffaf2' : '#2b2824';
-        ctx.font = `600 ${s(46)}px ${readFont}`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
-        ctx.fillText(userName, left, 324);
-        ctx.font = `600 ${s(31)}px ${readFont}`;
-        ctx.fillText(`${t('excerptedAt')} ${dates.full}`, left, 390);
-
-        const footerY = 1154;
-        ctx.font = `400 ${s(46)}px ${readFont}`;
-        const lines = wrapCanvasText(ctx, content, right - left);
-        drawMultilineFit(ctx, lines, left, 520, s(88), 1016);
-
-        ctx.fillStyle = muted;
-        ctx.font = `400 ${s(29)}px ${readFont}`;
-        drawMultiline(ctx, wrapCanvasText(ctx, shareCardSourceLine(note, character), right - left), left, 1040, s(44), 1);
-
-        drawShareCardFooter(ctx, {
-            width,
-            height,
-            font: readFont,
-            userName,
-            dateText: dates.full,
-            avatar: characterAvatar,
-            character,
-            textColor: darkBackground ? '#fffaf2' : '#2b2824',
-            muted,
-            lineColor,
-            left,
-            right,
-            footerY,
-            showMeta: false,
-        });
-        return;
-    }
-
-    if (themeId === 'mobai') {
-        const mobaiOffsetY = 38;
-        const contentY = 552;
-        const sourceY = 1088;
-        const footerY = 1132;
-        ctx.save();
-        drawShareTitle(ctx, character, left, 196 + mobaiOffsetY, {
-            font: readFont,
-            color: textColor,
-            maxWidth: 360,
-            largeSize: s(64),
-            smallSize: s(36),
-            verticalLine: false,
-            lineColor,
-        });
-
-        ctx.fillStyle = muted;
-        ctx.font = `400 ${s(25)}px ${readFont}`;
-        drawVerticalText(ctx, dates.verticalZh, right - 34, 142 + mobaiOffsetY, s(36), { lineLeft: 28, lineRight: 28, lineColor });
-        drawMobaiUserColumn(ctx, `${userName}·${t('excerptedAt')}`, right - 126, 166 + mobaiOffsetY, s(25), readFont, muted, lineColor);
-        ctx.restore();
-
-        ctx.fillStyle = textColor;
-        ctx.font = `400 ${s(38)}px ${readFont}`;
-        ctx.textAlign = 'left';
-        const contentRight = right - 70;
-        const lines = wrapCanvasText(ctx, content, contentRight - left);
-        drawMultilineFit(ctx, lines, left, contentY, s(70), 1042);
-
-        ctx.fillStyle = muted;
-        ctx.font = `400 ${s(29)}px ${readFont}`;
-        ctx.fillText(shareCardSourceLine(note, character), left, sourceY);
-
-        drawShareCardFooter(ctx, {
-            width,
-            height,
-            font: readFont,
-            userName,
-            dateText: dates.full,
-            avatar: characterAvatar,
-            character,
-            textColor,
-            muted,
-            lineColor,
-            left,
-            right,
-            footerY,
-            showMeta: false,
-        });
-
-        ctx.save();
-        ctx.strokeStyle = textColor;
-        ctx.globalAlpha = 0.88;
-        ctx.lineWidth = 20;
-        ctx.beginPath();
-        ctx.moveTo(left - 18, height - 58);
-        ctx.lineTo(right + 18, height - 58);
-        ctx.stroke();
-        ctx.restore();
-        return;
-    }
-
-    drawShareTitle(ctx, character, left, 300, {
-        font: readFont,
-        color: textColor,
-        maxWidth: 420,
-        largeSize: s(76),
-        smallSize: s(42),
-        verticalLine: false,
-        lineColor,
-    });
-
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-    ctx.fillStyle = textColor;
-    ctx.font = `400 ${s(42)}px ${readFont}`;
-    const lines = wrapCanvasText(ctx, content, right - left);
-    drawMultilineFit(ctx, lines, left, 560, s(78), 1054);
-
-    ctx.fillStyle = muted;
-    ctx.font = `400 ${s(30)}px ${readFont}`;
-    ctx.fillText(shareCardSourceLine(note, character), left, 1100);
-
-    drawShareCardFooter(ctx, {
-        width,
-        height,
-        font: readFont,
-        userName,
-        dateText: dates.full,
-        avatar: characterAvatar,
-        character,
-        textColor,
-        muted,
-        lineColor,
-        left,
-        right,
-        footerY: 1162,
-    });
-}
-
-async function downloadShareCard() {
-    await drawShareCard();
-    const canvas = document.querySelector('#tavern-notes-share-canvas');
-    const note = state.shareCardNote;
-    if (!canvas || !note) throw new Error(t('noShareCardToExport'));
-    const stamp = new Date().toISOString().slice(0, 10);
-    const character = (note.character?.name || '未命名角色').replace(/[\\/:*?"<>|]/g, '_');
-    canvas.toBlob(blob => {
-        if (!blob) {
-            notify(t('shareCardExportFailed'), 'error');
-            return;
-        }
-        const url = URL.createObjectURL(blob);
-        exportFile(url, `${t('brandForShare')}-${character}-${stamp}.png`);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-        notify(t('shareCardExported'), 'success');
-    }, 'image/png');
-}
-
 async function confirmDelete(note) {
     const preview = String(note.content || '').slice(0, 40).replace(/\s+/g, ' ');
     return window.confirm(t('confirmDeleteNote', {
@@ -5218,69 +3248,11 @@ async function confirmDelete(note) {
 }
 
 function openFullNote(note) {
-    const modal = document.querySelector('#tavern-notes-modal');
-    if (!modal) return;
-    closeNoteActionMenus(document.querySelector('#tavern-notes-panel'), 'tn');
-    const chatName = note.chat?.name || '';
-    const messageId = note.chat?.messageId ?? '-';
-    const tags = Array.isArray(note.tags) ? note.tags : [];
-    state.detailNote = note;
-    modal.querySelector('.tn-modal-kicker').textContent = `${noteTypeLabel(note.type)} · ${note.character?.name || '未命名角色'}`;
-    modal.querySelector('.tn-modal-title').textContent = note.createdAt ? new Date(note.createdAt).toLocaleString() : '全文';
-    modal.querySelector('.tn-modal-content').innerHTML = `
-        <div class="tn-modal-note-text">${renderQuotedText(note.content)}</div>
-        <div class="tn-modal-note-meta">
-            ${chatName ? `<span>${htmlEscape(chatName)}</span>` : ''}
-            <span>#${htmlEscape(messageId)}</span>
-            ${tags.map(tag => `<span>#${htmlEscape(tag)}</span>`).join('')}
-        </div>
-    `;
-    modal.classList.add('open');
-    modal.setAttribute('aria-hidden', 'false');
+    noteDetailController.open(note);
 }
 
 function closeFullNote() {
-    const modal = document.querySelector('#tavern-notes-modal');
-    modal?.classList.remove('open');
-    modal?.setAttribute('aria-hidden', 'true');
-    state.detailNote = null;
-}
-
-async function handleModalNoteAction(event) {
-    const button = event.target.closest?.('[data-modal-action]');
-    const note = state.detailNote;
-    if (!button || !note) return;
-    const action = button.dataset.modalAction;
-    if (action === 'copy') {
-        await navigator.clipboard.writeText(note.content);
-        notify(t('copied'), 'success');
-        return;
-    }
-    if (action === 'fill') {
-        writeInput(note.content, false);
-        closeFullNote();
-        closePanel();
-        notify(t('filled'), 'success');
-        return;
-    }
-    if (action === 'share') {
-        closeFullNote();
-        openShareCard(note);
-        return;
-    }
-    if (action === 'edit') {
-        closeFullNote();
-        openEditNote(note);
-        return;
-    }
-    if (action === 'delete') {
-        const confirmed = await confirmDelete(note);
-        if (!confirmed) return;
-        await api(`/notes/${encodeURIComponent(note.id)}`, { method: 'DELETE' });
-        closeFullNote();
-        await refreshNotes();
-        notify(t('deleted'), 'success');
-    }
+    noteDetailController.close();
 }
 
 function parseTagsInput(value) {
@@ -5348,959 +3320,68 @@ function removeEditTag(tag) {
     renderTagSuggestions();
 }
 
-function openEditNote(note) {
-    const menu = document.querySelector('#tavern-notes-edit-menu');
-    if (!menu || !note) return;
-    state.editingNote = note;
-    state.editingTags = parseTagsInput(note.tags || []);
-    const content = menu.querySelector('#tavern-notes-edit-content');
-    const tags = menu.querySelector('#tavern-notes-edit-tags');
-    if (content) content.value = note.content || '';
-    if (tags) tags.value = '';
-    renderEditTagChips();
-    renderTagSuggestions();
-    menu.classList.add('open');
-    menu.setAttribute('aria-hidden', 'false');
-    setTimeout(() => content?.focus(), 0);
-}
-
-function closeEditNote() {
-    const menu = document.querySelector('#tavern-notes-edit-menu');
-    menu?.classList.remove('open');
-    menu?.setAttribute('aria-hidden', 'true');
-    state.editingNote = null;
-    state.editingTags = [];
-}
-
-async function saveEditedNote() {
-    const note = state.editingNote;
-    if (!note) return;
-    const content = String(document.querySelector('#tavern-notes-edit-content')?.value || '').trim();
-    if (!content) throw new Error(t('noteContentRequired'));
-    commitEditTagInput();
-    const tags = [...state.editingTags];
-    await api(`/notes/${encodeURIComponent(note.id)}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ content, tags }),
-    });
-    tags.forEach(rememberTag);
-    closeEditNote();
-    await refreshNotes();
-    notify(t('noteUpdated'), 'success');
-}
-
-function normalizeTheme(theme) {
-    return {
-        ...DEFAULT_THEME,
-        ...(theme || {}),
-        variables: {
-            ...DEFAULT_THEME.variables,
-            ...toFullThemeVariables(theme?.variables),
-        },
-        assets: {
-            ...DEFAULT_THEME.assets,
-            ...(theme?.assets || {}),
-        },
-    };
-}
-
-function normalizeAppleThemeId(id = state.activeThemeId) {
-    if (id === LEGACY_APPLE_THEME_DAY_ID || id === LEGACY_APPLE_THEME_NIGHT_ID) return APPLE_THEME_ID;
-    return id;
-}
-
-function themeIsApple(theme = state.theme) {
-    return String(theme?.variables?.['--tn-theme-flavor'] || '').toLowerCase() === 'apple';
-}
-
-function applyAppleGlassMode(theme) {
-    if (!themeIsApple(theme)) return theme;
-    const mode = state.appleGlassMode === 'night' ? 'night' : 'day';
-    const variables = mode === 'night' ? APPLE_GLASS_NIGHT_VARIABLES : APPLE_GLASS_DAY_VARIABLES;
-    return {
-        ...theme,
-        variables: {
-            ...theme.variables,
-            ...variables,
-        },
-    };
-}
-
-function applyDefaultThemeMode(theme) {
-    const isDefault = normalizeAppleThemeId(state.activeThemeId) === 'default'
-        && String(theme?.variables?.['--tn-theme-flavor'] || 'default').toLowerCase() === 'default';
-    if (!isDefault || state.defaultThemeMode !== 'night') return theme;
-    return {
-        ...theme,
-        variables: {
-            ...theme.variables,
-            ...DEFAULT_NIGHT_VARIABLES,
-        },
-    };
-}
-
-function paintTheme(theme) {
-    const clean = applyDefaultThemeMode(applyAppleGlassMode(normalizeTheme(theme)));
-    const panel = document.querySelector('#tavern-notes-panel');
-    if (panel) {
-        clean.variables['--tn-theme-flavor'] = normalizeThemeFlavor(clean.variables['--tn-theme-flavor']);
-        replaceThemeVariables(panel, clean.variables, '--tn-');
-        const flavor = clean.variables['--tn-theme-flavor'];
-        if (flavor) panel.dataset.themeFlavor = flavor;
-        else delete panel.dataset.themeFlavor;
-        if (flavor === 'default') panel.dataset.themeMode = state.defaultThemeMode;
-        else delete panel.dataset.themeMode;
-        if (flavor !== 'archive') panel.classList.remove('tn-archive-reading');
-        if (clean.assets.backgroundImage) {
-            const image = String(clean.assets.backgroundImage).trim();
-            const cssImage = /^(url|linear-gradient|radial-gradient|conic-gradient)\(/i.test(image) ? image : `url("${image}")`;
-            panel.style.setProperty('--tn-background-image', cssImage);
-        } else {
-            panel.style.removeProperty('--tn-background-image');
-        }
-    }
-    updateThemeIcons(clean);
-    updateAppleThemeModeButton();
-    return clean;
-}
-
-function applyTheme(theme, options = {}) {
-    const {
-        commit = true,
-        syncEditor = true,
-        labelKey = commit ? 'currentTheme' : 'previewTheme',
-    } = options;
-    const clean = paintTheme(theme);
-    if (commit) {
-        state.theme = clean;
-        state.previewTheme = null;
-        state.themePreviewActive = false;
-    } else {
-        state.previewTheme = clean;
-        state.themePreviewActive = true;
-    }
-    document.querySelector('.tn-theme-name')?.replaceChildren(document.createTextNode(t(labelKey, { name: clean.name || t('unnamedTheme') })));
-    if (syncEditor) syncThemeEditor(clean);
-    return clean;
-}
-
-function revertThemePreview() {
-    if (!state.themePreviewActive) return;
-    const theme = state.theme || DEFAULT_THEME;
-    applyTheme(theme, { commit: true, syncEditor: false, labelKey: 'currentTheme' });
-    state.themeDraft = false;
-}
-
-function renderThemeSelect() {
-    const select = document.querySelector('#tavern-notes-theme-select');
-    if (!select) return;
-    const themes = state.themes?.length ? state.themes : [{ id: 'default', name: 'Soft Neomorphism' }];
-    select.replaceChildren(...themes.map(theme => {
-        const option = document.createElement('option');
-        option.value = theme.id;
-        option.textContent = theme.author ? `${theme.name} · ${theme.author}` : theme.name;
-        return option;
-    }));
-    select.value = normalizeAppleThemeId(state.activeThemeId) || 'default';
-    updateAppleThemeModeButton();
-}
-
-function isAppleThemeId(id = state.activeThemeId) {
-    return normalizeAppleThemeId(id) === APPLE_THEME_ID;
-}
-
-function updateAppleThemeModeButton() {
-    const buttons = [
-        document.querySelector('#tavern-notes-apple-mode-main'),
-    ].filter(Boolean);
-    if (!buttons.length) return;
-    const isApple = isAppleThemeId();
-    const isDefault = normalizeAppleThemeId(state.activeThemeId) === 'default';
-    const isSupported = isApple || isDefault;
-    const isNight = isApple ? state.appleGlassMode === 'night' : state.defaultThemeMode === 'night';
-    for (const button of buttons) {
-        button.classList.toggle('tn-hidden', !isSupported);
-        button.classList.toggle('active', isSupported && isNight);
-        const title = t(isApple ? 'appleThemeModeTitle' : 'defaultThemeModeTitle');
-        button.title = title;
-        button.setAttribute('aria-label', title);
-        button.querySelector('i')?.classList.toggle('fa-sun', isNight);
-        button.querySelector('i')?.classList.toggle('fa-moon', !isNight);
-        const labelKey = isApple
-            ? (isNight ? 'appleThemeDay' : 'appleThemeNight')
-            : (isNight ? 'defaultThemeDay' : 'defaultThemeNight');
-        button.querySelector('span')?.replaceChildren(document.createTextNode(t(labelKey)));
-    }
-    scheduleHeaderActionLayout();
-}
-
-async function toggleAppleThemeMode() {
-    if (normalizeAppleThemeId(state.activeThemeId) === 'default') {
-        state.defaultThemeMode = state.defaultThemeMode === 'night' ? 'day' : 'night';
-        saveLocalSettings();
-        applyTheme(DEFAULT_THEME, { commit: true, syncEditor: true, labelKey: 'currentTheme' });
-        notify(t(state.defaultThemeMode === 'night' ? 'defaultThemeNightOn' : 'defaultThemeDayOn'), 'success');
-        return;
-    }
-    if (!isAppleThemeId()) {
-        await activateTheme(APPLE_THEME_ID);
-        return;
-    }
-    state.appleGlassMode = state.appleGlassMode === 'night' ? 'day' : 'night';
-    saveLocalSettings();
-    applyTheme(state.theme || DEFAULT_THEME, { commit: true, syncEditor: true, labelKey: 'currentTheme' });
-    notify(t('appleThemeEnabled'), 'success');
-}
-
-function syncThemeEditor(theme = state.theme || DEFAULT_THEME) {
-    const clean = normalizeTheme(theme);
-    const nameInput = document.querySelector('#tavern-notes-theme-name-input');
-    const code = document.querySelector('#tavern-notes-theme-code');
-    if (nameInput) nameInput.value = clean.name || '';
-    if (code) code.value = JSON.stringify(clean, null, 2);
-}
-
-function getThemeFromEditor() {
-    const code = document.querySelector('#tavern-notes-theme-code');
-    const nameInput = document.querySelector('#tavern-notes-theme-name-input');
-    const theme = JSON.parse(code?.value || '{}');
-    if (nameInput?.value?.trim()) theme.name = nameInput.value.trim();
-    if (theme.format && theme.format !== 'tavern-notes-theme') throw new Error(t('invalidThemeFile'));
-    return normalizeTheme(theme);
-}
-
-function firstElement(selectors) {
-    for (const selector of selectors) {
-        const element = document.querySelector(selector);
-        if (element) return element;
-    }
-    return null;
-}
-
-function styleOf(selectors) {
-    const element = Array.isArray(selectors) ? firstElement(selectors) : document.querySelector(selectors);
-    return element ? getComputedStyle(element) : null;
-}
-
-function usefulColor(value) {
-    if (!value || value === 'transparent') return '';
-    const text = String(value).trim();
-    if (/^\d+(\.\d+)?\s*,\s*\d+(\.\d+)?\s*,\s*\d+(\.\d+)?/.test(text)) return `rgb(${text})`;
-    if (/rgba?\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)/i.test(value)) return '';
-    return text;
-}
-
-function cssVar(styles, name) {
-    return usefulColor(styles?.getPropertyValue(name)?.trim());
-}
-
-function parseRgb(value) {
-    const text = String(value || '').trim();
-    const rgb = text.match(/rgba?\(([^)]+)\)/i);
-    if (rgb) {
-        const parts = rgb[1].split(',').map(part => Number.parseFloat(part));
-        if (parts.length >= 3) return parts.slice(0, 3);
-    }
-    const hex = text.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
-    if (hex) {
-        const raw = hex[1].length === 3 ? hex[1].split('').map(char => char + char).join('') : hex[1];
-        return [0, 2, 4].map(index => Number.parseInt(raw.slice(index, index + 2), 16));
-    }
-    return null;
-}
-
-function toOpaqueColor(value, fallback = '#111522') {
-    const rgb = parseRgb(value);
-    if (!rgb) return fallback;
-    return `rgb(${rgb.map(channel => Math.max(0, Math.min(255, Math.round(channel)))).join(', ')})`;
-}
-
-function isDarkColor(value) {
-    const rgb = parseRgb(value);
-    if (!rgb) return false;
-    const [r, g, b] = rgb.map(channel => {
-        const normalized = channel / 255;
-        return normalized <= 0.03928 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
-    });
-    return (0.2126 * r + 0.7152 * g + 0.0722 * b) < 0.35;
-}
-
-function pickStyleValue(styles, property, fallback = '') {
-    for (const style of styles) {
-        const value = usefulColor(style?.getPropertyValue(property)?.trim());
-        if (value) return value;
-    }
-    return fallback;
-}
-
-function pickBackgroundColor(styles, fallback = DEFAULT_THEME.variables['--tn-paper']) {
-    return pickStyleValue(styles, 'background-color', fallback);
-}
-
-function pickBackgroundImage(styles, fallback = '') {
-    const image = pickStyleValue(styles, 'background-image', fallback);
-    return image === 'none' ? fallback : image;
-}
-
-function colorMix(color, alpha = 0.3) {
-    const value = usefulColor(color);
-    if (!value) return `rgba(156, 151, 139, ${alpha})`;
-    if (value.startsWith('rgb(')) return value.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`);
-    if (value.startsWith('rgba(')) return value.replace(/,\s*[\d.]+\)$/, `, ${alpha})`);
-    return value;
-}
-
-function shadowColor(value, fallbackColor) {
-    const shadow = String(value || '');
-    const rgba = shadow.match(/rgba?\([^)]+\)/i)?.[0];
-    return colorMix(rgba || fallbackColor, 0.38);
-}
-
-function getSillyTavernThemeName() {
-    const select = document.querySelector('#themes');
-    const selected = select?.selectedOptions?.[0];
-    const name = selected?.textContent?.trim() || select?.value?.trim() || '';
-    return name || t('currentTavernTheme');
-}
-
-function extractCurrentSillyTavernTheme() {
-    const body = getComputedStyle(document.body);
-    const root = getComputedStyle(document.documentElement);
-    const chatBlock = styleOf(['.mes', '.mes_block', '#chat .mes']);
-    const chatText = styleOf(['.mes_text', '.mes .mes_text', '#chat']);
-    const input = styleOf(['#send_textarea', '#send_form textarea', '#send_form']);
-    const menu = styleOf(['#user-settings-block', '#left-nav-panel', '.drawer-content', '.popup']);
-    const button = styleOf(['.menu_button', '.qr--button', '#send_but']);
-    const active = styleOf(['.selected', '.active', '.mes.selected', '.menu_button:hover']);
-    const styles = [chatBlock, input, menu, body, root].filter(Boolean);
-    const textStyles = [chatText, input, menu, body, root].filter(Boolean);
-    const bodyText = toOpaqueColor(cssVar(root, '--SmartThemeBodyColor') || pickStyleValue(textStyles, 'color', DEFAULT_THEME.variables['--tn-ink']), DEFAULT_THEME.variables['--tn-ink']);
-    const border = toOpaqueColor(cssVar(root, '--SmartThemeBorderColor') || pickStyleValue([input, button, menu, root], 'border-color', DEFAULT_THEME.variables['--tn-line']), DEFAULT_THEME.variables['--tn-line']);
-    const quote = toOpaqueColor(cssVar(root, '--SmartThemeQuoteColor') || pickStyleValue([active, button, root, body], 'color', DEFAULT_THEME.variables['--tn-gold']), DEFAULT_THEME.variables['--tn-gold']);
-    const em = toOpaqueColor(cssVar(root, '--SmartThemeEmColor') || bodyText, bodyText);
-    const underline = toOpaqueColor(cssVar(root, '--SmartThemeUnderlineColor') || quote, quote);
-    const userTint = toOpaqueColor(cssVar(root, '--SmartThemeUserMesBlurTintColor') || quote, quote);
-    const chatTint = cssVar(root, '--SmartThemeChatTintColor') || cssVar(root, '--SmartThemeBlurTintColor');
-    const uiBackground = cssVar(root, '--SmartThemeBlurTintColor') || cssVar(root, '--SmartThemeChatTintColor');
-    const panelBackground = uiBackground || pickBackgroundColor([menu, input, body, root], DEFAULT_THEME.variables['--tn-paper']);
-    const cardBackground = chatTint || uiBackground || pickBackgroundColor([chatBlock, input, menu, body], DEFAULT_THEME.variables['--tn-paper-2']);
-    const botTint = toOpaqueColor(cssVar(root, '--SmartThemeBotMesBlurTintColor') || cardBackground || quote, quote);
-    const panelSolid = toOpaqueColor(panelBackground, DEFAULT_THEME.variables['--tn-paper']);
-    const cardSolid = toOpaqueColor(cardBackground, panelSolid);
-    const shadow = pickStyleValue([chatBlock, input, button, menu], 'box-shadow', '');
-    const isDark = isDarkColor(panelBackground) || isDarkColor(cardBackground);
-    const lightGlow = isDark ? colorMix(quote, 0.18) : 'rgba(255, 255, 255, 0.76)';
-    const textShadow = usefulColor(cssVar(root, '--SmartThemeShadowColor')) || 'transparent';
-    const themeShadow = toOpaqueColor(cssVar(root, '--SmartThemeShadowColor') || shadowColor(shadow, '#000000'), '#000000');
-    const muted = `color-mix(in srgb, ${bodyText} ${isDark ? '68%' : '62%'}, ${panelSolid} ${isDark ? '32%' : '38%'})`;
-    const softBorder = `color-mix(in srgb, ${border} ${isDark ? '82%' : '52%'}, transparent)`;
-    const glow = `color-mix(in srgb, ${quote} ${isDark ? '16%' : '24%'}, transparent)`;
-    const darkShadow = isDark
-        ? colorMix(themeShadow, 0.5)
-        : shadowColor(shadow, pickStyleValue(styles, 'color', '#4c4a44'));
-    const buttonBase = isDark
-        ? `color-mix(in srgb, ${cardSolid} 88%, ${border} 12%)`
-        : `color-mix(in srgb, ${cardSolid} 84%, white 16%)`;
-    const darkButton = `color-mix(in srgb, ${cardSolid} 90%, black 10%)`;
-    const darkButtonHover = `color-mix(in srgb, ${quote} 16%, ${darkButton} 84%)`;
-    const darkButtonShadow = `0 0 0 1px ${softBorder}, 0 3px 10px ${colorMix(themeShadow, 0.42)}, inset 0 1px 0 color-mix(in srgb, ${bodyText} 12%, transparent)`;
-    const darkIconBg = `linear-gradient(145deg, color-mix(in srgb, ${quote} 8%, ${darkButton} 92%), color-mix(in srgb, ${darkButton} 84%, black 16%))`;
-    const darkIconShadow = `0 0 0 1px color-mix(in srgb, ${border} 68%, transparent), 0 2px 6px ${colorMix(themeShadow, 0.34)}, inset 0 1px 0 color-mix(in srgb, ${bodyText} 12%, transparent)`;
-    const paperLift = isDark
-        ? `color-mix(in srgb, ${panelSolid} 92%, black 8%)`
-        : `color-mix(in srgb, ${panelSolid} 94%, white 6%)`;
-    const cardLift = isDark
-        ? `color-mix(in srgb, ${cardSolid} 94%, black 6%)`
-        : `color-mix(in srgb, ${cardSolid} 90%, white 10%)`;
-    const themeName = getSillyTavernThemeName();
-
-    const theme = normalizeTheme({
-        name: t('mergedThemeName', { name: themeName }),
-        author: 'Tavern Notes',
-        variables: {
-            '--tn-paper': panelSolid,
-            '--tn-paper-2': cardSolid,
-            '--tn-ink': bodyText,
-            '--tn-muted': muted,
-            '--tn-line': softBorder,
-            '--tn-gold': quote,
-            '--tn-gold-2': quote,
-            '--tn-em': em,
-            '--tn-underline': underline,
-            '--tn-quote': quote,
-            '--tn-text-shadow': textShadow,
-            '--tn-panel-glow': glow,
-            '--tn-scrollbar-thumb': quote,
-            '--tn-scrollbar-track': `color-mix(in srgb, ${border} 24%, ${panelSolid} 76%)`,
-            '--tn-mini-button-bg': `linear-gradient(145deg, ${buttonBase}, ${paperLift})`,
-            '--tn-mini-button-shadow': isDark
-                ? darkButtonShadow
-                : DEFAULT_THEME.variables['--tn-mini-button-shadow'],
-            '--tn-mini-button-hover-bg': `linear-gradient(145deg, color-mix(in srgb, ${quote} ${isDark ? '24%' : '28%'}, ${buttonBase}), ${buttonBase})`,
-            '--tn-mini-button-hover-shadow': isDark
-                ? `0 0 0 1px color-mix(in srgb, ${quote} 42%, transparent), 0 4px 12px ${colorMix(themeShadow, 0.42)}, inset 0 1px 0 color-mix(in srgb, ${bodyText} 16%, transparent)`
-                : DEFAULT_THEME.variables['--tn-mini-button-hover-shadow'],
-            '--tn-filter-hover-shadow': isDark
-                ? `0 0 0 1px color-mix(in srgb, ${border} 70%, transparent), 0 5px 13px ${colorMix(themeShadow, 0.36)}`
-                : DEFAULT_THEME.variables['--tn-filter-hover-shadow'],
-            '--tn-filter-icon-border': isDark ? `color-mix(in srgb, ${border} 72%, transparent)` : DEFAULT_THEME.variables['--tn-filter-icon-border'],
-            '--tn-filter-icon-shadow': isDark ? darkIconShadow : DEFAULT_THEME.variables['--tn-filter-icon-shadow'],
-            '--tn-inline-action-bg': isDark ? darkButton : DEFAULT_THEME.variables['--tn-inline-action-bg'],
-            '--tn-inline-action-hover-bg': isDark ? darkButtonHover : DEFAULT_THEME.variables['--tn-inline-action-hover-bg'],
-            '--tn-inline-action-shadow': isDark ? 'none' : DEFAULT_THEME.variables['--tn-inline-action-shadow'],
-            '--tn-inline-action-hover-shadow': isDark
-                ? `inset 0 0 0 1px color-mix(in srgb, ${quote} 36%, transparent), inset 0 1px 0 color-mix(in srgb, ${bodyText} 12%, transparent)`
-                : DEFAULT_THEME.variables['--tn-inline-action-hover-shadow'],
-            '--tn-inline-icon-bg': isDark ? darkIconBg : DEFAULT_THEME.variables['--tn-inline-icon-bg'],
-            '--tn-inline-icon-hover-bg': isDark ? `linear-gradient(145deg, color-mix(in srgb, ${quote} 22%, ${darkButton} 78%), ${darkButton})` : DEFAULT_THEME.variables['--tn-inline-icon-hover-bg'],
-            '--tn-inline-icon-shadow': isDark ? darkIconShadow : DEFAULT_THEME.variables['--tn-inline-icon-shadow'],
-            '--tn-shadow-dark': darkShadow,
-            '--tn-shadow-light': lightGlow,
-            '--tn-radius-panel': '24px',
-            '--tn-radius-card': isDark ? '13px' : DEFAULT_THEME.variables['--tn-radius-card'],
-            '--tn-panel-border': border,
-            '--tn-control-bg': `linear-gradient(145deg, ${buttonBase}, ${paperLift})`,
-            '--tn-control-bg-hover': `linear-gradient(145deg, color-mix(in srgb, ${quote} ${isDark ? '22%' : '30%'}, ${buttonBase}), ${buttonBase})`,
-            '--tn-control-inset-bg': `linear-gradient(145deg, color-mix(in srgb, ${panelSolid} ${isDark ? '90%' : '88%'}, ${isDark ? 'black' : 'white'} ${isDark ? '10%' : '12%'}), color-mix(in srgb, ${cardSolid} ${isDark ? '86%' : '88%'}, ${isDark ? 'black' : 'white'} ${isDark ? '14%' : '12%'}))`,
-            '--tn-control-inset-shadow': isDark
-                ? `inset 0 0 0 1px color-mix(in srgb, ${border} 54%, transparent), inset 0 8px 16px ${colorMix(themeShadow, 0.36)}`
-                : DEFAULT_THEME.variables['--tn-control-inset-shadow'],
-            '--tn-input-bg': cardLift,
-            '--tn-input-color': bodyText,
-            '--tn-input-border': border,
-            '--tn-input-placeholder': muted,
-            '--tn-card-bg': `linear-gradient(145deg, ${cardLift}, ${paperLift})`,
-            '--tn-card-bg-active': `linear-gradient(145deg, color-mix(in srgb, ${quote} ${isDark ? '18%' : '24%'}, ${cardLift}), ${cardLift})`,
-            '--tn-card-active-shadow': isDark
-                ? `inset 0 0 0 1px color-mix(in srgb, ${quote} 28%, transparent), inset 0 8px 14px ${colorMix(themeShadow, 0.3)}`
-                : DEFAULT_THEME.variables['--tn-card-active-shadow'],
-            '--tn-icon-bg': isDark ? darkIconBg : `linear-gradient(145deg, color-mix(in srgb, ${quote} 16%, ${buttonBase}), ${paperLift})`,
-            '--tn-action-bg': `linear-gradient(145deg, ${paperLift}, ${cardLift})`,
-            '--tn-overlay-bg': `color-mix(in srgb, ${panelSolid} 94%, ${isDark ? 'black' : 'white'} 6%)`,
-            '--tn-fade-bg': `linear-gradient(90deg, color-mix(in srgb, ${cardSolid} 0%, transparent), ${cardSolid} 34%, color-mix(in srgb, ${quote} ${isDark ? '34%' : '18%'}, ${cardSolid}))`,
-            '--tn-card-image': 'linear-gradient(transparent, transparent)',
-            '--tn-note-bg': `linear-gradient(145deg, ${paperLift}, ${cardLift})`,
-            '--tn-note-border': `1px solid ${softBorder}`,
-            '--tn-note-shadow': isDark
-                ? `0 0 0 1px color-mix(in srgb, ${quote} 18%, transparent), 0 8px 24px ${colorMix(themeShadow, 0.5)}`
-                : DEFAULT_THEME.variables['--tn-note-shadow'],
-            '--tn-note-type-bg': isDark
-                ? `linear-gradient(145deg, color-mix(in srgb, ${userTint} 62%, ${quote} 38%), color-mix(in srgb, ${userTint} 72%, black 28%))`
-                : `linear-gradient(145deg, color-mix(in srgb, ${userTint} 34%, white 66%), color-mix(in srgb, ${quote} 18%, white 82%))`,
-            '--tn-note-type-color': isDark
-                ? `color-mix(in srgb, ${bodyText} 82%, ${userTint} 18%)`
-                : `color-mix(in srgb, ${quote} 82%, black 18%)`,
-            '--tn-note-type-user-bg': isDark
-                ? `linear-gradient(145deg, color-mix(in srgb, ${userTint} 58%, ${cardSolid} 42%), color-mix(in srgb, ${userTint} 28%, ${panelSolid} 72%))`
-                : `linear-gradient(145deg, color-mix(in srgb, ${userTint} 32%, white 68%), color-mix(in srgb, ${quote} 16%, white 84%))`,
-            '--tn-note-type-user-color': isDark
-                ? `color-mix(in srgb, ${bodyText} 88%, ${userTint} 12%)`
-                : `color-mix(in srgb, ${quote} 78%, black 22%)`,
-            '--tn-note-type-excerpt-bg': isDark
-                ? `linear-gradient(145deg, color-mix(in srgb, ${botTint} 52%, ${cardSolid} 48%), color-mix(in srgb, ${botTint} 22%, ${panelSolid} 78%))`
-                : `linear-gradient(145deg, color-mix(in srgb, ${botTint} 32%, white 68%), color-mix(in srgb, ${border} 16%, white 84%))`,
-            '--tn-note-type-excerpt-color': isDark
-                ? `color-mix(in srgb, ${bodyText} 84%, ${botTint} 16%)`
-                : `color-mix(in srgb, ${border} 76%, black 24%)`,
-            '--tn-note-accent-user': userTint,
-            '--tn-note-accent-excerpt': botTint,
-            '--tn-note-padding': isDark ? '15px 17px 15px' : DEFAULT_THEME.variables['--tn-note-padding'],
-            '--tn-note-topline-bg': isDark
-                ? `linear-gradient(135deg, color-mix(in srgb, ${userTint} 12%, ${cardSolid} 88%), color-mix(in srgb, ${botTint} 8%, ${panelSolid} 92%))`
-                : DEFAULT_THEME.variables['--tn-note-topline-bg'],
-            '--tn-note-topline-border': isDark ? `1px solid ${softBorder}` : DEFAULT_THEME.variables['--tn-note-topline-border'],
-            '--tn-note-topline-padding': isDark ? '8px 12px' : DEFAULT_THEME.variables['--tn-note-topline-padding'],
-            '--tn-note-topline-radius': isDark ? '10px' : DEFAULT_THEME.variables['--tn-note-topline-radius'],
-            '--tn-note-topline-margin': isDark ? '0 0 13px 0' : DEFAULT_THEME.variables['--tn-note-topline-margin'],
-            '--tn-note-dot-display': isDark ? 'none' : DEFAULT_THEME.variables['--tn-note-dot-display'],
-            '--tn-filter-shadow': isDark
-                ? `0 0 0 1px ${softBorder}, 0 6px 16px ${colorMix(themeShadow, 0.38)}`
-                : DEFAULT_THEME.variables['--tn-filter-shadow'],
-            '--tn-control-shadow': isDark
-                ? `0 0 0 1px ${softBorder}, 0 5px 14px ${colorMix(themeShadow, 0.38)}`
-                : DEFAULT_THEME.variables['--tn-control-shadow'],
-            '--tn-inset-light': isDark ? `color-mix(in srgb, ${quote} 16%, transparent)` : DEFAULT_THEME.variables['--tn-inset-light'],
-            '--tn-font-family': DEFAULT_THEME.variables['--tn-font-family'],
-        },
-        assets: {
-            ...DEFAULT_THEME.assets,
-            backgroundImage: '',
-        },
-    });
-    return theme;
-}
-
-function previewThemeFromEditor() {
-    applyTheme(getThemeFromEditor(), { commit: false, syncEditor: false, labelKey: 'previewTheme' });
-    notify(t('previewedTheme'), 'success');
-}
-
-async function previewAndSaveThemeFromEditor() {
-    const theme = getThemeFromEditor();
-    applyTheme(theme, { commit: false, syncEditor: false, labelKey: 'previewTheme' });
-    await saveThemeFromEditor(theme);
-}
-
-async function mergeCurrentSillyTavernTheme() {
-    const theme = extractCurrentSillyTavernTheme();
-    const stamp = new Date().toLocaleString('zh-CN', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-    }).replace(/[\/:\s]/g, '-');
-    theme.name = `${theme.name} - ${stamp}`;
-    state.themeDraft = true;
-    syncThemeEditor(theme);
-    applyTheme(theme, { commit: false, syncEditor: false, labelKey: 'tempMergedTheme' });
-    notify(t('mergedThemeDraft'), 'success');
-}
-
-function askThemeName(theme, actionLabel) {
-    const currentName = theme?.name || document.querySelector('#tavern-notes-theme-name-input')?.value || t('unnamedTheme');
-    const nextName = window.prompt(t('themeNamePrompt', { action: actionLabel }), currentName);
-    if (nextName === null) return null;
-    const cleanName = nextName.trim();
-    if (!cleanName) {
-        notify(t('themeNameEmpty'), 'warning');
-        return null;
-    }
-    return cleanName;
-}
-
-async function saveThemeFromEditor(themeFromEditor = null) {
-    const theme = themeFromEditor || getThemeFromEditor();
-    const shouldSaveAs = state.themeDraft || !state.activeThemeId || state.activeThemeId === 'default' || isAppleThemeId(state.activeThemeId);
-    const name = askThemeName(theme, shouldSaveAs ? t('saveAsAction') : t('saveAction'));
-    if (!name) return;
-    theme.name = name;
-    syncThemeEditor(theme);
-    if (shouldSaveAs) {
-        const data = await saveTheme(theme, null);
-        state.activeThemeId = data.id || state.activeThemeId;
-        state.themeDraft = false;
-        state.themePreviewActive = false;
-        notify(t('savedAsTheme'), 'success');
-        return;
-    }
-    await saveTheme(theme, state.activeThemeId);
-    state.themeDraft = false;
-    state.themePreviewActive = false;
-    notify(t('savedTheme'), 'success');
-}
-
-async function saveThemeAsFromEditor() {
-    const theme = getThemeFromEditor();
-    const name = askThemeName(theme, t('saveAsAction'));
-    if (!name) return;
-    theme.name = name;
-    syncThemeEditor(theme);
-    const data = await saveTheme(theme, null);
-    state.activeThemeId = data.id || state.activeThemeId;
-    state.themeDraft = false;
-    state.themePreviewActive = false;
-    notify(t('savedAsTheme'), 'success');
-}
-
-function updateIconElement(element, iconName, extraClass = '') {
-    if (!element || !iconName) return;
-    element.className = `fa-solid ${String(iconName).replace(/[^a-z0-9-]/gi, '')} ${extraClass}`.trim();
-}
-
-function renderDefaultIcon(src, extraClass = '') {
-    return `<img class="tavern-notes-default-icon ${extraClass}" src="${htmlEscape(src)}" alt="" aria-hidden="true" draggable="false" />`;
-}
-
-function setDefaultIcon(target, src, extraClass = '') {
-    const element = typeof target === 'string' ? document.querySelector(target) : target;
-    if (!element) return;
-    const current = element.querySelector('.tavern-notes-default-icon');
-    if (current?.tagName === 'IMG') {
-        current.src = src;
-        current.className = `tavern-notes-default-icon ${extraClass}`.trim();
-        updateDefaultIconContrast(current);
-        return;
-    }
-    current?.remove();
-    element.querySelector('i')?.remove();
-    element.insertAdjacentHTML('afterbegin', renderDefaultIcon(src, extraClass));
-    updateDefaultIconContrast(element.querySelector('.tavern-notes-default-icon'));
-}
-
-function parseComputedRgb(value) {
-    const numbers = String(value || '').match(/[\d.]+/g)?.map(Number) || [];
-    if (numbers.length < 3 || numbers.slice(0, 3).some(number => !Number.isFinite(number))) return null;
-    return {
-        red: numbers[0],
-        green: numbers[1],
-        blue: numbers[2],
-        alpha: Number.isFinite(numbers[3]) ? numbers[3] : 1,
-    };
-}
-
-function getEffectiveIconBackground(icon) {
-    let element = icon?.parentElement;
-    while (element) {
-        const color = parseComputedRgb(getComputedStyle(element).backgroundColor);
-        if (color && color.alpha > 0.1) return color;
-        element = element.parentElement;
-    }
-    return null;
-}
-
-function updateDefaultIconContrast(icon) {
-    if (!(icon instanceof HTMLImageElement)) return;
-    const background = getEffectiveIconBackground(icon);
-    const brightness = background
-        ? (background.red * 299 + background.green * 587 + background.blue * 114) / 1000
-        : (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 0 : 255);
-    icon.classList.toggle('tavern-notes-default-icon-light', brightness < 148);
-}
-
-function updateThemeIcons(theme = state.theme) {
-    const assets = normalizeTheme(theme).assets;
-    updateIconElement(document.querySelector('.tn-brand-mark i'), assets.brandIcon);
-    setDefaultIcon('#tavern-notes-open', DEFAULT_OPEN_ICON_URL, 'qr--button-icon');
-    setDefaultIcon('#tavern-notes-capture', DEFAULT_CAPTURE_ICON_URL, 'qr--button-icon');
-    setDefaultIcon('#tavern-notes-floating-open', DEFAULT_OPEN_ICON_URL);
-    setDefaultIcon('#tavern-notes-floating-capture', DEFAULT_CAPTURE_ICON_URL);
-    requestAnimationFrame(() => {
-        document.querySelectorAll('.tavern-notes-default-icon').forEach(updateDefaultIconContrast);
-    });
-}
-
-async function loadTheme() {
-    try {
-        await refreshThemeList();
-    } catch {
-        try {
-            const data = await api('/theme');
-            state.activeThemeId = normalizeAppleThemeId(data.activeId || 'default');
-            state.themeDraft = false;
-            applyTheme(data.theme || DEFAULT_THEME);
-            renderThemeSelect();
-        } catch {
-            state.themeDraft = false;
-            applyTheme(DEFAULT_THEME);
-        }
-    }
-}
-
-async function refreshThemeList() {
-    const data = await api('/themes');
-    state.themes = data.themes || [];
-    state.activeThemeId = normalizeAppleThemeId(data.activeId || 'default');
-    state.themeDraft = false;
-    renderThemeSelect();
-    applyTheme(data.activeTheme || DEFAULT_THEME);
-}
-
-async function activateTheme(id) {
-    const data = await api(`/themes/${encodeURIComponent(id || 'default')}/activate`, { method: 'POST' });
-    state.themes = data.themes || state.themes;
-    state.activeThemeId = normalizeAppleThemeId(data.activeId || data.id || id || 'default');
-    state.themeDraft = false;
-    renderThemeSelect();
-    applyTheme(data.theme || DEFAULT_THEME);
-    notify(t('switchedTheme'), 'success');
-}
-
-async function saveTheme(theme, id = state.activeThemeId) {
-    const clean = normalizeTheme(theme);
-    const data = await api('/themes', {
-        method: 'POST',
-        body: JSON.stringify({ theme: clean, id: id === 'default' || isAppleThemeId(id) ? null : id, activate: true }),
-    });
-    state.themes = data.themes || state.themes;
-    state.activeThemeId = normalizeAppleThemeId(data.activeId || data.id || state.activeThemeId || 'default');
-    state.themeDraft = false;
-    renderThemeSelect();
-    applyTheme(data.theme || clean);
-    return data;
-}
-
-function exportTheme() {
-    const theme = getThemeFromEditor();
-    const blob = new Blob([JSON.stringify(theme, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const safeName = String(theme.name || '未命名主题').replace(/[\\/:*?"<>|]/g, '_').slice(0, 40);
-    exportFile(url, `酒馆笔记主题-${safeName}-${Date.now()}.json`);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-async function importThemeFile(event) {
-    const file = event.target.files?.[0];
-    event.target.value = '';
-    if (!file) return;
-    const text = await file.text();
-    const theme = JSON.parse(text);
-    if (theme.format && theme.format !== 'tavern-notes-theme') throw new Error(t('invalidThemeFile'));
-    await saveTheme(theme, null);
-    notify(t('importedTheme'), 'success');
-}
-
-async function openThemeFolder() {
-    await api('/themes/folder/open', { method: 'POST' });
-    notify(t('requestedThemeFolder'), 'success');
-}
-
-async function deleteSelectedTheme() {
-    const id = document.querySelector('#tavern-notes-theme-select')?.value || state.activeThemeId;
-    if (!id || id === 'default' || isAppleThemeId(id)) {
-        notify(id === 'default' ? t('defaultThemeCannotDelete') : t('builtInThemeCannotDelete'), 'warning');
-        return;
-    }
-    const selected = state.themes.find(theme => theme.id === id);
-    if (!window.confirm(t('confirmDeleteTheme', { name: selected?.name || id }))) return;
-    const data = await api(`/themes/${encodeURIComponent(id)}`, { method: 'DELETE' });
-    state.themes = data.themes || [];
-    state.activeThemeId = normalizeAppleThemeId(data.activeId || 'default');
-    state.themeDraft = false;
-    renderThemeSelect();
-    applyTheme(data.theme || state.theme || DEFAULT_THEME);
-    notify(t('deletedTheme'), 'success');
-}
-
-function updateLauncherModeButton() {
-    const button = document.querySelector('#tavern-notes-launcher-mode');
-    if (!button) return;
-    const label = state.launcherMode === 'floating' ? t('floatingBall') : t('toolbarButtons');
-    button.classList.toggle('active', state.launcherMode === 'floating');
-    button.title = t('switchLauncherMode');
-    button.setAttribute('aria-label', t('switchLauncherMode'));
-    const span = button.querySelector('span');
-    if (span) span.textContent = label;
-}
-
-function removeLauncherButtons() {
-    document.querySelector('#tavern-notes-open')?.remove();
-    document.querySelector('#tavern-notes-capture')?.remove();
-}
-
-function addFloorCaptureButtons(root = document) {
-    if (!state.showFloorCaptureButton) {
-        removeFloorCaptureButtons();
-        return;
-    }
-    const selector = root === document ? '#chat .mes[mesid], #chat .mes[data-mesid]' : '.mes[mesid], .mes[data-mesid]';
-    root.querySelectorAll?.(selector).forEach(ensureFloorCaptureButton);
-}
-
-function ensureFloorCaptureButton(messageElement) {
-    if (!state.showFloorCaptureButton || messageElement.querySelector(':scope > .tn-floor-capture')) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'tn-floor-capture';
-    button.title = t('captureFloorTitle');
-    button.setAttribute('aria-label', t('captureFloorTitle'));
-    button.innerHTML = `<i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('captureFloor'))}</span>`;
-    button.addEventListener('click', event => {
-        event.preventDefault();
-        event.stopPropagation();
-        captureMessageFloor(messageElement).catch(error => notify(error.message, 'error'));
-    });
-    messageElement.append(button);
-}
-
-function addFloorCaptureButtonsFromMutations(records) {
-    const messages = new Set();
-    for (const record of records) {
-        for (const node of record.addedNodes) {
-            if (!(node instanceof Element)) continue;
-            const parentMessage = node.closest?.('.mes[mesid], .mes[data-mesid]');
-            if (parentMessage) messages.add(parentMessage);
-            if (node.matches?.('.mes[mesid], .mes[data-mesid]')) messages.add(node);
-            node.querySelectorAll?.('.mes[mesid], .mes[data-mesid]').forEach(message => messages.add(message));
-        }
-    }
-    messages.forEach(ensureFloorCaptureButton);
-}
-
-function watchChatMessages() {
-    if (!state.showFloorCaptureButton) {
-        stopFloorCaptureWatcher();
-        return;
-    }
-    addFloorCaptureButtons();
-    if (state.floorCaptureObserver) return;
-    const chatContainer = document.querySelector('#chat');
-    if (!chatContainer) {
-        setTimeout(watchChatMessages, 800);
-        return;
-    }
-    state.floorCaptureObserver = new MutationObserver(addFloorCaptureButtonsFromMutations);
-    state.floorCaptureObserver.observe(chatContainer, { childList: true, subtree: true });
-}
-
-function applyFloatingLauncherPosition(launcher) {
-    if (!launcher || !state.floatingPosition) return;
-    const maxX = Math.max(8, window.innerWidth - launcher.offsetWidth - 8);
-    const maxY = Math.max(8, window.innerHeight - launcher.offsetHeight - 8);
-    const x = Math.min(Math.max(8, Number(state.floatingPosition.x || 8)), maxX);
-    const y = Math.min(Math.max(8, Number(state.floatingPosition.y || 8)), maxY);
-    launcher.style.left = `${x}px`; launcher.style.top = `${y}px`; launcher.style.right = 'auto'; launcher.style.bottom = 'auto'; launcher.style.transform = 'none';
-}
-
-function bindFloatingLauncherDrag(launcher) {
-    if (!launcher || launcher.dataset.dragBound) return;
-    launcher.dataset.dragBound = 'true';
-    launcher.addEventListener('pointerdown', event => {
-        if (event.button !== undefined && event.button !== 0) return;
-        const rect = launcher.getBoundingClientRect();
-        const startX = event.clientX; const startY = event.clientY;
-        const offsetX = startX - rect.left; const offsetY = startY - rect.top;
-        state.floatingDragMoved = false;
-        const move = moveEvent => {
-            if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) > 5) state.floatingDragMoved = true;
-            if (!state.floatingDragMoved) return;
-            const x = Math.min(Math.max(8, moveEvent.clientX - offsetX), window.innerWidth - launcher.offsetWidth - 8);
-            const y = Math.min(Math.max(8, moveEvent.clientY - offsetY), window.innerHeight - launcher.offsetHeight - 8);
-            launcher.style.left = `${x}px`; launcher.style.top = `${y}px`; launcher.style.right = 'auto'; launcher.style.bottom = 'auto'; launcher.style.transform = 'none';
-            event.preventDefault();
-        };
-        const up = upEvent => {
-            window.removeEventListener('pointermove', move);
-            window.removeEventListener('pointerup', up);
-            window.removeEventListener('pointercancel', up);
-            if (!state.floatingDragMoved) return;
-            const rectNow = launcher.getBoundingClientRect();
-            const x = rectNow.left + rectNow.width / 2 < window.innerWidth / 2 ? 8 : window.innerWidth - rectNow.width - 8;
-            state.floatingPosition = { x, y: rectNow.top };
-            applyFloatingLauncherPosition(launcher); saveLocalSettings();
-            setTimeout(() => { state.floatingDragMoved = false; }, 0);
-            upEvent.preventDefault();
-        };
-        window.addEventListener('pointermove', move, { passive: false });
-        window.addEventListener('pointerup', up, { passive: false });
-        window.addEventListener('pointercancel', up, { passive: false });
-    });
-}
-
-function updateFloatingLauncher() {
-    let launcher = document.querySelector('#tavern-notes-floating-launcher');
-    if (state.launcherMode !== 'floating') {
-        launcher?.remove();
-        return;
-    }
-    if (!launcher) {
-        launcher = document.createElement('div');
-        launcher.id = 'tavern-notes-floating-launcher';
-        launcher.innerHTML = `
-            <button id="tavern-notes-floating-open" class="tn-floating-button tn-floating-main" type="button" title="${htmlEscape(t('openNotes'))}" aria-label="${htmlEscape(t('openNotes'))}">
-                ${renderDefaultIcon(DEFAULT_OPEN_ICON_URL)}
-            </button>
-            <button id="tavern-notes-floating-capture" class="tn-floating-button tn-floating-capture" type="button" title="${htmlEscape(t('captureSelectedTitle'))}" aria-label="${htmlEscape(t('captureSelectedTitle'))}">
-                ${renderDefaultIcon(DEFAULT_CAPTURE_ICON_URL)}
-            </button>
-        `;
-        document.body.append(launcher);
-        document.querySelector('#tavern-notes-floating-open')?.addEventListener('click', () => {
-            if (state.floatingDragMoved) return;
-            if (state.open) closePanel();
-            else openPanel();
-        });
-        document.querySelector('#tavern-notes-floating-capture')?.addEventListener('click', () => { if (!state.floatingDragMoved) captureSelection().catch(error => notify(error.message, 'error')); });
-    }
-    bindFloatingLauncherDrag(launcher);
-    requestAnimationFrame(() => applyFloatingLauncherPosition(launcher));
-    launcher.querySelector('#tavern-notes-floating-open')?.setAttribute('title', t('openNotes'));
-    launcher.querySelector('#tavern-notes-floating-open')?.setAttribute('aria-label', t('openNotes'));
-    launcher.querySelector('#tavern-notes-floating-capture')?.setAttribute('title', t('captureSelectedTitle'));
-    launcher.querySelector('#tavern-notes-floating-capture')?.setAttribute('aria-label', t('captureSelectedTitle'));
-    updateThemeIcons();
-}
-
-function toggleLauncherMode() {
-    state.launcherMode = state.launcherMode === 'floating' ? 'toolbar' : 'floating';
-    saveLocalSettings();
-    addInputToolbar();
-    updateFloatingLauncher();
-    updateLauncherModeButton();
-    notify(state.launcherMode === 'floating' ? t('floatingLauncherShown') : t('toolbarLauncherShown'), 'success');
-}
-
-function resetFloatingLauncherPosition() { state.floatingPosition = null; saveLocalSettings(); const launcher = document.querySelector('#tavern-notes-floating-launcher'); if (launcher) { launcher.style.removeProperty('left'); launcher.style.removeProperty('top'); launcher.style.removeProperty('right'); launcher.style.removeProperty('bottom'); launcher.style.removeProperty('transform'); } }
-
-function addInputToolbar() {
-    updateLauncherModeButton();
-    if (state.launcherMode === 'floating') {
-        removeLauncherButtons();
-        updateFloatingLauncher();
-        return;
-    }
-    updateFloatingLauncher();
-    document.querySelector('#rightSendForm > #tavern-notes-open')?.remove();
-    document.querySelector('#rightSendForm > #tavern-notes-capture')?.remove();
-
-    const qrBar = document.querySelector('#qr--bar');
-    const target = document.querySelector('#qr--bar > .qr--buttons') || qrBar;
-    if (!target) {
-        setTimeout(addInputToolbar, 800);
-        return;
-    }
-
-    const existingOpen = document.querySelector('#tavern-notes-open');
-    const existingCapture = document.querySelector('#tavern-notes-capture');
-    if (existingOpen && existingCapture) {
-        return;
-    }
-
-    document.querySelector('#tavern-notes-open')?.remove();
-    document.querySelector('#tavern-notes-capture')?.remove();
-
-    const openButton = document.createElement('div');
-    openButton.id = 'tavern-notes-open';
-    openButton.className = 'qr--button tavern-notes-qr-button interactable';
-    openButton.title = t('openNotes');
-    openButton.tabIndex = 0;
-    openButton.innerHTML = `${renderDefaultIcon(DEFAULT_OPEN_ICON_URL, 'qr--button-icon')}<span class="qr--hidden">${htmlEscape(t('appName'))}</span>`;
-
-    const captureButton = document.createElement('div');
-    captureButton.id = 'tavern-notes-capture';
-    captureButton.className = 'qr--button tavern-notes-qr-button interactable';
-    captureButton.title = t('captureSelectedTitle');
-    captureButton.tabIndex = 0;
-    captureButton.innerHTML = `${renderDefaultIcon(DEFAULT_CAPTURE_ICON_URL, 'qr--button-icon')}<span class="qr--hidden">${htmlEscape(t('captureSelected'))}</span>`;
-
-    target.append(openButton, captureButton);
-    updateThemeIcons();
-
-    openButton.addEventListener('click', openPanel);
-    openButton.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') openPanel();
-    });
-    captureButton.addEventListener('click', () => captureSelection().catch(error => notify(error.message, 'error')));
-    captureButton.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') captureSelection().catch(error => notify(error.message, 'error'));
-    });
-}
-
-function watchQuickReplyBar() {
-    if (state.qrBarObserver) return;
-    const sendForm = document.querySelector('#send_form');
-    if (!sendForm) {
-        setTimeout(watchQuickReplyBar, 800);
-        return;
-    }
-    state.qrBarObserver = new MutationObserver(() => {
-        if (!document.querySelector('#tavern-notes-open') || !document.querySelector('#tavern-notes-capture')) addInputToolbar();
-    });
-    state.qrBarObserver.observe(sendForm, { childList: true, subtree: true });
+const quickReplyView = createQuickReplyView({
+    selectors: {
+        open: '#tavern-notes-open',
+        capture: '#tavern-notes-capture',
+        floating: '#tavern-notes-floating-launcher',
+        floatingOpen: '#tavern-notes-floating-open',
+        floatingCapture: '#tavern-notes-floating-capture',
+        modeButton: '#tavern-notes-launcher-mode',
+    },
+    classes: {
+        toolbar: 'qr--button tavern-notes-qr-button interactable',
+        floating: 'tn-floating-button',
+        floatingMain: 'tn-floating-main',
+        floatingCapture: 'tn-floating-capture',
+    },
+    renderIcon: (kind, iconClass) => themeView.renderDefaultIcon(kind === 'open' ? DEFAULT_OPEN_ICON_URL : DEFAULT_CAPTURE_ICON_URL, iconClass),
+    translate: t,
+    onPositionChange: floatingPosition => updateSettings({ floatingPosition }),
+});
+let quickReplyController;
+const quickReplyObserverController = createObserverController({
+    createObserver: createMutationObserverFactory(globalThis),
+    getTarget: () => document.querySelector('#send_form'),
+    onRefresh: () => quickReplyController?.refresh(),
+});
+quickReplyController = createQuickReplyController({
+    view: quickReplyView,
+    getMode: () => state.launcherMode,
+    saveSettings: patch => updateSettings(patch),
+    findToolbar: () => document.querySelector('#qr--bar > .qr--buttons') || document.querySelector('#qr--bar'),
+    createObserverController: () => quickReplyObserverController,
+    notify: mode => notify(t(mode === 'floating' ? 'floatingLauncherShown' : 'toolbarLauncherShown'), 'success'),
+    capabilities: {
+        ...APPLICATION_CAPABILITIES,
+        open: () => { if (state.open) closePanel(); else openPanel(); },
+        capture: () => captureController.handleManualCapture().catch(error => notify(error.message, 'error')),
+        getPosition: () => state.floatingPosition,
+        iconsChanged: () => themeView.updateIcons(appStore.getSlice('theme').theme || DEFAULT_THEME),
+    },
+});
+
+const applicationLifecycle = createLifecycleRegistry();
+[appStore, settingsService, storageModeController, systemStatusController, fontController, updateController,
+    shareCardController, noteDetailController, themeController, { destroy: destroyNoteFeatureLayer },
+    appShellView, headerLayoutObserverController, quickReplyController]
+    .forEach(resource => applicationLifecycle.registerDestroy(() => resource.destroy()));
+function destroyApplicationModules() {
+    applicationLifecycle.destroyAll();
+    removeMobileViewportGuard();
 }
 
 function addExtensionsMenuEntry() {
-    const menu = document.querySelector('#extensionsMenu');
-    if (!menu || document.querySelector('#tavern-notes-menu-entry')) return;
-
-    menu.insertAdjacentHTML('beforeend', `
-        <div id="tavern-notes-menu-entry" class="list-group-item flex-container flexGap5 interactable" title="${htmlEscape(t('openNotes'))}" tabindex="0">
-            <i class="fa-solid fa-book-open"></i>
-            <span>${htmlEscape(t('appName'))}</span>
-        </div>
-    `);
-    document.querySelector('#tavern-notes-menu-entry')?.addEventListener('click', openPanel);
+    ensureAppMenuEntry({
+        documentRef: document,
+        menuSelector: '#extensionsMenu',
+        id: 'tavern-notes-menu-entry',
+        className: 'list-group-item flex-container flexGap5 interactable',
+        title: t('openNotes'),
+        iconMarkup: '<i class="fa-solid fa-book-open"></i>',
+        label: t('appName'),
+        onOpen: openPanel,
+    });
 }
 
 async function openPanel() {
@@ -6310,8 +3391,8 @@ async function openPanel() {
     panel.classList.remove('tn-archive-reading');
     panel.classList.add('open');
     scheduleHeaderActionLayout();
-    updateFloatingLauncher();
-    await refreshNotes();
+    quickReplyController.refresh();
+    await noteListController.refresh();
     const list = document.querySelector('#tavern-notes-list');
     if (list) list.scrollTop = 0;
 }
@@ -6320,65 +3401,52 @@ function closePanel() {
     const panel = document.querySelector('#tavern-notes-panel');
     if (!panel) return;
     closeHeaderPopovers();
-    closeNewNoteMenu();
+    newNoteView.close();
     closeFullNote();
-    closeEditNote();
-    closeTagLibrary();
+    noteEditorView.close();
+    tagView.close();
     closeExportMenu();
     closeFloorCaptureMenu();
     closeUserInputCleanupMenu();
-    closeThemeMenu();
+    themeController.close();
     closeShareCard();
     state.open = false;
     panel.classList.remove('open');
-    updateFloatingLauncher();
+    quickReplyController.refresh();
 }
 
 async function init() {
+    const loadedSettings = await settingsService.load();
+    hasLegacyFullSettings = loadedSettings.found && !loadedSettings.settings.storageMode;
+    state.storageModeResolved = Boolean(state.storageMode);
+    appStore.patch('theme', {
+        appleMode: loadedSettings.settings.appleGlassMode,
+        defaultMode: loadedSettings.settings.defaultThemeMode,
+    });
     const detectedStatus = await resolveInitialStorageMode();
     if (!state.storageMode) {
-        showStorageModeChooser();
+        storageModeController.open();
         return;
     }
     installMobileViewportGuard();
-    buildPanel();
+    appShellView.mount();
     observeHeaderActionLayout();
-    applyShareFontImport();
-    await loadTheme();
-    addInputToolbar();
-    watchQuickReplyBar();
-    watchChatMessages();
+    fontController.applyCss();
+    await themeController.load();
+    quickReplyController.mount();
     setTimeout(() => checkForTavernNotesUpdate(), 5000);
 
-    try {
-        const status = detectedStatus || await api('/status');
-        state.currentUserName = status.user || state.currentUserName || '';
-        saveLocalSettings();
-        const mode = t(state.storageMode === 'lite' ? 'storageModeLite' : 'storageModeFull');
-        setStatus(`${mode} · ${t('connected', { user: status.user, version: status.version || EXTENSION_VERSION, count: status.totalNotes || 0 })}`);
-    } catch (error) {
-        notify(state.storageMode === 'full' ? t('backendDisconnected', { message: error.message }) : error.message, 'error');
-        if (state.storageMode === 'full' && ['backend_missing', 'backend_unreachable'].includes(error.code)) {
-            showBackendInstallGuide();
-        }
-    }
+    if (!detectedStatus) await systemStatusController.refresh().catch(() => {});
 
-    eventSource.on(event_types.MESSAGE_SENT, messageId => {
-        setTimeout(() => captureUserMessage(messageId), 100);
-        setTimeout(addFloorCaptureButtons, 120);
-    });
-    eventSource.on(event_types.MESSAGE_EDITED, messageId => {
-        setTimeout(() => captureUserMessage(messageId), 100);
-        setTimeout(addFloorCaptureButtons, 120);
-    });
-    eventSource.on(event_types.MESSAGE_UPDATED, messageId => {
-        setTimeout(() => captureUserMessage(messageId), 100);
-        setTimeout(addFloorCaptureButtons, 120);
-    });
-
-    watchSelectionFrames();
-    document.addEventListener('scroll', hideSelectionCaptureButton, true);
-    window.addEventListener('resize', hideSelectionCaptureButton);
 }
 
-eventSource.on(event_types.APP_READY, init);
+const application = createApplication({
+    modules: [{ mount: init, destroy: destroyApplicationModules }],
+    onError: error => notify(error.message, 'error'),
+});
+bootstrapApplication({
+    createApplication: () => application,
+    events: sillyTavernEvents,
+    isReady: () => document.readyState === 'complete' && Boolean(document.querySelector('#send_form')),
+    onError: error => notify(error.message, 'error'),
+});

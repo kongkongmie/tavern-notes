@@ -32,8 +32,11 @@ try {
         'core/local-theme-repository.js',
         'core/repository-router.js',
         'core/storage-mode-settings.js',
+        'core/theme-model.js',
+        'core/theme-presets.js',
         'core/theme-runtime.js',
         'core/update-center.js',
+        'features/theme-studio.js',
         'CHANGELOG.md',
         'CHANGELOG.zh-CN.md',
     ].forEach(relativePath => assert.ok(fs.existsSync(path.join(frontend, relativePath)), `Missing installed frontend file: ${relativePath}`));

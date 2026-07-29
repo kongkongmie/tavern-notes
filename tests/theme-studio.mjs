@@ -1,0 +1,82 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { createThemeStudio, renderThemeStudioMarkup } from '../features/theme-studio.js';
+
+function element(value = '') {
+    const listeners = new Set();
+    return {
+        value,
+        addEventListener(type, listener) { if (type === 'click') listeners.add(listener); },
+        removeEventListener(type, listener) { if (type === 'click') listeners.delete(listener); },
+        listeners,
+    };
+}
+const elements = new Map([
+    ['#tavern-notes-theme-name-input', element()],
+    ['#tavern-notes-theme-code', element()],
+    ['#tavern-notes-theme-preview-save', element()],
+    ['#tavern-notes-theme-merge-st', element()],
+    ['#tavern-notes-theme-save-as', element()],
+]);
+const document = {
+    body: {},
+    documentElement: {},
+    querySelector: selector => elements.get(selector) || null,
+};
+const defaultTheme = {
+    format: 'tavern-notes-theme',
+    version: 1,
+    name: 'Default',
+    variables: { '--tn-paper': '#fff' },
+    assets: {},
+};
+const normalizeTheme = theme => ({
+    ...defaultTheme,
+    ...theme,
+    variables: { ...defaultTheme.variables, ...(theme.variables || {}) },
+    assets: { ...defaultTheme.assets, ...(theme.assets || {}) },
+});
+const themeState = { theme: defaultTheme, draft: false, activeId: 'default' };
+const controllerCalls = [];
+const themeController = {
+    getThemeState: () => ({ ...themeState }),
+    previewTheme: (theme, options) => controllerCalls.push(['preview', theme, options]),
+    saveTheme: async (theme, options) => controllerCalls.push(['save', theme, options]),
+    setDraft: draft => { themeState.draft = draft; },
+    isAppleThemeId: () => false,
+};
+const studio = createThemeStudio({
+    document,
+    window: { prompt: () => null },
+    getComputedStyle: () => ({ getPropertyValue: () => '' }),
+    defaultTheme,
+    normalizeTheme,
+    themeController,
+    translate: key => key,
+    notify: () => {},
+});
+
+studio.syncEditor({ ...defaultTheme, name: 'Edited' });
+assert.equal(elements.get('#tavern-notes-theme-name-input').value, 'Edited');
+assert.equal(JSON.parse(elements.get('#tavern-notes-theme-code').value).name, 'Edited');
+elements.get('#tavern-notes-theme-code').value = JSON.stringify({ name: 'From JSON', variables: { '--tn-paper': '#000' } });
+elements.get('#tavern-notes-theme-name-input').value = 'From input';
+assert.equal(studio.getThemeFromEditor().name, 'From input');
+elements.get('#tavern-notes-theme-code').value = JSON.stringify({ format: 'other-format' });
+assert.throws(() => studio.getThemeFromEditor(), /invalidThemeFile/);
+const markup = renderThemeStudioMarkup({ translate: key => key, escapeHtml: value => String(value) });
+assert.match(markup, /data-theme-studio/);
+assert.match(markup, /tavern-notes-theme-code/);
+studio.mount();
+studio.mount();
+assert.equal(elements.get('#tavern-notes-theme-preview-save').listeners.size, 1);
+studio.destroy();
+assert.equal(elements.get('#tavern-notes-theme-preview-save').listeners.size, 0);
+
+const source = fs.readFileSync(new URL('../features/theme-studio.js', import.meta.url), 'utf8');
+assert.doesNotMatch(source, /\bstate\.(?:theme|activeThemeId|previewTheme|themeDraft|themePreviewActive)\b/);
+assert.doesNotMatch(source, /\bapplyTheme\b|\bsaveTheme\s*[,}]/);
+assert.match(source, /themeController\.previewTheme/);
+assert.match(source, /themeController\.saveTheme/);
+
+console.log('Theme studio controller test passed.');

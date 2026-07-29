@@ -19,6 +19,7 @@ export function prepareStorageModeSwitch({
     legacyLiteSettingsKey,
     currentMode,
     targetMode,
+    persistCurrent = true,
 }) {
     if (!['full', 'lite'].includes(targetMode)) throw new TypeError('Invalid storage mode.');
     const currentSettings = readSettingsObject(storage, currentSettingsKey);
@@ -38,6 +39,6 @@ export function prepareStorageModeSwitch({
         ...readSettingsObject(storage, profileKey),
         storageMode: targetMode,
     };
-    storage.setItem(currentSettingsKey, JSON.stringify(targetSettings));
+    if (persistCurrent) storage.setItem(currentSettingsKey, JSON.stringify(targetSettings));
     return targetSettings;
 }
