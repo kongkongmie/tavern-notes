@@ -124,6 +124,7 @@ studio.destroy();
 assert.equal(elements.get('#tavern-notes-theme-preview-save').listeners.size, 0);
 
 const source = fs.readFileSync(new URL('../features/theme-studio.js', import.meta.url), 'utf8');
+assert.match(source, /styleOf\(\['#bg1', '#bg_custom', '#chat', '#sheld', '\.drawer-content'\]\)/, 'theme merge must sample the visible Tavern backdrop');
 assert.doesNotMatch(source, /\bstate\.(?:theme|activeThemeId|previewTheme|themeDraft|themePreviewActive)\b/);
 assert.doesNotMatch(source, /\bapplyTheme\b|\bsaveTheme\s*[,}]/);
 assert.match(source, /themeController\.previewTheme/);

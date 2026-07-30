@@ -963,7 +963,9 @@ function matchesFilters(note, filters) {
         && note.source !== 'manual_inspiration') return false;
     if (filters.type && note.type !== filters.type) return false;
     if (filters.characterName && note.character?.name !== filters.characterName) return false;
-    if (filters.characterId && String(note.character?.id ?? '') !== filters.characterId) return false;
+    if (filters.characterId === 'tavern-notes-user') {
+        if (note.type !== 'user_input' && note.character?.isUser !== true && note.character?.id !== 'tavern-notes-user') return false;
+    } else if (filters.characterId && String(note.character?.id ?? '') !== filters.characterId) return false;
     if (filters.tag && !(note.tags || []).some(tag => tag.toLocaleLowerCase() === String(filters.tag).toLocaleLowerCase())) return false;
     if (filters.q) {
         const haystack = `${note.content}\n${note.character?.name || ''}\n${note.chat?.name || ''}\n${(note.tags || []).join(' ')}`.toLowerCase();
@@ -1045,12 +1047,16 @@ function countNoteGroups(storePath, index, filters = {}) {
     };
 }
 
-function summarizeCharacters(storePath, index, filters = {}) {
+function summarizeCharacters(storePath, index, filters = {}, userName = 'User') {
     const notes = groupNotesForDisplay(readAllNotes(storePath, index, cleanCountFilters(filters)));
     const summaries = new Map();
 
     for (const note of notes) {
-        const character = note.character || {};
+        const storedCharacter = note.character || {};
+        const isUser = note.type === 'user_input' || storedCharacter.isUser === true || storedCharacter.id === 'tavern-notes-user';
+        const character = isUser
+            ? { id: 'tavern-notes-user', name: userName || 'User', avatar: null, isUser: true }
+            : storedCharacter;
         const key = [
             character.id ?? '',
             character.avatar ?? '',
@@ -1264,7 +1270,7 @@ async function init(router) {
         try {
             const storePath = getStorePath(request);
             const index = loadIndex(storePath, request.user.profile?.handle);
-            const characters = summarizeCharacters(storePath, index, request.query || {});
+            const characters = summarizeCharacters(storePath, index, request.query || {}, request.user.profile?.handle || 'User');
             response.json({ ok: true, characters });
         } catch (error) {
             response.status(error.status || 500).json({ ok: false, error: error.message });

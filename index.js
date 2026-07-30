@@ -302,14 +302,16 @@ const TEXT_ZH_CN = {
     savedFontsPlaceholder: '选择已导入字体',
     noSavedFonts: '还没有已导入字体',
     fontSize: '字号',
-    fontImport: '字体地址或 @import',
-    fontHelp: '粘贴 ZeoSeven 的 result.css 地址，或整段 @import CSS，然后点“导入字体”。识别成功后会自动填入字体名并刷新图片。',
+    fontImport: '导入网络字体（地址或 @import）',
+    fontHelp: '粘贴 ZeoSeven 的 result.css 地址，或整段 @import CSS，然后点“导入网络字体”。识别成功后会自动填入字体名并刷新图片。',
     findFonts: '查找免费商用字体',
     background: '背景',
+    customBackground: '自定义背景色',
+    customTextColor: '自定义文字色',
     display: '显示',
     characterName: '角色名',
     date: '日期',
-    importFont: '导入字体',
+    importFont: '导入网络字体',
     importLocalFont: '导入本地字体',
     redrawPreview: '刷新预览',
     exportPng: '导出 PNG',
@@ -572,12 +574,14 @@ const TEXTS = {
         mergeTheme: '融合目前酒館主題',
         saveAs: '另存為',
         resetDefault: '恢復預設',
-        importFont: '匯入字體',
+        importFont: '匯入網路字體',
         importLocalFont: '匯入本機字體',
+        customBackground: '自訂背景色',
+        customTextColor: '自訂文字色',
         savedFonts: '已匯入字體',
         savedFontsPlaceholder: '選擇已匯入字體',
         noSavedFonts: '還沒有已匯入字體',
-        fontHelp: '貼上 ZeoSeven 的 result.css 地址，或整段 @import CSS，然後點「匯入字體」。識別成功後會自動填入字體名稱並重新整理圖片。',
+        fontHelp: '貼上 ZeoSeven 的 result.css 地址，或整段 @import CSS，然後點「匯入網路字體」。識別成功後會自動填入字體名稱並重新整理圖片。',
         findFonts: '查找免費商用字體',
         redrawPreview: '重新整理預覽',
         exportPng: '匯出 PNG',
@@ -823,14 +827,16 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         savedFontsPlaceholder: 'Choose imported font',
         noSavedFonts: 'No imported fonts yet',
         fontSize: 'Font size',
-        fontImport: 'Font URL or @import',
+        fontImport: 'Import web font (URL or @import)',
         fontHelp: 'Paste a ZeoSeven result.css URL, or a full @import CSS snippet, then click Import font. When recognized, the font name is filled in and the image refreshes.',
         findFonts: 'Find free commercial fonts',
         background: 'Background',
+        customBackground: 'Custom background',
+        customTextColor: 'Custom text color',
         display: 'Display',
         characterName: 'Character name',
         date: 'Date',
-        importFont: 'Import font',
+        importFont: 'Import web font',
         importLocalFont: 'Import local font',
         redrawPreview: 'Refresh preview',
         exportPng: 'Export PNG',
@@ -1102,14 +1108,16 @@ Click Preview & save or Save as to create a theme file.`,
         savedFontsPlaceholder: '가져온 글꼴 선택',
         noSavedFonts: '아직 가져온 글꼴이 없습니다',
         fontSize: '글자 크기',
-        fontImport: '글꼴 주소 또는 @import',
+        fontImport: '웹 글꼴 가져오기 (URL 또는 @import)',
         fontHelp: 'ZeoSeven result.css 주소나 전체 @import CSS를 붙여 넣은 뒤 글꼴 가져오기를 누르세요. 인식되면 글꼴 이름이 자동으로 채워지고 이미지가 새로고침됩니다.',
         findFonts: '무료 상업용 글꼴 찾기',
         background: '배경',
+        customBackground: '사용자 지정 배경색',
+        customTextColor: '사용자 지정 글자색',
         display: '표시',
         characterName: '캐릭터 이름',
         date: '날짜',
-        importFont: '글꼴 가져오기',
+        importFont: '웹 글꼴 가져오기',
         importLocalFont: '로컬 글꼴 가져오기',
         redrawPreview: '미리보기 새로고침',
         exportPng: 'PNG 내보내기',
@@ -2083,8 +2091,8 @@ const captureView = createCaptureView({
         selectionClass: 'tn-selection-capture',
         floorButton: '.tn-floor-capture',
         chat: '#chat',
-        messages: '.mes[mesid], .mes[data-mesid]',
-        message: '.mes[mesid], .mes[data-mesid]',
+        messages: '#chat .mes, .mes[mesid], .mes[data-mesid]',
+        message: '.mes',
     },
     translate: t,
     escapeHtml: htmlEscape,
@@ -2209,7 +2217,10 @@ const fontController = createFontController({
     view: fontView,
     getSettings: () => state.shareCardSettings,
     updateSettings: patch => updateSettings({ shareCard: patch }),
-    onChanged: () => shareCardController?.preview(),
+    onChanged: () => {
+        shareCardView?.sync();
+        shareCardController?.preview();
+    },
     notify: (kind, family) => {
         if (kind === 'local-imported') notify(t('localFontImported', { name: family }), 'success');
         else notify(kind === 'imported' ? t('importedFont', { name: family }) : t('importedFontCode'), 'success');
@@ -2374,6 +2385,14 @@ const noteDetailController = createNoteDetailController({
 
 function notify(message, kind = 'info') {
     setStatus(message);
+    const notice = document.querySelector('#tavern-notes-notice');
+    if (notice) {
+        clearTimeout(notify.noticeTimer);
+        notice.textContent = message;
+        notice.dataset.kind = kind;
+        notice.classList.add('show');
+        notify.noticeTimer = setTimeout(() => notice.classList.remove('show'), 2400);
+    }
     const toastrApi = globalThis.toastr;
     if (!toastrApi) return;
     if (kind === 'success') toastrApi.success(message);
@@ -2460,6 +2479,7 @@ function updateAutoCaptureUserInputButton() {
     const button = document.querySelector('#tavern-notes-auto-user-input');
     if (!button) return;
     button.classList.toggle('active', state.autoCaptureUserInput);
+    button.setAttribute('aria-pressed', String(state.autoCaptureUserInput));
     const label = t('autoCaptureUserInputTitle');
     button.title = label;
     button.setAttribute('aria-label', label);
@@ -2754,7 +2774,7 @@ function rememberTag(tag) {
     const name = String(tag || '').trim();
     if (!name) return;
     const key = normalizeTagKey(name);
-    updateSettings({ recentTags: [name, ...state.recentTags.filter(item => normalizeTagKey(item) !== key)].slice(0, 16) });
+    updateSettings({ recentTags: [name, ...state.recentTags.filter(item => normalizeTagKey(item) !== key)].slice(0, 100) });
 }
 
 function setTagFilter(tag = '') {
@@ -2767,13 +2787,8 @@ function updateArchiveReadingMode() {
     const panel = document.querySelector('#tavern-notes-panel');
     const list = document.querySelector('#tavern-notes-list');
     if (!panel || !list) return;
-    if (panel.dataset.themeFlavor !== 'archive') {
-        panel.classList.remove('tn-archive-reading');
-        return;
-    }
-
-    const threshold = panel.classList.contains('tn-archive-reading') ? 4 : 24;
-    panel.classList.toggle('tn-archive-reading', list.scrollTop > threshold);
+    const threshold = panel.classList.contains('tn-reading-mode') ? 4 : 24;
+    panel.classList.toggle('tn-reading-mode', list.scrollTop > threshold);
 }
 
 function getCharacterAvatar(character) {
@@ -3027,7 +3042,10 @@ function buildPanel() {
         getFloorCaptureTagName,
         extensionVersion: EXTENSION_VERSION,
         renderThemeViewMarkup,
-        themeCapabilities: THEME_CAPABILITIES,
+        themeCapabilities: {
+            ...THEME_CAPABILITIES,
+            openThemeFolder: state.storageMode === 'full',
+        },
         renderThemeStudioMarkup,
         shareCardThemes: SHARE_CARD_THEMES,
         shareCardBackgrounds: SHARE_CARD_BACKGROUNDS,
@@ -3392,7 +3410,7 @@ async function openPanel() {
     const panel = document.querySelector('#tavern-notes-panel');
     if (!panel) return;
     state.open = true;
-    panel.classList.remove('tn-archive-reading');
+    panel.classList.remove('tn-archive-reading', 'tn-reading-mode');
     panel.classList.add('open');
     scheduleHeaderActionLayout();
     quickReplyController.refresh();
@@ -3422,7 +3440,6 @@ function closePanel() {
 async function init() {
     const loadedSettings = await settingsService.load();
     const needsUnifiedOnboarding = localStorage.getItem(UNIFIED_ONBOARDING_KEY) !== 'done';
-    let showUnifiedOnboarding = false;
     hasLegacyFullSettings = loadedSettings.found && !loadedSettings.settings.storageMode;
     state.storageModeResolved = Boolean(state.storageMode);
     appStore.patch('theme', {
@@ -3430,21 +3447,6 @@ async function init() {
         defaultMode: loadedSettings.settings.defaultThemeMode,
     });
     if (needsUnifiedOnboarding) {
-        let fullBackendAvailable = false;
-        if (state.storageMode === 'full') {
-            try {
-                await fullSystemStatusRepository.getStatus();
-                fullBackendAvailable = true;
-            } catch {
-                fullBackendAvailable = false;
-            }
-        }
-        if (!fullBackendAvailable) {
-            const result = await settingsService.update({ storageMode: 'lite' });
-            if (!result.ok) throw result.error;
-            state.storageModeResolved = true;
-            showUnifiedOnboarding = true;
-        }
         localStorage.setItem(UNIFIED_ONBOARDING_KEY, 'done');
     }
     const detectedStatus = await resolveInitialStorageMode();
@@ -3461,8 +3463,6 @@ async function init() {
     setTimeout(() => checkForTavernNotesUpdate(), 5000);
 
     if (!detectedStatus) await systemStatusController.refresh().catch(() => {});
-    if (showUnifiedOnboarding) setTimeout(() => systemStatusController.showInstallGuide(), 500);
-
 }
 
 const application = createApplication({
