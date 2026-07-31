@@ -1,3 +1,5 @@
+import { compactFontCss } from './font-model.js';
+
 export const SETTINGS_SCHEMA_VERSION = 1;
 
 const DEFAULT_FLOOR_CAPTURE_SELECTOR = 'content, .content, [data-tavern-notes-content], [data-note-content], .comment, .mes_text';
@@ -90,6 +92,7 @@ function normalizeImportedFonts(fonts) {
             ...clone(font),
             id: String(font.id),
             name: String(font.name),
+            css: font.type === 'local' ? '' : compactFontCss(font.css),
             dataUrl: '',
         }))
         .slice(0, 16);
@@ -109,7 +112,7 @@ function normalizeShareCard(raw = {}) {
         background: typeof raw.background === 'string' && raw.background ? raw.background : DEFAULT_SETTINGS.shareCard.background,
         textColor: typeof raw.textColor === 'string' ? raw.textColor : DEFAULT_SETTINGS.shareCard.textColor,
         fontFamily: typeof raw.fontFamily === 'string' && raw.fontFamily ? raw.fontFamily : DEFAULT_SETTINGS.shareCard.fontFamily,
-        fontImport: typeof raw.fontImport === 'string' ? raw.fontImport : DEFAULT_SETTINGS.shareCard.fontImport,
+        fontImport: typeof raw.fontImport === 'string' ? compactFontCss(raw.fontImport) : DEFAULT_SETTINGS.shareCard.fontImport,
         importedFonts: normalizeImportedFonts(raw.importedFonts),
         fontScale: Number.isFinite(fontScale) && fontScale > 0 ? fontScale : DEFAULT_SETTINGS.shareCard.fontScale,
         showCharacter: raw.showCharacter !== false,

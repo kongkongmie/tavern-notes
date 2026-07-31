@@ -47,6 +47,10 @@ const fontController = createFontController({
     view: { mount() {}, destroy() {}, applyCss() {}, loadFont: async () => {}, readFile: async () => 'data:font/woff;base64,AA', waitForFont: async () => {} },
     getSettings: () => settings,
     updateSettings: async patch => { settings = { ...settings, ...patch }; return { ok: true }; },
+    fetchImpl: async () => ({
+        ok: true,
+        text: async () => `@font-face{font-family:"Remote Font";src:url("./part.woff2")}${'x'.repeat(100000)}`,
+    }),
     onChanged: () => { fontChanges += 1; },
 });
 fontController.mount();
@@ -56,6 +60,9 @@ await fontController.deleteFont(settings.importedFonts[0].id);
 assert.equal(deleted.length, 1);
 assert.equal(settings.fontFamily, 'system-ui');
 assert.equal(fontChanges, 2);
+await fontController.importCss('@import url("https://fonts.example/font.css");\nbody { font-family: "Remote Font"; }');
+assert.equal(settings.fontImport, '@import url("https://fonts.example/font.css");\n.tavern-notes-share-font-probe { font-family: "Remote Font"; }');
+assert.ok(settings.fontImport.length < 500, 'remote response CSS must not be stored in settings');
 fontController.destroy();
 
 let statusResolvers = [];

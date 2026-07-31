@@ -1,6 +1,6 @@
 import {
     createFontStack, extractFontCssUrl, normalizeFontCss, parseFontFamily, quoteFontFamily,
-    rememberFont, resolveFontCssUrls, sanitizeFontCss, stripFontQuotes,
+    rememberFont, sanitizeFontCss, stripFontQuotes,
 } from '../core/font-model.js';
 
 export function createFontController({ repository, view, getSettings, updateSettings, fetchImpl = fetch, notify = () => {}, onChanged = () => {}, errors = {} }) {
@@ -15,10 +15,10 @@ export function createFontController({ repository, view, getSettings, updateSett
         if (url) {
             try {
                 const response = await fetchImpl(url);
-                if (response.ok) remoteCss = resolveFontCssUrls(await response.text(), url);
+                if (response.ok) remoteCss = await response.text();
             } catch {}
         }
-        const safeCss = sanitizeFontCss(`${normalized}\n${remoteCss}`);
+        const safeCss = sanitizeFontCss(normalized);
         const family = parseFontFamily(safeCss) || parseFontFamily(normalized) || parseFontFamily(remoteCss);
         return [safeCss, family ? `.tavern-notes-share-font-probe { font-family: ${family}; }` : ''].filter(Boolean).join('\n');
     }

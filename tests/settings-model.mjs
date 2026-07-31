@@ -49,6 +49,22 @@ assert.equal(normalized.shareCard.theme, 'calendar');
 assert.equal(normalized.shareCard.fontScale, 0.8);
 assert.equal(normalized.shareCard.importedFonts[0].dataUrl, '');
 
+const remoteImport = '@import url("https://fonts.example/font.css");';
+const compacted = normalizeSettings({
+    shareCard: {
+        fontImport: `${remoteImport}\n${'@font-face{font-family:"Remote";src:url("part.woff2")}'.repeat(2000)}`,
+        importedFonts: [{
+            id: 'remote',
+            type: 'css',
+            name: 'Remote',
+            css: `${remoteImport}\n${'@font-face{font-family:"Remote";src:url("part.woff2")}'.repeat(2000)}`,
+        }],
+    },
+});
+assert.equal(compacted.shareCard.fontImport, remoteImport);
+assert.equal(compacted.shareCard.importedFonts[0].css, remoteImport);
+assert.ok(JSON.stringify(compacted).length < 5000, 'legacy remote font CSS must be compacted below localStorage quota risk');
+
 const persisted = pickPersistedSettings({ settings: legacy });
 assert.equal(persisted.schemaVersion, SETTINGS_SCHEMA_VERSION);
 assert.equal(persisted.language, 'en');

@@ -29,6 +29,12 @@ export function sanitizeFontCss(value) {
     ])].join('\n');
 }
 
+export function compactFontCss(value) {
+    const safeCss = sanitizeFontCss(normalizeFontCss(value));
+    const imports = safeCss.match(/@import\s+url\("[^"]+"\);/gi) || [];
+    return imports.length ? [...new Set(imports)].join('\n') : safeCss;
+}
+
 export function resolveFontCssUrls(value, stylesheetUrl) {
     return String(value || '').replace(/url\(\s*(['"]?)([^'"\)]+)\1\s*\)/gi, (match, quote, rawUrl) => {
         const fontUrl = String(rawUrl || '').trim();
