@@ -1,6 +1,6 @@
 ﻿# Changelog
 
-## 1.2.0
+## 2.0.0
 
 - Unified Tavern Notes into one install: new users install `tavern-notes` once and choose Full file storage or Lite browser storage on first launch.
 - Added a repository router so the same interface, capture tools, tags, editing, search, detail actions, share cards, themes, and update center work with either storage mode.
