@@ -1,5 +1,10 @@
 ﻿# Changelog
 
+## 2.0.1
+
+- Restored the whole-floor capture button when switching chats reuses a message container and replaces only its inner content.
+- Added a regression test covering capture-button restoration after a chat switch.
+
 ## 2.0.0
 
 - Unified Tavern Notes into one install: new users install `tavern-notes` once and choose Full file storage or Lite browser storage on first launch.

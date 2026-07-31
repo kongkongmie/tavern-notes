@@ -14,6 +14,12 @@ const message = {
     querySelector: () => null,
     append: () => { appended += 1; },
 };
+const replacementContent = {
+    nodeType: 1,
+    closest: () => message,
+    matches: () => false,
+    querySelectorAll: () => [],
+};
 const body = {};
 const documentRef = {
     body,
@@ -60,6 +66,11 @@ observerCallback([{
     }],
 }]);
 assert.equal(appended, 1, 'messages inserted through a DocumentFragment must receive floor capture');
+
+observerCallback([{
+    addedNodes: [replacementContent],
+}]);
+assert.equal(appended, 2, 'replacing content inside a reused message must restore floor capture');
 
 view.destroy();
 console.log('capture view observer: ok');

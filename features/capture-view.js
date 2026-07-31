@@ -163,9 +163,12 @@ export function createCaptureView({
             documentRef.querySelectorAll(selectors.floorButton).forEach(button => button.remove());
             return;
         }
+        const messageSelector = selectors.messages || selectors.message;
         const messages = new Set();
-        if (root?.matches?.(selectors.message)) messages.add(root);
-        root.querySelectorAll?.(selectors.messages || selectors.message).forEach(message => messages.add(message));
+        const containingMessage = root?.closest?.(messageSelector);
+        if (containingMessage) messages.add(containingMessage);
+        if (root?.matches?.(messageSelector)) messages.add(root);
+        root.querySelectorAll?.(messageSelector).forEach(message => messages.add(message));
         messages.forEach(ensureFloorButton);
     }
 
