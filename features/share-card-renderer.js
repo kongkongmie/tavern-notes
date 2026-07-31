@@ -630,7 +630,14 @@ export function createShareCardRenderer({
         try {
             descriptor = await resolveFont(input.settings) || descriptor;
             await loadFont(descriptor);
-            await waitForFont(descriptor.font);
+            const fontSample = [
+                input.note?.content,
+                input.note?.character?.name,
+                getUserName(),
+                translate('brandForShare'),
+                translate('fromTavernNotes'),
+            ].filter(Boolean).join(' ');
+            await waitForFont(descriptor.font, fontSample);
         } catch {
             descriptor = { font: 'system-ui, "Noto Serif SC", serif' };
         }

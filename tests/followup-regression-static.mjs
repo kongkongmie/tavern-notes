@@ -12,6 +12,7 @@ const css = fs.readFileSync(new URL('../style.css', import.meta.url), 'utf8');
 const sharedCss = fs.readFileSync(new URL('../shared/base.css', import.meta.url), 'utf8');
 const effectiveCss = `${sharedCss}\n${css}`;
 const backend = fs.readFileSync(new URL('../server-plugin/tavern-notes/index.js', import.meta.url), 'utf8');
+const shareRenderer = fs.readFileSync(new URL('../features/share-card-renderer.js', import.meta.url), 'utf8');
 
 assert.doesNotMatch(source, /root\.addEventListener\('keyup', scheduleSelectionCaptureButton\)/);
 assert.match(captureView, /new MutationObserver\(records =>/);
@@ -39,6 +40,10 @@ assert.match(
 assert.match(backend, /note\.source !== 'manual_inspiration'/);
 assert.doesNotMatch(source, /params\.set\('includeUserInput'/, 'recording toggle must not hide stored notes');
 assert.match(userCapture, /prepareUserInputCapture/, 'recording toggle must still stop automatic capture');
+const autoCaptureToggle = entry.match(/async function toggleAutoCaptureUserInput\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+assert.match(autoCaptureToggle, /notify\(state\.autoCaptureUserInput/);
+assert.doesNotMatch(autoCaptureToggle, /renderFilterTabs/, 'recording toggle must not call an undefined filter renderer');
+assert.match(shareRenderer, /await waitForFont\(descriptor\.font, fontSample\)/, 'canvas fonts must preload the actual note characters');
 assert.match(css, /--tn-panel-shadow:\s*0 18px 48px rgba\(74, 68, 58, 0\.18\)/, 'default day panel should use one restrained outer shadow');
 assert.doesNotMatch(css, /26px 26px 58px[\s\S]{0,120}-18px -18px 42px/, 'default day panel must not restore the bidirectional glow');
 assert.match(css, /\.tn-share-bg\s*\{[\s\S]*?box-shadow:\s*0 2px 7px rgba\(0, 0, 0, 0\.16\)/, 'share background swatches should not use a white outer glow');

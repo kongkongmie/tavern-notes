@@ -2315,7 +2315,7 @@ let shareCardController;
 const shareCardRenderer = createShareCardRenderer({
     resolveFont: () => fontController.resolveFont(),
     loadFont: async () => {},
-    waitForFont: font => fontController.waitForFont(font),
+    waitForFont: (font, text) => fontController.waitForFont(font, text),
     getCharacterAvatarUrl: getShareCardAvatarUrl,
     getUserAvatarUrl: getShareCardUserAvatarUrl,
     getUserName: getShareCardUserName,
@@ -2490,8 +2490,6 @@ async function toggleAutoCaptureUserInput() {
     const result = await updateSettings({ autoCaptureUserInput: !state.autoCaptureUserInput });
     if (!result.ok) return;
     updateAutoCaptureUserInputButton();
-    renderFilterTabs();
-    noteListController.refresh();
     notify(state.autoCaptureUserInput ? t('autoCaptureUserInputOn') : t('autoCaptureUserInputOff'), 'success');
 }
 
@@ -2778,6 +2776,7 @@ function rememberTag(tag) {
 }
 
 function setTagFilter(tag = '') {
+    resetArchiveReadingMode();
     state.tagFilter = String(tag || '');
     if (state.tagFilter) rememberTag(state.tagFilter);
     noteFilterController.setTag(state.tagFilter);
@@ -2789,15 +2788,25 @@ function updateArchiveReadingMode() {
     if (!panel || !list) return;
     const reading = panel.classList.contains('tn-reading-mode');
     if (!reading && list.scrollTop > 24) {
-        panel.classList.add('tn-reading-mode');
+        const collapsibleHeight = [
+            panel.querySelector('.tn-header'),
+            panel.querySelector('.tn-search-row'),
+            panel.querySelector('.tn-tag-shelf:not(.tn-hidden)'),
+            panel.querySelector('.tn-filters'),
+        ].reduce((total, element) => total + (element?.offsetHeight || 0), 0);
+        const reclaimedHeight = Math.max(0, collapsibleHeight - 48);
+        if (list.scrollHeight - list.clientHeight > reclaimedHeight + 24) {
+            panel.classList.add('tn-reading-mode');
+        }
         return;
     }
-    // A short filtered list can lose all overflow when reading mode expands it.
-    // Keep the mode stable when the browser clamps scrollTop to zero, otherwise
-    // the header and list heights continuously toggle and the page flickers.
-    if (reading && list.scrollTop <= 4 && list.scrollHeight > list.clientHeight + 4) {
+    if (reading && list.scrollTop <= 4) {
         panel.classList.remove('tn-reading-mode');
     }
+}
+
+function resetArchiveReadingMode() {
+    document.querySelector('#tavern-notes-panel')?.classList.remove('tn-reading-mode');
 }
 
 function getCharacterAvatar(character) {
@@ -2992,6 +3001,7 @@ function getMessageCharacterForCapture(messageId) {
 }
 
 function setActiveFilter(filter) {
+    resetArchiveReadingMode();
     state.filter = filter;
     if (filter === 'characters') state.characterFilter = null;
     document.querySelectorAll('.tn-filter').forEach(tab => {
@@ -3002,6 +3012,7 @@ function setActiveFilter(filter) {
 }
 
 function setCharacterFilter(character) {
+    resetArchiveReadingMode();
     state.filter = 'all';
     state.characterFilter = {
         id: character.id === '' ? null : character.id,
@@ -3019,6 +3030,7 @@ function setCharacterFilter(character) {
 }
 
 function clearCharacterFilter() {
+    resetArchiveReadingMode();
     state.characterFilter = null;
     state.filter = 'characters';
     document.querySelectorAll('.tn-filter').forEach(tab => {

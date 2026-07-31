@@ -46,12 +46,12 @@ export function createFontView({ getStyleElement, translate, stripQuotes = value
             fontSet.add(face);
         },
         readFile,
-        async waitForFont(font) {
+        async waitForFont(font, text = '酒馆笔记分享卡') {
             if (!fontSet) return;
             await remoteStylesheetReady;
             const timeout = new Promise(resolve => setTimeout(resolve, 10000));
             const tasks = [];
-            if (fontSet.load) tasks.push(fontSet.load(`32px ${font}`, '酒馆笔记分享卡'));
+            if (fontSet.load) tasks.push(fontSet.load(`32px ${font}`, String(text || '酒馆笔记分享卡')));
             if (fontSet.ready) tasks.push(fontSet.ready);
             await Promise.race([Promise.allSettled(tasks), timeout]);
         },

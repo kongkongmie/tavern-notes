@@ -100,7 +100,7 @@ export function createFontController({ repository, view, getSettings, updateSett
             this.applyCss();
             return { font: createFontStack(getSettings()) };
         },
-        waitForFont: font => view.waitForFont(font),
+        waitForFont: (font, text) => view.waitForFont(font, text),
         destroy() { mounted = false; generation += 1; view.destroy(); },
     };
 }
