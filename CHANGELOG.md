@@ -1,5 +1,10 @@
 ﻿# Changelog
 
+## 2.0.2
+
+- Merged character-directory entries by stable avatar when the same SillyTavern card has accumulated different internal character IDs.
+- Character filtering now includes notes from every historical ID represented by that avatar.
+
 ## 2.0.1
 
 - Restored the whole-floor capture button when switching chats reuses a message container and replaces only its inner content.

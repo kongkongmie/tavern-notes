@@ -47,7 +47,7 @@ try {
         'Windows folder opening must use Explorer directly before command-shell fallbacks',
     );
     assert.match(fs.readFileSync(path.join(fixtureRoot, 'config.yaml'), 'utf8'), /^enableServerPlugins:\s*true$/m);
-    assert.equal(JSON.parse(fs.readFileSync(path.join(frontend, 'manifest.json'), 'utf8')).version, '2.0.1');
+    assert.equal(JSON.parse(fs.readFileSync(path.join(frontend, 'manifest.json'), 'utf8')).version, '2.0.2');
 
     console.log('Full fresh-install smoke test passed.');
 } finally {

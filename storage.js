@@ -248,6 +248,10 @@ function matchesCharacter(note, id, name) {
     if (String(id || '') === 'tavern-notes-user') {
         return note.type === 'user_input' || note.character?.isUser === true || note.character?.id === 'tavern-notes-user';
     }
+    const avatarPrefix = 'tavern-notes-avatar:';
+    if (String(id || '').startsWith(avatarPrefix)) {
+        return String(note.character?.avatar || '') === String(id).slice(avatarPrefix.length);
+    }
     if (id !== null && id !== undefined && id !== '') return String(note.character?.id ?? '') === String(id);
     if (name) return String(note.character?.name || '') === String(name);
     return true;
@@ -289,10 +293,17 @@ function characterSummaries(notes, userName = 'User') {
         const character = isUser
             ? { id: 'tavern-notes-user', name: userName || 'User', avatar: null, isUser: true }
             : storedCharacter;
-        const key = [character.id ?? '', character.avatar ?? '', character.name ?? ''].join('|');
+        const avatar = String(character.avatar || '');
+        const key = character.isUser === true
+            ? 'user'
+            : avatar
+                ? `avatar|${avatar}`
+                : character.id !== null && character.id !== undefined && character.id !== ''
+                    ? `id|${character.id}`
+                    : `name|${String(character.name || '').toLocaleLowerCase()}`;
         if (!map.has(key)) {
             map.set(key, {
-                id: character.id ?? null,
+                id: avatar ? `tavern-notes-avatar:${avatar}` : character.id ?? null,
                 name: character.name || '未命名角色',
                 avatar: character.avatar ?? null,
                 isUser: character.isUser === true,

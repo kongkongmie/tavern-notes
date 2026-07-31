@@ -155,11 +155,21 @@ function invoke(router, method, route, req) {
         assert.equal(renamedExport.notes.filter(note => note.tags.includes('剧情脑洞')).length, 2);
         assert.equal(renamedNotes.notes[0].character.isUser, true);
 
+        const sharedAvatar = 'chen-xu.png';
+        invoke(router, 'POST', '/notes', request(root, { body: { type: 'excerpt', content: 'yesterday', character: { id: 'old-id', name: '陈序v2', avatar: sharedAvatar } } }));
+        invoke(router, 'POST', '/notes', request(root, { body: { type: 'excerpt', content: 'today', character: { id: 'new-id', name: '陈序v2', avatar: sharedAvatar } } }));
+        const characterList = invoke(router, 'GET', '/characters', request(root));
+        const mergedCharacter = characterList.characters.find(character => character.name === '陈序v2');
+        assert.equal(mergedCharacter.total, 2);
+        assert.equal(mergedCharacter.id, `tavern-notes-avatar:${sharedAvatar}`);
+        const mergedNotes = invoke(router, 'GET', '/notes', request(root, { query: { characterId: mergedCharacter.id, characterName: mergedCharacter.name } }));
+        assert.equal(mergedNotes.totalNotes, 2);
+
         invoke(router, 'DELETE', '/notes/:id', request(root, {
             params: { id: created.id },
         }));
         const afterDelete = invoke(router, 'GET', '/notes', request(root));
-        assert.equal(afterDelete.totalNotes, 9);
+        assert.equal(afterDelete.totalNotes, 11);
 
         console.log('Full note edit/tag smoke test passed.');
     } finally {

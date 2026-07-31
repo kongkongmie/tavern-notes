@@ -3,7 +3,7 @@ const path = require('node:path');
 const childProcess = require('node:child_process');
 
 const STORE_DIR = 'tavern-notes';
-const PLUGIN_VERSION = '2.0.1';
+const PLUGIN_VERSION = '2.0.2';
 const INDEX_FILE = 'index.json';
 const THEME_FILE = 'theme.json';
 const THEME_ACTIVE_FILE = 'theme-active.json';
@@ -965,6 +965,8 @@ function matchesFilters(note, filters) {
     if (filters.characterName && note.character?.name !== filters.characterName) return false;
     if (filters.characterId === 'tavern-notes-user') {
         if (note.type !== 'user_input' && note.character?.isUser !== true && note.character?.id !== 'tavern-notes-user') return false;
+    } else if (String(filters.characterId || '').startsWith('tavern-notes-avatar:')) {
+        if (String(note.character?.avatar || '') !== String(filters.characterId).slice('tavern-notes-avatar:'.length)) return false;
     } else if (filters.characterId && String(note.character?.id ?? '') !== filters.characterId) return false;
     if (filters.tag && !(note.tags || []).some(tag => tag.toLocaleLowerCase() === String(filters.tag).toLocaleLowerCase())) return false;
     if (filters.q) {
@@ -1057,14 +1059,17 @@ function summarizeCharacters(storePath, index, filters = {}, userName = 'User') 
         const character = isUser
             ? { id: 'tavern-notes-user', name: userName || 'User', avatar: null, isUser: true }
             : storedCharacter;
-        const key = [
-            character.id ?? '',
-            character.avatar ?? '',
-            character.name ?? '未命名角色',
-        ].map(value => String(value).replaceAll('|', '\\|')).join('|');
+        const avatar = String(character.avatar || '');
+        const key = character.isUser === true
+            ? 'user'
+            : avatar
+                ? `avatar|${avatar.replaceAll('|', '\\|')}`
+                : character.id !== null && character.id !== undefined && character.id !== ''
+                    ? `id|${String(character.id).replaceAll('|', '\\|')}`
+                    : `name|${String(character.name || '').toLocaleLowerCase().replaceAll('|', '\\|')}`;
 
         const summary = summaries.get(key) || {
-            id: character.id ?? null,
+            id: avatar ? `tavern-notes-avatar:${avatar}` : character.id ?? null,
             name: character.name || '未命名角色',
             avatar: character.avatar ?? null,
             isUser: character.isUser === true,
