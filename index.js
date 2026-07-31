@@ -271,6 +271,7 @@ const TEXT_ZH_CN = {
     theme: '主题',
     exportNotes: '导入导出笔记',
     closeNotes: '关闭酒馆笔记',
+    expandToolbar: '展开工具栏',
     searchPlaceholder: '搜索笔记、角色、聊天、标签...',
     connecting: '正在连接酒馆笔记...',
     prevPage: '上一页',
@@ -566,6 +567,7 @@ const TEXTS = {
         noPageNotesToExport: '目前頁面沒有可匯出的筆記。',
         exportStarted: '已開始匯出。',
         closeNotes: '關閉酒館筆記',
+        expandToolbar: '展開工具列',
         searchPlaceholder: '搜尋筆記、角色、聊天、標籤...',
         connecting: '正在連接酒館筆記...',
         currentPage: '目前頁面',
@@ -795,6 +797,7 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         theme: 'Theme',
         exportNotes: 'Export notes',
         closeNotes: 'Close Tavern Notes',
+        expandToolbar: 'Expand toolbar',
         searchPlaceholder: 'Search notes, characters, chats, tags...',
         connecting: 'Connecting to Tavern Notes...',
         prevPage: 'Previous page',
@@ -1076,6 +1079,7 @@ Click Preview & save or Save as to create a theme file.`,
         theme: '테마',
         exportNotes: '노트 내보내기',
         closeNotes: '술집 노트 닫기',
+        expandToolbar: '도구 모음 펼치기',
         searchPlaceholder: '노트, 캐릭터, 채팅, 태그 검색...',
         connecting: '술집 노트에 연결 중...',
         prevPage: '이전 페이지',
@@ -3163,6 +3167,7 @@ function bindEvents() {
     document.querySelector('#tavern-notes-floor-capture-setting')?.addEventListener('click', toggleFloorCaptureButtonSetting);
     document.querySelector('.tn-floor-capture-close')?.addEventListener('click', closeFloorCaptureMenu);
     document.querySelector('.tn-close')?.addEventListener('click', closePanel);
+    document.querySelector('.tn-reading-mode-expand')?.addEventListener('click', expandArchiveReadingMode);
     document.querySelector('.tn-header')?.addEventListener('click', expandArchiveReadingMode);
     document.querySelector('#tavern-notes-export')?.addEventListener('click', toggleExportMenu);
     document.querySelector('#tavern-notes-floor-capture-selector-save')?.addEventListener('click', () => saveFloorCaptureSelector(document.querySelector('#tavern-notes-floor-capture-selector')?.value));
