@@ -230,6 +230,7 @@ for (const [stateKey, settingsKey] of Object.entries(SETTINGS_STATE_FIELDS)) {
 }
 
 let mobileViewportMediaQuery = null;
+let readingModeExpandedAtScrollTop = null;
 
 function updateMobileViewportGuard() {
     const isMobile = mobileViewportMediaQuery?.matches
@@ -2787,6 +2788,11 @@ function updateArchiveReadingMode() {
     const list = document.querySelector('#tavern-notes-list');
     if (!panel || !list) return;
     const reading = panel.classList.contains('tn-reading-mode');
+    if (!reading && readingModeExpandedAtScrollTop !== null) {
+        if (list.scrollTop <= 24) readingModeExpandedAtScrollTop = null;
+        else if (list.scrollTop <= readingModeExpandedAtScrollTop + 24) return;
+        else readingModeExpandedAtScrollTop = null;
+    }
     if (!reading && list.scrollTop > 24) {
         const collapsibleHeight = [
             panel.querySelector('.tn-header'),
@@ -2806,7 +2812,16 @@ function updateArchiveReadingMode() {
 }
 
 function resetArchiveReadingMode() {
+    readingModeExpandedAtScrollTop = null;
     document.querySelector('#tavern-notes-panel')?.classList.remove('tn-reading-mode');
+}
+
+function expandArchiveReadingMode(event) {
+    const panel = document.querySelector('#tavern-notes-panel');
+    if (!panel?.classList.contains('tn-reading-mode') || event.target.closest?.('.tn-close')) return;
+    const list = document.querySelector('#tavern-notes-list');
+    readingModeExpandedAtScrollTop = list?.scrollTop || 0;
+    panel.classList.remove('tn-reading-mode');
 }
 
 function getCharacterAvatar(character) {
@@ -3148,6 +3163,7 @@ function bindEvents() {
     document.querySelector('#tavern-notes-floor-capture-setting')?.addEventListener('click', toggleFloorCaptureButtonSetting);
     document.querySelector('.tn-floor-capture-close')?.addEventListener('click', closeFloorCaptureMenu);
     document.querySelector('.tn-close')?.addEventListener('click', closePanel);
+    document.querySelector('.tn-header')?.addEventListener('click', expandArchiveReadingMode);
     document.querySelector('#tavern-notes-export')?.addEventListener('click', toggleExportMenu);
     document.querySelector('#tavern-notes-floor-capture-selector-save')?.addEventListener('click', () => saveFloorCaptureSelector(document.querySelector('#tavern-notes-floor-capture-selector')?.value));
     document.querySelector('#tavern-notes-floor-capture-selector')?.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); saveFloorCaptureSelector(event.target.value); } });

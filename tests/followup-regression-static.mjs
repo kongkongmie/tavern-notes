@@ -44,6 +44,8 @@ const autoCaptureToggle = entry.match(/async function toggleAutoCaptureUserInput
 assert.match(autoCaptureToggle, /notify\(state\.autoCaptureUserInput/);
 assert.doesNotMatch(autoCaptureToggle, /renderFilterTabs/, 'recording toggle must not call an undefined filter renderer');
 assert.match(shareRenderer, /await waitForFont\(descriptor\.font, fontSample\)/, 'canvas fonts must preload the actual note characters');
+assert.match(entry, /\.tn-header'\)\?\.addEventListener\('click', expandArchiveReadingMode\)/, 'collapsed header must expand when tapped');
+assert.match(sharedCss, /tn-reading-mode[\s\S]*?max-height:\s*0 !important[\s\S]*?transform:\s*translateY\(-8px\)/, 'reading mode controls should collapse with a transition');
 assert.match(css, /--tn-panel-shadow:\s*0 18px 48px rgba\(74, 68, 58, 0\.18\)/, 'default day panel should use one restrained outer shadow');
 assert.doesNotMatch(css, /26px 26px 58px[\s\S]{0,120}-18px -18px 42px/, 'default day panel must not restore the bidirectional glow');
 assert.match(css, /\.tn-share-bg\s*\{[\s\S]*?box-shadow:\s*0 2px 7px rgba\(0, 0, 0, 0\.16\)/, 'share background swatches should not use a white outer glow');
