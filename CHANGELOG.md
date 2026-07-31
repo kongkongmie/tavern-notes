@@ -2,7 +2,7 @@
 
 ## 2.0.3
 
-- Added backup reminders to unified Lite mode when notes reach about 20 MB, or when at least 50 notes have not been exported for 30 days.
+- Added backup reminders to unified Lite mode when notes reach about 20 MB, or when at least 500 notes have not been exported for 30 days.
 - Persisted the reminder time in Lite IndexedDB so refreshes, chat switches, and restarts do not repeat the notice for 30 days. Full mode remains excluded because it already has automatic backups.
 
 ## 2.0.2
