@@ -2787,8 +2787,17 @@ function updateArchiveReadingMode() {
     const panel = document.querySelector('#tavern-notes-panel');
     const list = document.querySelector('#tavern-notes-list');
     if (!panel || !list) return;
-    const threshold = panel.classList.contains('tn-reading-mode') ? 4 : 24;
-    panel.classList.toggle('tn-reading-mode', list.scrollTop > threshold);
+    const reading = panel.classList.contains('tn-reading-mode');
+    if (!reading && list.scrollTop > 24) {
+        panel.classList.add('tn-reading-mode');
+        return;
+    }
+    // A short filtered list can lose all overflow when reading mode expands it.
+    // Keep the mode stable when the browser clamps scrollTop to zero, otherwise
+    // the header and list heights continuously toggle and the page flickers.
+    if (reading && list.scrollTop <= 4 && list.scrollHeight > list.clientHeight + 4) {
+        panel.classList.remove('tn-reading-mode');
+    }
 }
 
 function getCharacterAvatar(character) {
