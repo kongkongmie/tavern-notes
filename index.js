@@ -86,6 +86,7 @@ import {
     getLiteStorageInfo,
     importLiteExport,
     liteApi,
+    markLiteBackupReminderShown,
     markLiteExported,
 } from './storage.js';
 
@@ -96,7 +97,7 @@ const LITE_SETTINGS_PROFILE_KEY = 'tavern-notes-unified-lite-settings';
 const LEGACY_LITE_SETTINGS_KEY = 'tavern-notes-lite-settings';
 const UNIFIED_ONBOARDING_KEY = 'tavern-notes-unified-onboarding-v1';
 const UPDATE_NOTICE_KEY = 'tavern-notes-update-notice';
-const EXTENSION_VERSION = '2.0.2';
+const EXTENSION_VERSION = '2.0.3';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/manifest.json';
 const REMOTE_CHANGELOG_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/CHANGELOG.md';
 const REMOTE_CHANGELOG_ANNOTATION_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/CHANGELOG.zh-CN.md';
@@ -119,6 +120,8 @@ const THEME_CAPABILITIES = Object.freeze({
 const APPLICATION_CAPABILITIES = createApplicationCapabilities({ coexistenceGuard: false });
 const sillyTavernEvents = createSillyTavernEventAdapter({ eventSource, eventTypes: event_types });
 const MOBILE_VIEWPORT_QUERY = '(max-width: 1000px)';
+const LITE_STORAGE_NOTICE_BYTES = 20 * 1024 * 1024;
+const LITE_BACKUP_NOTICE_DAYS = 30;
 const LEGACY_APPLE_THEME_DAY_ID = 'apple-glass-day';
 const LEGACY_APPLE_THEME_NIGHT_ID = 'apple-glass-night';
 const LEGACY_FLOOR_CAPTURE_SELECTOR = '.comment, [data-tavern-notes-content], [data-note-content], .mes_text';
@@ -405,6 +408,7 @@ const TEXT_ZH_CN = {
     storageLiteDescription: '适合手机、Termux 限制环境或不能安装后端的用户。立即使用 IndexedDB，也会连接此浏览器中原有的 Lite 笔记。',
     storageModeFull: 'Full 文件模式',
     storageModeLite: 'Lite 浏览器模式',
+    liteBackupReminder: 'Lite 笔记已占用约 {size}。建议导出 JSON 备份；本提醒 30 天内不会重复。',
     storageModeCurrent: '当前保存方式：{mode}',
     chooseStorageMode: '保存方式',
     changeStorageModeWarning: '切换保存方式不会迁移或删除笔记。切换后将显示另一存储中的内容，是否继续？',
@@ -648,6 +652,7 @@ const TEXTS = {
         storageLiteDescription: '適合手機、Termux 受限環境或無法安裝後端的使用者。立即使用 IndexedDB，也會連接此瀏覽器中原有的 Lite 筆記。',
         storageModeFull: 'Full 檔案模式',
         storageModeLite: 'Lite 瀏覽器模式',
+        liteBackupReminder: 'Lite 筆記已占用約 {size}。建議匯出 JSON 備份；此提醒 30 天內不會重複。',
         storageModeCurrent: '目前儲存方式：{mode}',
         chooseStorageMode: '儲存方式',
         changeStorageModeWarning: '切換儲存方式不會移轉或刪除筆記。切換後將顯示另一個儲存空間中的內容，是否繼續？',
@@ -929,6 +934,7 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         storageLiteDescription: 'For phones, restricted Termux setups, or users who cannot install a backend. Uses IndexedDB immediately and reconnects existing Lite notes in this browser.',
         storageModeFull: 'Full file mode',
         storageModeLite: 'Lite browser mode',
+        liteBackupReminder: 'Lite notes use about {size}. Export a JSON backup; this reminder will not repeat for 30 days.',
         storageModeCurrent: 'Current storage: {mode}',
         chooseStorageMode: 'Storage mode',
         changeStorageModeWarning: 'Switching storage does not migrate or delete notes. The app will show notes from the other store. Continue?',
@@ -1211,6 +1217,7 @@ Click Preview & save or Save as to create a theme file.`,
         storageLiteDescription: '휴대폰, 제한된 Termux 환경 또는 백엔드를 설치할 수 없는 사용자용입니다. IndexedDB를 즉시 사용하며 이 브라우저의 기존 Lite 노트에도 다시 연결합니다.',
         storageModeFull: 'Full 파일 모드',
         storageModeLite: 'Lite 브라우저 모드',
+        liteBackupReminder: 'Lite 노트가 약 {size}를 사용 중입니다. JSON 백업을 내보내세요. 이 알림은 30일 동안 반복되지 않습니다.',
         storageModeCurrent: '현재 저장 방식: {mode}',
         chooseStorageMode: '저장 방식',
         changeStorageModeWarning: '저장 방식을 바꿔도 노트를 이전하거나 삭제하지 않습니다. 전환 후 다른 저장소의 노트가 표시됩니다. 계속할까요?',
@@ -2282,8 +2289,14 @@ const liteSystemStatusRepository = createLiteSystemStatusRepository({
 const systemStatusController = createSystemStatusController({
     repository: { getStatus: () => (state.storageMode === 'lite' ? liteSystemStatusRepository : fullSystemStatusRepository).getStatus() },
     view: systemStatusView,
-    capabilities: { backendStatus: true, installGuide: true, storageModeSwitch: true, storageQuota: false },
+    capabilities: { backendStatus: true, installGuide: true, storageModeSwitch: true, storageQuota: true },
     formatStatus: status => `${t(state.storageMode === 'lite' ? 'storageModeLite' : 'storageModeFull')} · ${t('connected', { user: status.user, version: status.version || EXTENSION_VERSION, count: status.totalNotes })}`,
+    notifyReminder: async status => {
+        if (state.storageMode !== 'lite') return;
+        notify(t('liteBackupReminder', { size: formatStorageBytes(status.approximateBytes) }), 'info');
+        await markLiteBackupReminderShown();
+    },
+    reminderOptions: { storageNoticeBytes: LITE_STORAGE_NOTICE_BYTES, backupNoticeDays: LITE_BACKUP_NOTICE_DAYS },
     onStatus: status => { if (status.user) updateSettings({ currentUserName: status.user }); },
     onError: error => {
         notify(t('backendDisconnected', { message: error.message }), 'error');
@@ -2713,6 +2726,14 @@ async function saveUserInputCleanupSettings() {
     if (!result.ok) return;
     syncUserInputCleanupControls();
     notify(t('inputRulesSaved'), 'success');
+}
+
+function formatStorageBytes(bytes) {
+    const value = Math.max(0, Number(bytes) || 0);
+    if (value < 1024) return `${Math.round(value)} B`;
+    if (value < 1024 ** 2) return `${(value / 1024).toFixed(1)} KB`;
+    if (value < 1024 ** 3) return `${(value / 1024 ** 2).toFixed(1)} MB`;
+    return `${(value / 1024 ** 3).toFixed(1)} GB`;
 }
 
 function htmlEscape(value) {
@@ -3495,7 +3516,7 @@ async function init() {
     if (needsUnifiedOnboarding) {
         localStorage.setItem(UNIFIED_ONBOARDING_KEY, 'done');
     }
-    const detectedStatus = await resolveInitialStorageMode();
+    await resolveInitialStorageMode();
     if (!state.storageMode) {
         storageModeController.open();
         return;
@@ -3508,7 +3529,7 @@ async function init() {
     quickReplyController.mount();
     setTimeout(() => checkForTavernNotesUpdate(), 5000);
 
-    if (!detectedStatus) await systemStatusController.refresh().catch(() => {});
+    await systemStatusController.refresh({ showReminder: state.storageMode === 'lite' }).catch(() => {});
 }
 
 const application = createApplication({
