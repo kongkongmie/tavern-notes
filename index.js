@@ -2096,8 +2096,8 @@ const captureView = createCaptureView({
         selectionClass: 'tn-selection-capture',
         floorButton: '.tn-floor-capture',
         chat: '#chat',
-        messages: '#chat .mes, .mes[mesid], .mes[data-mesid]',
-        message: '.mes',
+        messages: '.mes, [mesid], [data-mesid]',
+        message: '.mes, [mesid], [data-mesid]',
     },
     translate: t,
     escapeHtml: htmlEscape,
@@ -2979,7 +2979,11 @@ function toggleHeaderPopover(id) {
 }
 
 function getMessageIdFromElement(messageElement) {
-    const raw = messageElement?.getAttribute?.('mesid') || messageElement?.dataset?.mesid;
+    const carrier = messageElement?.matches?.('[mesid], [data-mesid]')
+        ? messageElement
+        : messageElement?.closest?.('[mesid], [data-mesid]')
+            || messageElement?.querySelector?.('[mesid], [data-mesid]');
+    const raw = carrier?.getAttribute?.('mesid') ?? carrier?.dataset?.mesid;
     if (raw === undefined || raw === null || raw === '') return null;
     const numeric = Number(raw);
     return Number.isFinite(numeric) ? numeric : raw;

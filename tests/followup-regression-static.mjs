@@ -16,7 +16,8 @@ const shareRenderer = fs.readFileSync(new URL('../features/share-card-renderer.j
 
 assert.doesNotMatch(source, /root\.addEventListener\('keyup', scheduleSelectionCaptureButton\)/);
 assert.match(captureView, /new MutationObserver\(records =>/);
-assert.match(captureView, /querySelectorAll\?\.\(selectors\.message\)\.forEach\(ensureFloorButton\)/);
+assert.match(captureView, /documentRef\.body \|\| documentRef\.querySelector\(selectors\.chat\)/);
+assert.match(captureView, /\[1, 11\]\.includes\(node\?\.nodeType\)/);
 assert.doesNotMatch(source, /new MutationObserver\(\(\) => addFloorCaptureButtons\(chatContainer\)\)/);
 assert.match(source, /document\.addEventListener\('pointerdown', closeHeaderPopoverFromOutside, true\)/);
 assert.match(source, /class="\$\{classPrefix\}-floor-content-tag-section"/);
