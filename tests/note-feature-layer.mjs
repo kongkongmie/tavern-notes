@@ -135,6 +135,9 @@ function harness(repository) {
     assert.match(downloads[0][0], /"visible"/);
     assert.equal((await controller.exportAllJson()).ok, true);
     assert.equal(exported, 1);
+    assert.equal((await controller.exportSelectedJson([{ id: 'picked', content: 'chosen', character: { name: 'B' } }])).ok, true);
+    assert.match(downloads[2][0], /"scope": "selected"/);
+    assert.match(downloads[2][0], /"picked"/);
     assert.equal((await controller.importJson({ format: 'tavern-notes-export', notes: [{ id: 'x' }] })).ok, true);
     assert.equal(h.query.page, 1);
 }

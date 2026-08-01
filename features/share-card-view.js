@@ -46,6 +46,7 @@ export function createShareCardView({
             bind(query(`#${idPrefix}-share-local-font-file`), 'change', event => emit('import-local-font', event));
             bind(query(`#${idPrefix}-share-redraw`), 'click', () => emit('preview'));
             bind(query(`#${idPrefix}-share-download`), 'click', () => emit('export'));
+            bind(query(`#${idPrefix}-share-download-full`), 'click', () => emit('export-full-length'));
             mounted = true;
         },
         getCanvas() {

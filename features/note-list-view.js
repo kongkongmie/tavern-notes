@@ -68,6 +68,7 @@ export function createNoteListRenderer({
     getVariantIndex,
     getActiveVariant,
     renderTagShelf = () => {},
+    getBatchState = () => ({ active: false, selectedIds: new Set() }),
 }) {
     const c = suffix => `${classPrefix}-${suffix}`;
 
@@ -119,6 +120,7 @@ export function createNoteListRenderer({
         if (!state.notes.length) {
             return `<div class="${c('empty')}"><div class="${c('empty-orb')}"><i class="fa-regular fa-note-sticky"></i></div><div class="${c('empty-title')}">${escapeHtml(translate('noNotes'))}</div><small>${escapeHtml(translate('noNotesHint'))}</small></div>`;
         }
+        const batch = getBatchState();
         return renderCards(state.notes, {
             classPrefix,
             escapeHtml,
@@ -130,6 +132,8 @@ export function createNoteListRenderer({
             getVariants,
             getVariantIndex,
             getActiveVariant,
+            batchMode: batch.active,
+            selectedIds: batch.selectedIds,
         });
     }
 

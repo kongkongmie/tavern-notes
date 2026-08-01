@@ -31,6 +31,7 @@ import { createNoteListController } from './features/note-list-controller.js';
 import { createNoteFilterController } from './features/note-filter-controller.js';
 import { createNoteMutationController } from './features/note-mutation-controller.js';
 import { createNoteExportController, prepareNoteForExport } from './features/note-export-controller.js';
+import { createNoteBatchController } from './features/note-batch-controller.js';
 import { createNoteActionHandler, createNoteListRenderer, createNoteListView } from './features/note-list-view.js';
 import { createNoteFilterView } from './features/note-filter-view.js';
 import { createNoteEditorView } from './features/note-editor-view.js';
@@ -286,6 +287,17 @@ const TEXT_ZH_CN = {
     exportHint: '当前页面只导出现在列表里这一页看到的笔记。',
     exportJson: '可再次导入的 JSON 笔记文件',
     exportTxt: '纯 TXT 文件',
+    batchExportJson: '导出 JSON',
+    batchExportTxt: '导出 TXT',
+    batchManage: '批量管理',
+    selectedNotes: '已选择',
+    selectAllPage: '全选本页',
+    invertPage: '反选本页',
+    selectNote: '选择这条笔记',
+    confirmBatchDelete: '确定删除选中的 {count} 条笔记吗？\n\n此操作无法撤销，建议先导出备份。',
+    batchDeleted: '已删除 {count} 条笔记。',
+    noSelectedNotes: '请先选择至少一条笔记。',
+    cancel: '退出',
     importJson: '导入 JSON 笔记',
     importDone: '导入完成：新增 {imported} 条，跳过 {skipped} 条重复或空笔记。',
     invalidBackup: '无法导入：请选择酒馆笔记导出的 JSON 备份。',
@@ -320,6 +332,7 @@ const TEXT_ZH_CN = {
     importLocalFont: '导入本地字体',
     redrawPreview: '刷新预览',
     exportPng: '导出 PNG',
+    exportFullLengthPng: '输出全文长图',
     noShareCardToExport: '没有可导出的分享卡。',
     shareCardExportFailed: '生成图片失败。',
     shareCardExported: '已导出分享卡。',
@@ -564,6 +577,17 @@ const TEXTS = {
         exportNotes: '匯入匯出筆記',
         exportJson: '可再次匯入的 JSON 筆記檔案',
         exportTxt: '純 TXT 檔案',
+        batchExportJson: '匯出 JSON',
+        batchExportTxt: '匯出 TXT',
+        batchManage: '批次管理',
+        selectedNotes: '已選擇',
+        selectAllPage: '全選本頁',
+        invertPage: '反選本頁',
+        selectNote: '選擇這則筆記',
+        confirmBatchDelete: '確定刪除選中的 {count} 則筆記嗎？\n\n此操作無法復原，建議先匯出備份。',
+        batchDeleted: '已刪除 {count} 則筆記。',
+        noSelectedNotes: '請先選擇至少一則筆記。',
+        cancel: '退出',
         importJson: '匯入 JSON 筆記',
         importDone: '匯入完成：新增 {imported} 條，略過 {skipped} 條重複或空白筆記。',
         invalidBackup: '無法匯入：請選擇酒館筆記匯出的 JSON 備份。',
@@ -592,6 +616,7 @@ const TEXTS = {
         findFonts: '查找免費商用字體',
         redrawPreview: '重新整理預覽',
         exportPng: '匯出 PNG',
+        exportFullLengthPng: '輸出全文長圖',
         noShareCardToExport: '沒有可匯出的分享卡。',
         shareCardExportFailed: '產生圖片失敗。',
         shareCardExported: '已匯出分享卡。',
@@ -815,6 +840,17 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         exportNotes: 'Import / Export Notes',
         exportJson: 'Re-importable JSON note file',
         exportTxt: 'Plain TXT file',
+        batchExportJson: 'Export JSON',
+        batchExportTxt: 'Export TXT',
+        batchManage: 'Batch manage',
+        selectedNotes: 'Selected',
+        selectAllPage: 'Select this page',
+        invertPage: 'Invert this page',
+        selectNote: 'Select this note',
+        confirmBatchDelete: 'Delete the selected {count} notes?\n\nThis cannot be undone. Export a backup first if needed.',
+        batchDeleted: 'Deleted {count} notes.',
+        noSelectedNotes: 'Select at least one note first.',
+        cancel: 'Exit',
         importJson: 'Import JSON notes',
         importDone: 'Import complete: {imported} added, {skipped} duplicates or empty notes skipped.',
         invalidBackup: 'Import failed. Choose a JSON backup exported by Tavern Notes.',
@@ -849,6 +885,7 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         importLocalFont: 'Import local font',
         redrawPreview: 'Refresh preview',
         exportPng: 'Export PNG',
+        exportFullLengthPng: 'Export full-length image',
         noShareCardToExport: 'There is no share card to export.',
         shareCardExportFailed: 'Could not generate the image.',
         shareCardExported: 'Share card exported.',
@@ -1098,6 +1135,17 @@ Click Preview & save or Save as to create a theme file.`,
         exportNotes: '노트 가져오기 / 내보내기',
         exportJson: '다시 가져올 수 있는 JSON 노트 파일',
         exportTxt: '순수 TXT 파일',
+        batchExportJson: 'JSON 내보내기',
+        batchExportTxt: 'TXT 내보내기',
+        batchManage: '일괄 관리',
+        selectedNotes: '선택됨',
+        selectAllPage: '현재 페이지 전체 선택',
+        invertPage: '현재 페이지 선택 반전',
+        selectNote: '이 노트 선택',
+        confirmBatchDelete: '선택한 노트 {count}개를 삭제할까요?\n\n되돌릴 수 없습니다. 필요하면 먼저 백업을 내보내세요.',
+        batchDeleted: '노트 {count}개를 삭제했습니다.',
+        noSelectedNotes: '먼저 노트를 하나 이상 선택하세요.',
+        cancel: '나가기',
         importJson: 'JSON 노트 가져오기',
         importDone: '가져오기 완료: {imported}개 추가, 중복 또는 빈 노트 {skipped}개 건너뜀.',
         invalidBackup: '가져올 수 없습니다. Tavern Notes에서 내보낸 JSON 백업을 선택하세요.',
@@ -1132,6 +1180,7 @@ Click Preview & save or Save as to create a theme file.`,
         importLocalFont: '로컬 글꼴 가져오기',
         redrawPreview: '미리보기 새로고침',
         exportPng: 'PNG 내보내기',
+        exportFullLengthPng: '전체 내용 긴 이미지 내보내기',
         noShareCardToExport: '내보낼 공유 카드가 없습니다.',
         shareCardExportFailed: '이미지 생성에 실패했습니다.',
         shareCardExported: '공유 카드를 내보냈습니다.',
@@ -1928,6 +1977,7 @@ const noteListView = createNoteListView({
     onPageChange: direction => noteListController.goToPage(state.page + direction),
     onPageJump: page => noteListController.goToPage(page),
     onAction: event => {
+        if (noteBatchController?.getState().active) return;
         if (event.target.closest('#tavern-notes-list')) noteActionHandler(event).catch(error => notify(error.message, 'error'));
     },
 });
@@ -1950,6 +2000,7 @@ const noteFilterView = createNoteFilterView({
     onSort: (by, order) => noteFilterController.setSort(by, order),
     onReset: () => noteFilterController.reset(),
 });
+let noteBatchController = null;
 const noteListRenderer = createNoteListRenderer({
     classPrefix: 'tn',
     panelId: 'tavern-notes-panel',
@@ -1974,6 +2025,21 @@ const noteListRenderer = createNoteListRenderer({
     getVariantIndex,
     getActiveVariant,
     renderTagShelf: () => tagView.renderShelf(),
+    getBatchState: () => noteBatchController?.getState() || ({ active: false, selectedIds: new Set() }),
+});
+noteBatchController = createNoteBatchController({
+    root: () => document.querySelector('#tavern-notes-panel'),
+    getVisibleNotes: () => noteListController.getVisibleNotes(),
+    renderList: () => noteListRenderer.render(),
+    exportController: noteExportController,
+    mutationController: noteMutationController,
+    confirmDelete: count => window.confirm(t('confirmBatchDelete', { count })),
+    onEvent: (type, value) => {
+        if (type === 'empty') notify(t('noSelectedNotes'), 'warning');
+        else if (type === 'deleted') notify(t('batchDeleted', { count: value }), 'success');
+        else if (type === 'exported') notify(t('exportStarted'), 'success');
+        else if (type === 'error') notify(value?.message || t('loadFailed'), 'error');
+    },
 });
 const noteEditorView = createNoteEditorView({
     root: () => document.querySelector('#tavern-notes-panel'),
@@ -2134,7 +2200,7 @@ const userInputMaintenanceView = createUserInputMaintenanceView({
 const noteFeatureLifecycle = createLifecycleRegistry();
 [noteListView, noteFilterView, noteEditorView, newNoteView, noteTransferView, tagView, captureView, userInputMaintenanceView,
     noteListController, noteFilterController, noteMutationController, noteExportController, tagController, captureController,
-    userInputCaptureController, userInputMaintenanceController]
+    userInputCaptureController, userInputMaintenanceController, noteBatchController]
     .forEach(resource => noteFeatureLifecycle.registerDestroy(() => resource.destroy()));
 function destroyNoteFeatureLayer() { noteFeatureLifecycle.destroyAll(); }
 const themeRepository = createModeThemeRepository({
@@ -2357,6 +2423,7 @@ const shareCardView = createShareCardView({
         }
         else if (type === 'preview') await shareCardController.preview();
         else if (type === 'export') await shareCardController.exportImage();
+        else if (type === 'export-full-length') await shareCardController.exportFullLengthImage();
         else if (type === 'error') notify(value.message, 'error');
     },
 });
@@ -2957,7 +3024,9 @@ function layoutHeaderActions() {
     overflowButtons.forEach(button => moreMenu.append(button));
     hiddenButtons.forEach(button => moreMenu.append(button));
 
-    const hasOverflow = overflowButtons.length > 0;
+    const persistentMenuButtons = [...moreMenu.querySelectorAll(':scope > button')]
+        .filter(button => !buttons.includes(button) && !button.classList.contains('tn-hidden'));
+    const hasOverflow = overflowButtons.length > 0 || persistentMenuButtons.length > 0;
     moreButton.classList.toggle('tn-hidden', !hasOverflow);
     actions.style.setProperty('--tn-header-action-columns', String(directButtons.length + (hasOverflow ? 1 : 0)));
     if (!hasOverflow) moreMenu.classList.remove('open');
@@ -3150,6 +3219,7 @@ const appShellView = createAppShellView({
 
 function bindEvents() {
     noteListView.mount();
+    noteBatchController.mount();
     noteFilterView.mount();
     noteEditorView.mount();
     newNoteView.mount();

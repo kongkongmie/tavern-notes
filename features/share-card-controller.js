@@ -40,13 +40,14 @@ export function createShareCardController({
         return result;
     }
 
-    async function exportImage() {
+    async function exportImage({ fullLength = false } = {}) {
         if (!mounted || !currentNote || exporting) return null;
         exporting = true;
         onEvent('exporting', true);
         try {
             const settings = normalizeShareCardSettings(getSettings());
-            const result = await renderer.renderExport({
+            const renderExport = fullLength ? renderer.renderFullLengthExport : renderer.renderExport;
+            const result = await renderExport({
                 canvas: view.getCanvas(),
                 note: normalizeShareCardContent(currentNote),
                 settings,
@@ -54,7 +55,8 @@ export function createShareCardController({
             if (!(result?.blob instanceof Blob) || result.blob.size === 0) {
                 throw new Error('share-card-export-empty-result');
             }
-            const filename = createShareCardFilename(currentNote, { brand });
+            const baseFilename = createShareCardFilename(currentNote, { brand });
+            const filename = fullLength ? baseFilename.replace(/\.png$/i, '-全文长图.png') : baseFilename;
             await downloadBlob(result.blob, filename);
             onEvent('exported');
             return { ...result, filename };
@@ -94,6 +96,7 @@ export function createShareCardController({
             return result;
         },
         exportImage,
+        exportFullLengthImage: () => exportImage({ fullLength: true }),
         close,
         destroy() {
             mounted = false;

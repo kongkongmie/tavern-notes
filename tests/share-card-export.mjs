@@ -6,12 +6,21 @@ const pngBytes = Buffer.from('png-result');
 const rendererSource = await readFile(new URL('../features/share-card-renderer.js', import.meta.url), 'utf8');
 const drawShareCardSource = rendererSource.slice(
     rendererSource.indexOf('async function drawShareCard'),
-    rendererSource.indexOf('function dataUrlToBlob'),
+    rendererSource.indexOf('async function drawFullLengthShareCard'),
 );
 assert.equal((drawShareCardSource.match(/return canvas;/g) || []).length, 4);
 assert.doesNotMatch(drawShareCardSource, /^\s*return;\s*$/m);
 assert.ok((drawShareCardSource.match(/settings\.showCharacter/g) || []).length >= 6);
 assert.ok((drawShareCardSource.match(/settings\.showDate/g) || []).length >= 4);
+const fullLengthSource = rendererSource.slice(
+    rendererSource.indexOf('async function drawFullLengthShareCard'),
+    rendererSource.indexOf('function dataUrlToBlob'),
+);
+assert.match(fullLengthSource, /const width = 1080/);
+assert.match(fullLengthSource, /lines\.length \* lineHeight/);
+assert.doesNotMatch(fullLengthSource, /drawMultilineFit/);
+assert.match(fullLengthSource, /const headerHeight = 270/);
+assert.match(fullLengthSource, /drawCircleImage\(ctx, characterAvatar, padding, 70/);
 
 const direct = await canvasToBlob({
     toBlob(callback) {

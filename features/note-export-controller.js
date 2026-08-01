@@ -118,6 +118,18 @@ export function createNoteExportController({
         });
     }
 
+    async function exportSelected(notes, format) {
+        return run('exportRunning', async () => {
+            const prepared = (notes || []).map(prepareVisibleNote);
+            if (!prepared.length) throw new Error('NO_SELECTED_NOTES');
+            const data = { ok: true, format: 'tavern-notes-export', version: 1, scope: 'selected', exportedAt: now().toISOString(), notes: prepared };
+            const content = format === 'json' ? JSON.stringify(data, null, 2) : buildPlainTextExport(prepared);
+            const type = format === 'json' ? 'application/json;charset=utf-8' : 'text/plain;charset=utf-8';
+            download(content, `tavern-notes-selected-${stamp(now)}.${format}`, type);
+            return data;
+        });
+    }
+
     return {
         mount() {
             mounted = true;
@@ -143,6 +155,8 @@ export function createNoteExportController({
         exportAllTxt: () => exportAll('txt'),
         exportCurrentPageJson: () => exportPage('json'),
         exportCurrentPageTxt: () => exportPage('txt'),
+        exportSelectedJson: notes => exportSelected(notes, 'json'),
+        exportSelectedTxt: notes => exportSelected(notes, 'txt'),
         destroy() {
             mounted = false;
             if (getNoteUiState().importRunning || getNoteUiState().exportRunning) {

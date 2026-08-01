@@ -28,6 +28,7 @@ assert.equal(detail.variants.length, 2);
 
 let settings = normalizeShareCardSettings();
 let renders = [];
+let filenames = [];
 let resolver = [];
 const shareView = {
     mount() {}, destroy() {}, open() {}, close() {}, sync() {},
@@ -39,12 +40,13 @@ const shareController = createShareCardController({
     renderer: {
         renderPreview: () => new Promise(resolve => resolver.push(resolve)),
         renderExport: async () => ({ blob: exportBlob, mimeType: 'image/png', width: 900, height: 1400 }),
+        renderFullLengthExport: async () => ({ blob: exportBlob, mimeType: 'image/png', width: 1080, height: 2400 }),
         destroy() {},
     },
     getSettings: () => settings,
     updateSettings: async patch => { settings = { ...settings, ...patch }; return { ok: true }; },
     resetSettings: async () => ({ ok: true }),
-    downloadBlob: blob => renders.push(blob),
+    downloadBlob: (blob, filename) => { renders.push(blob); filenames.push(filename); },
     brand: 'TN',
 });
 shareController.mount();
@@ -57,6 +59,9 @@ await Promise.resolve();
 await Promise.all([shareController.exportImage(), shareController.exportImage()]);
 assert.equal(renders.length, 1);
 assert.equal(renders[0], exportBlob);
+await shareController.exportFullLengthImage();
+assert.equal(renders.length, 2);
+assert.match(filenames[1], /-全文长图\.png$/);
 shareController.destroy();
 
 const calls = [];

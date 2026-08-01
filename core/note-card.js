@@ -12,6 +12,8 @@ export function renderNoteCards(notes, options) {
         getVariants,
         getVariantIndex,
         getActiveVariant,
+        batchMode = false,
+        selectedIds = new Set(),
     } = options;
     const c = name => `${classPrefix}-${name}`;
 
@@ -32,7 +34,8 @@ export function renderNoteCards(notes, options) {
         `;
 
         return `
-            <article class="${uiClass('note', { classPrefix })} ${c(`note-${escapeHtml(noteTypeClass(note.type))}`)}${variants.length > 1 ? ` ${c('note-has-variants')}` : ''}" data-note-id="${escapeHtml(note.id)}" data-chat-name="${escapeHtml(chatName)}" tabindex="0" aria-label="${escapeHtml(translate('viewFull'))}">
+            <article class="${uiClass('note', { classPrefix })} ${c(`note-${escapeHtml(noteTypeClass(note.type))}`)}${variants.length > 1 ? ` ${c('note-has-variants')}` : ''}${selectedIds.has(String(note.id)) ? ` ${c('batch-selected')}` : ''}" data-note-id="${escapeHtml(note.id)}" data-chat-name="${escapeHtml(chatName)}" tabindex="0" aria-label="${escapeHtml(translate('viewFull'))}">
+                ${batchMode ? `<label class="${c('batch-check')}" title="${escapeHtml(translate('selectNote'))}"><input class="${c('batch-checkbox')}" type="checkbox" value="${escapeHtml(note.id)}" ${selectedIds.has(String(note.id)) ? 'checked' : ''} /><span><i class="fa-solid fa-check"></i></span></label>` : ''}
                 ${variantControls}
                 <div class="${c('note-topline')}">
                     <span class="${c('note-type')}">${escapeHtml(noteTypeLabel(note.type))}</span>

@@ -690,6 +690,10 @@
     padding: 0 18px 9px;
 }
 
+:is(#tavern-notes-panel, #tavern-notes-lite-panel) .tn-reading-mode-expand {
+    display: none;
+}
+
 @media (max-width: 980px) {
     :is(#tavern-notes-panel, #tavern-notes-lite-panel) :is(
         .tn-header,

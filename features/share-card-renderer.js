@@ -574,6 +574,95 @@ async function drawShareCard({
     return canvas;
 }
 
+async function drawFullLengthShareCard({
+    canvas,
+    note,
+    settings,
+    font,
+    characterAvatarUrl,
+    userName,
+    translate,
+}) {
+    if (!canvas) throw new Error('share-card-canvas-unavailable');
+    if (!note) throw new Error('share-card-note-unavailable');
+    const width = 1080;
+    const padding = 92;
+    const contentWidth = width - padding * 2;
+    const fontScale = Math.min(Math.max(Number(settings.fontScale || 0.8), 0.65), 1.1);
+    const bodySize = Math.round(42 * fontScale);
+    const lineHeight = Math.round(72 * fontScale);
+    const character = note.character?.name || '未命名角色';
+    const content = String(note.content || '').trim();
+    const dates = shareCardDateParts(note);
+    const characterAvatar = await loadShareCardImage(characterAvatarUrl);
+
+    canvas.width = width;
+    canvas.height = 1400;
+    let ctx = canvas.getContext('2d');
+    ctx.font = `400 ${bodySize}px ${font}`;
+    const lines = wrapCanvasText(ctx, content, contentWidth);
+    const headerHeight = 270;
+    const contentHeight = Math.max(lineHeight, lines.length * lineHeight);
+    const footerHeight = 210;
+    const height = Math.max(720, headerHeight + contentHeight + footerHeight);
+
+    canvas.height = height;
+    ctx = canvas.getContext('2d');
+    const background = settings.background || '#eef7f2';
+    const darkBackground = isDarkShareCardColor(background);
+    const textColor = settings.textColor || (darkBackground ? '#f6f3ed' : '#103f25');
+    const muted = darkBackground ? 'rgba(246,243,237,0.64)' : 'rgba(16,63,37,0.62)';
+    const lineColor = darkBackground ? 'rgba(246,243,237,0.34)' : 'rgba(16,63,37,0.22)';
+
+    ctx.fillStyle = background;
+    ctx.fillRect(0, 0, width, height);
+    let y = 104;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    const avatarSize = 82;
+    const headerTextLeft = characterAvatar ? padding + avatarSize + 28 : padding;
+    if (characterAvatar) drawCircleImage(ctx, characterAvatar, padding, 70, avatarSize);
+    if (settings.showCharacter) {
+        ctx.fillStyle = textColor;
+        ctx.font = `700 ${Math.round(54 * fontScale)}px ${font}`;
+        ctx.fillText(character, headerTextLeft, y + 38, contentWidth - avatarSize - 28);
+    } else {
+        ctx.fillStyle = textColor;
+        ctx.font = `700 ${Math.round(40 * fontScale)}px ${font}`;
+        ctx.fillText(translate('fromTavernNotes'), headerTextLeft, y + 32, contentWidth - avatarSize - 28);
+    }
+    if (settings.showDate) {
+        ctx.fillStyle = muted;
+        ctx.font = `400 ${Math.round(28 * fontScale)}px ${font}`;
+        ctx.fillText(dates.full, headerTextLeft, y + 88);
+    }
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padding, headerHeight - 52);
+    ctx.lineTo(width - padding, headerHeight - 52);
+    ctx.stroke();
+
+    y = headerHeight;
+    ctx.fillStyle = textColor;
+    ctx.font = `400 ${bodySize}px ${font}`;
+    drawMultiline(ctx, lines, padding, y, lineHeight, lines.length);
+
+    const footerY = height - 112;
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(padding, footerY - 62);
+    ctx.lineTo(width - padding, footerY - 62);
+    ctx.stroke();
+    const footerAvatarSize = 64;
+    if (characterAvatar) drawCircleImage(ctx, characterAvatar, width - padding - footerAvatarSize, footerY - 30, footerAvatarSize);
+    ctx.fillStyle = muted;
+    ctx.font = `400 ${Math.round(25 * fontScale)}px ${font}`;
+    ctx.fillText(`${translate('fromTavernNotes')} · ${userName}`, padding, footerY + 10, contentWidth - footerAvatarSize - 24);
+    return canvas;
+}
+
 
 function dataUrlToBlob(dataUrl, fallbackType = 'image/png') {
     const [header, payload] = String(dataUrl || '').split(',', 2);
@@ -651,6 +740,27 @@ export function createShareCardRenderer({
         });
     }
 
+    async function renderFullLength(input) {
+        let descriptor = { font: 'system-ui, "Noto Serif SC", serif' };
+        try {
+            descriptor = await resolveFont(input.settings) || descriptor;
+            await loadFont(descriptor);
+            await waitForFont(descriptor.font, String(input.note?.content || ''));
+        } catch {
+            descriptor = { font: 'system-ui, "Noto Serif SC", serif' };
+        }
+        const sourceCanvas = input.canvas;
+        const canvas = sourceCanvas?.ownerDocument?.createElement?.('canvas') || document.createElement('canvas');
+        return drawFullLengthShareCard({
+            ...input,
+            canvas,
+            font: descriptor.font,
+            characterAvatarUrl: getCharacterAvatarUrl(input.note),
+            userName: getUserName(),
+            translate,
+        });
+    }
+
     return {
         renderPreview: render,
         async renderExport(input) {
@@ -665,6 +775,12 @@ export function createShareCardRenderer({
                 width: canvas.width,
                 height: canvas.height,
             };
+        },
+        async renderFullLengthExport(input) {
+            const canvas = await renderFullLength(input);
+            const blob = await canvasToBlob(canvas, 'image/png');
+            if (!(blob instanceof Blob) || blob.size === 0) throw new Error('share-card-export-empty-result');
+            return { blob, mimeType: 'image/png', width: canvas.width, height: canvas.height };
         },
         destroy() {},
     };

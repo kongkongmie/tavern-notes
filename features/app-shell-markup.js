@@ -68,7 +68,7 @@ export function renderAppShellMarkup({
                     <button id="${idPrefix}-selection-capture-setting" class="${ui('soft-button')} ${state.showSelectionCaptureButton ? 'active' : ''}" title="${htmlEscape(t('selectionCaptureButtonTitle'))}"><i class="fa-solid fa-highlighter"></i><span>${htmlEscape(t('captureSelected'))}</span></button>
                     <button id="${idPrefix}-floor-capture-open" class="${ui('soft-button')} ${state.showFloorCaptureButton ? 'active' : ''}" title="${htmlEscape(t('floorCaptureEntryTitle'))}"><i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('captureFloor'))}</span></button>
                     <button id="${idPrefix}-more-open" class="${ui('soft-button')}" title="${htmlEscape(t('more'))}" aria-label="${htmlEscape(t('more'))}"><i class="fa-solid fa-ellipsis"></i><span>${htmlEscape(t('more'))}</span></button>
-                    <div id="${idPrefix}-more-menu" class="${ui('header-popover')} ${ui('header-secondary')}"><button id="${idPrefix}-auto-user-input" class="${ui('soft-button')} ${state.autoCaptureUserInput ? 'active' : ''}" title="${htmlEscape(t('autoCaptureUserInputTitle'))}"><i class="fa-solid fa-keyboard"></i><span>${htmlEscape(t('autoCaptureUserInput'))}</span></button><button id="${idPrefix}-user-input-cleanup-open" class="${ui('soft-button')}" title="${htmlEscape(t('userInputCleanupIntro'))}"><i class="fa-solid fa-filter-circle-xmark"></i><span>${htmlEscape(t('userInputCleanup'))}</span></button><button id="${idPrefix}-export" class="${ui('soft-button')}" title="${htmlEscape(t('exportNotes'))}"><i class="fa-solid fa-download"></i><span>${htmlEscape(t('exportNotes'))}</span></button>${storageModeAction}<button id="${idPrefix}-update-open" class="${ui('soft-button')}" title="${htmlEscape(t('updateCenter'))}"><i class="fa-solid fa-clock-rotate-left"></i><span>${htmlEscape(t('updateCenter'))}</span></button><button id="${idPrefix}-reset-floating" class="${ui('soft-button')}" title="${htmlEscape(t('resetFloatingPosition'))}"><i class="fa-solid fa-location-crosshairs"></i><span>${htmlEscape(t('resetFloatingPosition'))}</span></button><button id="${idPrefix}-apple-mode-main" class="${ui('soft-button')} ${ui('hidden')}"><i class="fa-solid fa-moon"></i><span>${htmlEscape(t('appleThemeNight'))}</span></button></div>
+                    <div id="${idPrefix}-more-menu" class="${ui('header-popover')} ${ui('header-secondary')}"><button id="${idPrefix}-auto-user-input" class="${ui('soft-button')} ${state.autoCaptureUserInput ? 'active' : ''}" title="${htmlEscape(t('autoCaptureUserInputTitle'))}"><i class="fa-solid fa-keyboard"></i><span>${htmlEscape(t('autoCaptureUserInput'))}</span></button><button id="${idPrefix}-user-input-cleanup-open" class="${ui('soft-button')}" title="${htmlEscape(t('userInputCleanupIntro'))}"><i class="fa-solid fa-filter-circle-xmark"></i><span>${htmlEscape(t('userInputCleanup'))}</span></button><button id="${idPrefix}-batch-open" class="${ui('soft-button')}" title="${htmlEscape(t('batchManage'))}"><i class="fa-solid fa-list-check"></i><span>${htmlEscape(t('batchManage'))}</span></button><button id="${idPrefix}-export" class="${ui('soft-button')}" title="${htmlEscape(t('exportNotes'))}"><i class="fa-solid fa-download"></i><span>${htmlEscape(t('exportNotes'))}</span></button>${storageModeAction}<button id="${idPrefix}-update-open" class="${ui('soft-button')}" title="${htmlEscape(t('updateCenter'))}"><i class="fa-solid fa-clock-rotate-left"></i><span>${htmlEscape(t('updateCenter'))}</span></button><button id="${idPrefix}-reset-floating" class="${ui('soft-button')}" title="${htmlEscape(t('resetFloatingPosition'))}"><i class="fa-solid fa-location-crosshairs"></i><span>${htmlEscape(t('resetFloatingPosition'))}</span></button><button id="${idPrefix}-apple-mode-main" class="${ui('soft-button')} ${ui('hidden')}"><i class="fa-solid fa-moon"></i><span>${htmlEscape(t('appleThemeNight'))}</span></button></div>
                 </div>
             </header>
             <div id="${idPrefix}-notice" class="${ui('notice')}" role="status" aria-live="polite"></div>
@@ -77,6 +77,15 @@ export function renderAppShellMarkup({
                 <input id="${idPrefix}-search" class="text_pole" type="search" placeholder="${htmlEscape(t('searchPlaceholder'))}" />
             </div>
             <div id="${idPrefix}-tag-shelf" class="${ui('tag-shelf')} ${ui('hidden')}" aria-label="${htmlEscape(t('tags'))}"></div>
+            <div id="${idPrefix}-batch-bar" class="${ui('batch-bar')} ${ui('hidden')}">
+                <b>${htmlEscape(t('selectedNotes'))} <span class="${ui('batch-count')}">0</span></b>
+                <button class="${ui('batch-all')}" type="button">${htmlEscape(t('selectAllPage'))}</button>
+                <button class="${ui('batch-invert')}" type="button">${htmlEscape(t('invertPage'))}</button>
+                <button class="${ui('batch-export-json')}" type="button">${htmlEscape(t('batchExportJson'))}</button>
+                <button class="${ui('batch-export-txt')}" type="button">${htmlEscape(t('batchExportTxt'))}</button>
+                <button class="${ui('batch-delete')}" type="button"><i class="fa-regular fa-trash-can"></i>${htmlEscape(t('delete'))}</button>
+                <button class="${ui('batch-cancel')}" type="button">${htmlEscape(t('cancel'))}</button>
+            </div>
             <div class="${ui('shell')}">
                 <nav class="${ui('filters')}">
                     ${getVisibleFilters().map(filter => `
@@ -294,6 +303,7 @@ export function renderAppShellMarkup({
                         <div class="${classPrefix}-share-actions">
                             <button id="${idPrefix}-share-redraw" class="${ui('export-choice')}" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>${htmlEscape(t('redrawPreview'))}</span></button>
                             <button id="${idPrefix}-share-download" class="${ui('export-choice')}" type="button"><i class="fa-solid fa-download"></i><span>${htmlEscape(t('exportPng'))}</span></button>
+                            <button id="${idPrefix}-share-download-full" class="${ui('export-choice')} ${classPrefix}-share-wide-action" type="button"><i class="fa-solid fa-file-image"></i><span>${htmlEscape(t('exportFullLengthPng'))}</span></button>
                         </div>
                         <input id="${idPrefix}-share-local-font-file" type="file" accept=".ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2" hidden />
                     </div>
