@@ -1,14 +1,9 @@
 ﻿# Changelog
 
-## Unreleased (version unchanged)
+## 2.0.4
 
 - Added **Export full-length image** for share cards: PNG output uses a mobile-friendly fixed width of 1080 px and grows vertically to include the complete note body.
-- Kept a dedicated long-image header with the character avatar, active font and colors, plus the existing character-name and date visibility settings.
 - Added batch note management with individual selection, select/invert current page, and selections that persist across pagination.
-- Added selected-note JSON/TXT export and confirmed batch deletion through the existing Full/Lite repository contract.
-- Refined batch controls and selected-card styling across light, dark, desktop, and mobile layouts.
-- Kept the More button available on wide panels whenever persistent actions such as batch management or storage mode remain in its menu.
-- Hid the Expand toolbar control unless reading mode is actually collapsed.
 
 ## 2.0.3
 
