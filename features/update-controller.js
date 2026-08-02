@@ -1,13 +1,34 @@
 import { shouldShowUpdateNotice } from '../core/update-model.js';
 
-export function createUpdateController({ repository, view, fallbackVersion, notify = () => {}, setStatus = () => {}, today = () => new Date().toDateString() }) {
+export function createUpdateController({ repository, view, fallbackVersion, notify = () => {}, setStatus = () => {}, confirmUpdate = async () => true, onUpdated = async () => {}, today = () => new Date().toDateString() }) {
     let mounted = false;
     let generation = 0;
     let info = null;
     let checking = false;
+    let updating = false;
 
     function render() {
-        if (mounted) view.render({ info, checking, fallbackVersion });
+        if (mounted) view.render({ info, checking, updating, fallbackVersion });
+    }
+
+    async function update() {
+        if (!mounted || updating || !info?.hasUpdate) return { ok: false, unavailable: true };
+        if (!await confirmUpdate(info)) return { ok: false, cancelled: true };
+        updating = true;
+        render();
+        try {
+            const result = await repository.update();
+            const completedInfo = { ...info };
+            info = { ...info, installedVersion: info.latestVersion, hasUpdate: false };
+            await onUpdated(result, completedInfo);
+            return { ok: true, value: result };
+        } catch (error) {
+            notify({ error, updateFailed: true });
+            return { ok: false, error };
+        } finally {
+            updating = false;
+            render();
+        }
     }
 
     async function check({ notifyAvailable = true, throwOnError = false } = {}) {
@@ -47,10 +68,12 @@ export function createUpdateController({ repository, view, fallbackVersion, noti
             mounted = true;
             view.mount({
                 onCheck: () => check({ notifyAvailable: false, throwOnError: true }),
+                onUpdate: update,
                 onOpen: () => { render(); if (!info && !checking) check({ notifyAvailable: false }); },
             });
         },
         check,
+        update,
         open() { view.open(); },
         close() { view.close(); },
         getState: () => ({ info, checking }),
@@ -58,6 +81,7 @@ export function createUpdateController({ repository, view, fallbackVersion, noti
             mounted = false;
             generation += 1;
             checking = false;
+            updating = false;
             view.destroy();
         },
     };

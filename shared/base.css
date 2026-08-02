@@ -102,46 +102,43 @@
     border: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, rgba(255, 255, 255, 0.5)) 72%, transparent);
     border-radius: 999px;
     color: color-mix(in srgb, var(--SmartThemeBodyColor, #f7f3ea) 88%, white 12%);
-    background:
-        radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.26), transparent 34%),
-        color-mix(in srgb, var(--SmartThemeBlurTintColor, rgba(28, 32, 30, 0.72)) 72%, transparent);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, rgba(28, 32, 30, 0.72)) 72%, transparent);
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.16);
     backdrop-filter: blur(10px);
     cursor: pointer;
-    transition: color 140ms ease, background 140ms ease, transform 140ms ease;
+    opacity: var(--tavern-notes-floating-opacity, 0.9);
+    transition: color 140ms ease, background 140ms ease, transform 140ms ease, opacity 140ms ease;
 }
 
 :is(.tn-floating-button, .tnl-floating-button):hover {
     color: color-mix(in srgb, var(--SmartThemeQuoteColor, #f4b51f) 78%, white 22%);
-    background:
-        radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.34), transparent 34%),
-        color-mix(in srgb, var(--SmartThemeBlurTintColor, rgba(28, 32, 30, 0.84)) 82%, var(--SmartThemeQuoteColor, #f4b51f) 18%);
+    background: color-mix(in srgb, var(--SmartThemeBlurTintColor, rgba(28, 32, 30, 0.84)) 82%, var(--SmartThemeQuoteColor, #f4b51f) 18%);
     transform: translateY(-1px);
+    opacity: 1;
 }
 
 :is(.tn-floating-main, .tnl-floating-main) {
-    width: 48px;
-    height: 48px;
-    font-size: 18px;
+    width: calc(48px * var(--tavern-notes-floating-scale, 1));
+    height: calc(48px * var(--tavern-notes-floating-scale, 1));
+    font-size: calc(18px * var(--tavern-notes-floating-scale, 1));
 }
 
 :is(.tn-floating-main, .tnl-floating-main)
     :is(.tavern-notes-default-icon, .tavern-notes-lite-default-icon) {
-    width: 22px;
-    height: 22px;
+    width: calc(22px * var(--tavern-notes-floating-scale, 1));
+    height: calc(22px * var(--tavern-notes-floating-scale, 1));
 }
 
 :is(.tn-floating-capture, .tnl-floating-capture) {
-    width: 34px;
-    height: 34px;
-    font-size: 13px;
-    opacity: 0.82;
+    width: calc(34px * var(--tavern-notes-floating-scale, 1));
+    height: calc(34px * var(--tavern-notes-floating-scale, 1));
+    font-size: calc(13px * var(--tavern-notes-floating-scale, 1));
 }
 
 :is(.tn-floating-capture, .tnl-floating-capture)
     :is(.tavern-notes-default-icon, .tavern-notes-lite-default-icon) {
-    width: 17px;
-    height: 17px;
+    width: calc(17px * var(--tavern-notes-floating-scale, 1));
+    height: calc(17px * var(--tavern-notes-floating-scale, 1));
 }
 
 :is(#tavern-notes-panel, #tavern-notes-lite-panel) *::-webkit-scrollbar {
@@ -154,7 +151,7 @@
 }
 
 :is(#tavern-notes-panel, #tavern-notes-lite-panel) {
-    font-size: 16px !important;
+    font-size: calc(16px * var(--tavern-notes-ui-scale, 1)) !important;
 }
 
 .tn-notice {
@@ -232,7 +229,7 @@
 }
 
 .tn-title {
-    font-size: 32px;
+    font-size: calc(32px * var(--tavern-notes-ui-scale, 1));
     font-weight: 300;
     letter-spacing: 0;
     line-height: 1.05;
@@ -294,7 +291,7 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    font-size: 13px;
+    font-size: calc(13px * var(--tavern-notes-ui-scale, 1));
     white-space: nowrap;
 }
 
@@ -304,7 +301,7 @@
     border-radius: 50%;
     display: grid;
     place-items: center;
-    font-size: 15px;
+    font-size: calc(15px * var(--tavern-notes-ui-scale, 1));
 }
 
 .tn-header-actions
@@ -361,12 +358,12 @@
 }
 
 .tn-filter-text b {
-    font-size: 13px;
+    font-size: calc(13px * var(--tavern-notes-ui-scale, 1));
     font-weight: 600;
 }
 
 :is(.tn-section-title, .tnl-section-title) span {
-    font-size: 15px;
+    font-size: calc(15px * var(--tavern-notes-ui-scale, 1));
     font-weight: 600;
 }
 
@@ -488,7 +485,7 @@
     padding: 12px;
     border-radius: 18px;
     font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 12px;
+    font-size: calc(12px * var(--tavern-notes-ui-scale, 1));
     line-height: 1.5;
     white-space: pre;
 }
@@ -536,7 +533,7 @@
     backdrop-filter: blur(10px);
     opacity: 0.44;
     cursor: pointer;
-    font-size: 11px;
+    font-size: calc(11px * var(--tavern-notes-ui-scale, 1));
     line-height: 1;
     white-space: nowrap;
     transition: opacity 120ms ease, color 120ms ease, transform 120ms ease;
@@ -545,6 +542,39 @@
 .tn-floor-capture span {
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+#chat .mes .mes_buttons > .tn-floor-capture-integrated {
+    position: static;
+    inset: auto;
+    z-index: auto;
+    width: auto;
+    min-height: 0;
+    max-width: none;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    color: var(--SmartThemeBodyColor, inherit);
+    background: none;
+    box-shadow: none;
+    opacity: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    transform: none;
+    appearance: none;
+}
+
+#chat .mes .mes_buttons > .tn-floor-capture-integrated span {
+    display: none;
+}
+
+#chat .mes .mes_buttons > .tn-floor-capture-integrated:hover,
+#chat .mes .mes_buttons > .tn-floor-capture-integrated:focus-visible {
+    color: inherit;
+    background: none;
+    box-shadow: none;
+    opacity: 1;
+    transform: none;
 }
 
 #chat .mes:hover > .tn-floor-capture,
@@ -615,7 +645,7 @@
 }
 
 :is(#tavern-notes-panel, #tavern-notes-lite-panel) .tn-title {
-    font-size: 29px;
+    font-size: calc(29px * var(--tavern-notes-ui-scale, 1));
     line-height: 1;
 }
 
@@ -825,7 +855,7 @@
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
         font: inherit;
-        font-size: 13px;
+        font-size: calc(13px * var(--tavern-notes-ui-scale, 1));
         font-weight: 750;
         letter-spacing: 0.03em;
         white-space: nowrap;
@@ -835,7 +865,7 @@
     }
 
     :is(#tavern-notes-panel, #tavern-notes-lite-panel).tn-reading-mode .tn-reading-mode-expand i {
-        font-size: 12px;
+        font-size: calc(12px * var(--tavern-notes-ui-scale, 1));
         animation: tn-reading-expand-hint 1.8s ease-in-out infinite;
     }
 

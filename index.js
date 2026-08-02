@@ -98,7 +98,7 @@ const LITE_SETTINGS_PROFILE_KEY = 'tavern-notes-unified-lite-settings';
 const LEGACY_LITE_SETTINGS_KEY = 'tavern-notes-lite-settings';
 const UNIFIED_ONBOARDING_KEY = 'tavern-notes-unified-onboarding-v1';
 const UPDATE_NOTICE_KEY = 'tavern-notes-update-notice';
-const EXTENSION_VERSION = '2.0.4';
+const EXTENSION_VERSION = '2.0.5';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/manifest.json';
 const REMOTE_CHANGELOG_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/CHANGELOG.md';
 const REMOTE_CHANGELOG_ANNOTATION_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/CHANGELOG.zh-CN.md';
@@ -216,6 +216,8 @@ const SETTINGS_STATE_FIELDS = {
     recentTags: 'recentTags',
     launcherMode: 'launcherMode',
     floatingPosition: 'floatingPosition',
+    floatingButtonScale: 'floatingButtonScale',
+    floatingButtonOpacity: 'floatingButtonOpacity',
     autoCaptureUserInput: 'autoCaptureUserInput',
     collapseRepeatedUserInput: 'collapseRepeatedUserInput',
     userInputIgnoreExact: 'userInputIgnoreExact',
@@ -224,6 +226,7 @@ const SETTINGS_STATE_FIELDS = {
     showFloorCaptureButton: 'showFloorCaptureButton',
     floorCaptureSelector: 'floorCaptureSelector',
     floorCaptureExcludedTags: 'floorCaptureExcludedTags',
+    uiFontScale: 'uiFontScale',
     shareCardSettings: 'shareCard',
 };
 for (const [stateKey, settingsKey] of Object.entries(SETTINGS_STATE_FIELDS)) {
@@ -313,6 +316,9 @@ const TEXT_ZH_CN = {
     save: '保存',
     saveAs: '另存为',
     resetDefault: '恢复默认',
+    uiFontSize: '界面字体大小',
+    floatingButtonSize: '悬浮按钮大小',
+    floatingButtonOpacity: '悬浮按钮透明度',
     shareCard: '分享卡片',
     font: '字体',
     savedFonts: '已导入字体',
@@ -406,6 +412,7 @@ const TEXT_ZH_CN = {
     updateAvailableTitle: '酒馆笔记有新版本',
     updateAvailable: '检测到 v{version}。请在 SillyTavern 扩展面板里更新；如果当初用黑窗安装，也可以重新运行安装器。',
     updateCenter: '版本与更新', updateCenterIntro: '查看当前版本、最新版本和更新日志。是否更新完全由你决定。', checkUpdates: '检查更新', checkingUpdates: '正在检查…', installedVersion: '当前版本', latestVersion: '最新版本', updateAvailableStatus: '发现新版本 v{version}', upToDateStatus: '已经是最新版本', updateCheckFailed: '暂时无法连接更新服务器', openExtensionManager: '打开扩展管理', openRepository: '打开项目页面', updateInstructions: '更新由 SillyTavern 扩展管理器执行；酒馆笔记不会静默安装或覆盖文件。', changelogTitle: '更新日志', latestBadge: '最新', noChangelog: '暂时没有取得更新日志。', viewUpdate: '查看更新', authorAnnotation: '作者中文注释',
+    updateNow: '立即更新', updatingNow: '正在更新…', confirmAutoUpdate: '确定让 SillyTavern 立即更新酒馆笔记到 v{version} 吗？', updateCompletedReload: '酒馆笔记前端已经更新完成。\n\n点击“确定”刷新页面并启用新版本。', updateFailedMessage: '自动更新失败：{message}', serverPluginUpdatePrompt: '酒馆笔记前端已经更新，但这个版本同时需要更新 Server Plugin。\n\n请重新运行：\n{path}\n\n然后完整重启 SillyTavern。',
     backendInstallTitle: 'Lite 浏览器版已安装成功',
     backendInstallMessage: '现在已经可以直接使用酒馆笔记。数据会保存在当前浏览器中，关闭此窗口即可开始。',
     backendInstallFullTitle: '想把笔记保存为本地文件？',
@@ -605,6 +612,9 @@ const TEXTS = {
         mergeTheme: '融合目前酒館主題',
         saveAs: '另存為',
         resetDefault: '恢復預設',
+        uiFontSize: '介面字體大小',
+        floatingButtonSize: '懸浮按鈕大小',
+        floatingButtonOpacity: '懸浮按鈕透明度',
         importFont: '匯入網路字體',
         importLocalFont: '匯入本機字體',
         customBackground: '自訂背景色',
@@ -662,6 +672,7 @@ const TEXTS = {
         updateAvailableTitle: '酒館筆記有新版本',
         updateAvailable: '偵測到 v{version}。請在 SillyTavern 擴充面板裡更新；如果當初用黑窗安裝，也可以重新執行安裝器。',
         updateCenter: '版本與更新', updateCenterIntro: '查看目前版本、最新版本和更新日誌。是否更新完全由你決定。', checkUpdates: '檢查更新', checkingUpdates: '正在檢查…', installedVersion: '目前版本', latestVersion: '最新版本', updateAvailableStatus: '發現新版本 v{version}', upToDateStatus: '已經是最新版本', updateCheckFailed: '暫時無法連線更新伺服器', openExtensionManager: '開啟擴充管理', openRepository: '開啟專案頁面', updateInstructions: '更新由 SillyTavern 擴充管理器執行；酒館筆記不會靜默安裝或覆蓋檔案。', changelogTitle: '更新日誌', latestBadge: '最新', noChangelog: '暫時沒有取得更新日誌。', viewUpdate: '查看更新', authorAnnotation: '作者中文註釋',
+        updateNow: '立即更新', updatingNow: '正在更新…', confirmAutoUpdate: '確定讓 SillyTavern 立即更新酒館筆記到 v{version} 嗎？', updateCompletedReload: '酒館筆記前端已更新完成。\n\n點擊「確定」重新整理頁面並啟用新版本。', updateFailedMessage: '自動更新失敗：{message}', serverPluginUpdatePrompt: '酒館筆記前端已更新，但此版本同時需要更新 Server Plugin。\n\n請重新執行：\n{path}\n\n然後完整重啟 SillyTavern。',
         backendInstallTitle: 'Lite 瀏覽器版已安裝成功',
         backendInstallMessage: '現在已經可以直接使用酒館筆記。資料會儲存在目前瀏覽器中，關閉此視窗即可開始。',
         backendInstallFullTitle: '想把筆記儲存為本機檔案？',
@@ -866,6 +877,9 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         save: 'Save',
         saveAs: 'Save as',
         resetDefault: 'Reset default',
+        uiFontSize: 'Interface font size',
+        floatingButtonSize: 'Floating button size',
+        floatingButtonOpacity: 'Floating button opacity',
         shareCard: 'Share Card',
         font: 'Font',
         savedFonts: 'Imported fonts',
@@ -956,6 +970,7 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         updateAvailableTitle: 'Tavern Notes update available',
         updateAvailable: 'Version {version} is available. Update it in the SillyTavern extensions panel, or rerun the installer if you originally used the installer.',
         updateCenter: 'Version & updates', updateCenterIntro: 'View the installed version, latest version, and release notes. You decide whether to update.', checkUpdates: 'Check for updates', checkingUpdates: 'Checking…', installedVersion: 'Installed', latestVersion: 'Latest', updateAvailableStatus: 'Version {version} is available', upToDateStatus: 'You are up to date', updateCheckFailed: 'Could not reach the update server', openExtensionManager: 'Open extension manager', openRepository: 'Open project page', updateInstructions: 'Updates are performed by the SillyTavern extension manager. Tavern Notes never installs silently or overwrites files on its own.', changelogTitle: 'Release notes', latestBadge: 'Latest', noChangelog: 'Release notes are not available right now.', viewUpdate: 'View update', authorAnnotation: 'Author’s Chinese notes',
+        updateNow: 'Update now', updatingNow: 'Updating…', confirmAutoUpdate: 'Let SillyTavern update Tavern Notes to v{version} now?', updateCompletedReload: 'The Tavern Notes frontend has been updated.\n\nSelect OK to reload the page and use the new version.', updateFailedMessage: 'Automatic update failed: {message}', serverPluginUpdatePrompt: 'The Tavern Notes frontend was updated, but this release also requires a Server Plugin update.\n\nRun this again:\n{path}\n\nThen fully restart SillyTavern.',
         backendInstallTitle: 'Lite browser edition installed successfully',
         backendInstallMessage: 'Tavern Notes is ready to use. Your data will be stored in this browser; close this dialog to begin.',
         backendInstallFullTitle: 'Want to save notes as local files?',
@@ -1161,6 +1176,9 @@ Click Preview & save or Save as to create a theme file.`,
         save: '저장',
         saveAs: '다른 이름으로 저장',
         resetDefault: '기본값 복원',
+        uiFontSize: '인터페이스 글자 크기',
+        floatingButtonSize: '플로팅 버튼 크기',
+        floatingButtonOpacity: '플로팅 버튼 투명도',
         shareCard: '공유 카드',
         font: '글꼴',
         savedFonts: '가져온 글꼴',
@@ -1251,6 +1269,7 @@ Click Preview & save or Save as to create a theme file.`,
         updateAvailableTitle: 'Tavern Notes 업데이트 가능',
         updateAvailable: 'v{version} 버전이 있습니다. SillyTavern 확장 패널에서 업데이트하거나, 설치기로 설치했다면 설치기를 다시 실행하세요.',
         updateCenter: '버전 및 업데이트', updateCenterIntro: '현재 버전, 최신 버전과 변경 사항을 확인합니다. 업데이트 여부는 사용자가 결정합니다.', checkUpdates: '업데이트 확인', checkingUpdates: '확인 중…', installedVersion: '현재 버전', latestVersion: '최신 버전', updateAvailableStatus: '새 버전 v{version} 사용 가능', upToDateStatus: '최신 버전입니다', updateCheckFailed: '업데이트 서버에 연결할 수 없습니다', openExtensionManager: '확장 관리 열기', openRepository: '프로젝트 페이지 열기', updateInstructions: '업데이트는 SillyTavern 확장 관리자가 수행합니다. Tavern Notes는 자동으로 설치하거나 파일을 덮어쓰지 않습니다.', changelogTitle: '업데이트 기록', latestBadge: '최신', noChangelog: '현재 업데이트 기록을 가져올 수 없습니다.', viewUpdate: '업데이트 보기', authorAnnotation: '작성자 중국어 주석',
+        updateNow: '지금 업데이트', updatingNow: '업데이트 중…', confirmAutoUpdate: 'SillyTavern에서 Tavern Notes를 v{version}(으)로 지금 업데이트할까요?', updateCompletedReload: 'Tavern Notes 프런트엔드 업데이트가 완료되었습니다.\n\n확인을 눌러 페이지를 새로고침하고 새 버전을 적용하세요.', updateFailedMessage: '자동 업데이트 실패: {message}', serverPluginUpdatePrompt: 'Tavern Notes 프런트엔드는 업데이트되었지만 이 버전은 Server Plugin 업데이트도 필요합니다.\n\n다음을 다시 실행하세요:\n{path}\n\n그런 다음 SillyTavern을 완전히 재시작하세요.',
         backendInstallTitle: 'Lite 브라우저 버전 설치 완료',
         backendInstallMessage: '이제 Tavern Notes를 바로 사용할 수 있습니다. 데이터는 현재 브라우저에 저장되며, 이 창을 닫으면 시작할 수 있습니다.',
         backendInstallFullTitle: '노트를 로컬 파일로 저장하고 싶나요?',
@@ -2168,6 +2187,7 @@ const captureView = createCaptureView({
         selectionButton: '#tavern-notes-selection-capture',
         selectionClass: 'tn-selection-capture',
         floorButton: '.tn-floor-capture',
+        floorActions: '.mes_buttons',
         chat: '#chat',
         messages: '.mes, [mesid], [data-mesid]',
         message: '.mes, [mesid], [data-mesid]',
@@ -2179,6 +2199,7 @@ const captureView = createCaptureView({
     getSelectionSnapshot: readCaptureSelection,
     onSelectionCapture: snapshot => captureController.handleManualCapture(snapshot),
     onFloorCapture: message => captureController.captureWholeFloor(message),
+    onChatChanged: handler => sillyTavernEvents.onChatChanged(handler),
 });
 const userInputMaintenanceView = createUserInputMaintenanceView({
     root: () => document.querySelector('#tavern-notes-panel'),
@@ -2269,6 +2290,18 @@ const themeStudio = createThemeStudio({
     themeController,
     translate: t,
     notify,
+    getUiFontScale: () => state.uiFontScale,
+    updateUiFontScale: async value => {
+        const result = await updateSettings({ uiFontScale: value });
+        if (result.ok) applyUiFontScale();
+        return result;
+    },
+    getFloatingAppearance: () => ({ scale: state.floatingButtonScale, opacity: state.floatingButtonOpacity }),
+    updateFloatingAppearance: async patch => {
+        const result = await updateSettings(patch);
+        if (result.ok) quickReplyController.refresh();
+        return result;
+    },
 });
 themeController.attachStudio(themeStudio);
 
@@ -2313,6 +2346,7 @@ const updateRepository = createUpdateRepository({
     annotationUrl: REMOTE_CHANGELOG_ANNOTATION_URL,
     noticeStorage: localStorage,
     noticeKey: UPDATE_NOTICE_KEY,
+    getRequestHeaders,
 });
 const updateView = createUpdateView({
     root: () => document.querySelector('#tavern-notes-update-menu'),
@@ -2329,10 +2363,23 @@ const updateController = createUpdateController({
     view: updateView,
     fallbackVersion: EXTENSION_VERSION,
     notify: info => {
+        if (info?.updateFailed) {
+            notify(t('updateFailedMessage', { message: info.error?.message || t('updateCheckFailed') }), 'error');
+            return true;
+        }
         const toastrApi = globalThis.toastr;
         if (!toastrApi) return false;
         toastrApi.info(t('updateAvailable', { version: info.latestVersion }), t('updateAvailableTitle'), { timeOut: 12000, extendedTimeOut: 16000 });
         return true;
+    },
+    confirmUpdate: info => window.confirm(t('confirmAutoUpdate', { version: info.latestVersion })),
+    onUpdated: async (_result, info) => {
+        if (info.serverPluginUpdateRequired && state.storageMode === 'full') {
+            window.alert(t('serverPluginUpdatePrompt', { path: BACKEND_INSTALL_WINDOWS_PATH }));
+            return;
+        }
+        window.alert(t('updateCompletedReload'));
+        window.location.reload();
     },
     setStatus: info => setStatus(`${t('updateAvailableTitle')}: ${t('updateAvailable', { version: info.latestVersion })}`),
 });
@@ -3164,6 +3211,11 @@ function applyStorageCapabilities() {
     }
 }
 
+function applyUiFontScale() {
+    const panel = document.querySelector('#tavern-notes-panel');
+    if (panel) panel.style.setProperty('--tavern-notes-ui-scale', String(state.uiFontScale || 1));
+}
+
 function buildPanel() {
     if (document.querySelector('#tavern-notes-panel')) return;
 
@@ -3207,6 +3259,7 @@ function buildPanel() {
     updateFloorCaptureSelectorInput();
     bindEvents();
     applyStorageCapabilities();
+    applyUiFontScale();
 }
 
 const appShellView = createAppShellView({
@@ -3516,6 +3569,7 @@ quickReplyController = createQuickReplyController({
         open: () => { if (state.open) closePanel(); else openPanel(); },
         capture: () => captureController.handleManualCapture().catch(error => notify(error.message, 'error')),
         getPosition: () => state.floatingPosition,
+        getAppearance: () => ({ scale: state.floatingButtonScale, opacity: state.floatingButtonOpacity }),
         iconsChanged: () => themeView.updateIcons(appStore.getSlice('theme').theme || DEFAULT_THEME),
     },
 });

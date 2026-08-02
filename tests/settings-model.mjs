@@ -31,6 +31,9 @@ const normalized = normalizeSettings({
     userInputIgnoreExact: [' a ', 'a', '', 7],
     floorCaptureExcludedTags: ['<THINKING>', 'bad tag', 'thinking'],
     appleGlassMode: 'invalid',
+    uiFontScale: 3,
+    floatingButtonScale: 9,
+    floatingButtonOpacity: 0.1,
     recentTags: 'not-an-array',
     shareCard: {
         theme: 'invalid',
@@ -44,6 +47,12 @@ assert.equal(normalized.floatingPosition, null);
 assert.deepEqual(normalized.userInputIgnoreExact, ['a', '7']);
 assert.deepEqual(normalized.floorCaptureExcludedTags, ['thinking']);
 assert.equal(normalized.appleGlassMode, 'day');
+assert.equal(normalized.uiFontScale, 1.2);
+assert.equal(normalized.floatingButtonScale, 1.5);
+assert.equal(normalizeSettings({ floatingButtonScale: 0.1 }).floatingButtonScale, 0.4);
+assert.equal(normalized.floatingButtonOpacity, 0.3);
+assert.equal(normalizeSettings({ uiFontScale: 0.2 }).uiFontScale, 0.8);
+assert.equal(normalizeSettings({ uiFontScale: 'bad' }).uiFontScale, 1);
 assert.deepEqual(normalized.recentTags, []);
 assert.equal(normalized.shareCard.theme, 'calendar');
 assert.equal(normalized.shareCard.fontScale, 0.8);

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { renderFullAppShellMarkup } from '../repositories/full-app-shell-markup.js';
+import { renderThemeStudioMarkup } from '../features/theme-studio.js';
 
 const html = renderFullAppShellMarkup({
     state: {
@@ -49,3 +50,13 @@ for (const classValue of html.matchAll(/class="([^"]*)"/g)) {
 }
 
 console.log('Full app shell markup test passed.');
+
+const themeStudio = renderThemeStudioMarkup({
+    translate: key => key,
+    escapeHtml: value => String(value),
+    uiFontScale: 0.9,
+});
+assert.match(themeStudio, /id="tavern-notes-ui-font-scale"[^>]*min="80"[^>]*max="120"[^>]*value="90"/);
+assert.match(themeStudio, /id="tavern-notes-ui-font-scale-value">90%/);
+assert.match(themeStudio, /id="tavern-notes-floating-button-scale"[^>]*min="40"[^>]*max="150"/);
+assert.match(themeStudio, /id="tavern-notes-floating-button-opacity"[^>]*min="30"[^>]*max="100"/);

@@ -20,7 +20,7 @@ export function createQuickReplyController({ view, getMode, saveSettings, findTo
         mount() {
             if (mounted) return;
             mounted = true; paused = false;
-            view.mount?.({ open: capabilities.open, capture: capabilities.capture, getPosition: capabilities.getPosition, iconsChanged: capabilities.iconsChanged });
+            view.mount?.({ open: capabilities.open, capture: capabilities.capture, getPosition: capabilities.getPosition, getAppearance: capabilities.getAppearance, iconsChanged: capabilities.iconsChanged });
             observer?.mount?.();
             refresh();
         },

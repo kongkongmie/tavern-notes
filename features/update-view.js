@@ -18,16 +18,18 @@ export function createUpdateView({ root, idPrefix, classPrefix, translate, escap
             bind(document.querySelector(`#${idPrefix}-update-open`), 'click', () => this.open());
             bind(document.querySelector(`#${idPrefix}-update-indicator`), 'click', () => this.open());
             bind(menu.querySelector(`#${idPrefix}-update-check`), 'click', () => handlers.onCheck().catch(() => {}));
+            bind(menu.querySelector(`#${idPrefix}-update-install`), 'click', () => handlers.onUpdate().catch(() => {}));
             bind(menu.querySelector(`#${idPrefix}-update-manager`), 'click', openManager);
             bind(menu.querySelector(`#${idPrefix}-update-repository`), 'click', openRepository);
             mounted = true;
         },
-        render({ info, checking, fallbackVersion }) {
+        render({ info, checking, updating, fallbackVersion }) {
             if (!menu) return;
             const installed = menu.querySelector('[data-update-installed]');
             const latest = menu.querySelector('[data-update-latest]');
             const status = menu.querySelector('[data-update-status]');
             const checkButton = menu.querySelector(`#${idPrefix}-update-check`);
+            const updateButton = menu.querySelector(`#${idPrefix}-update-install`);
             const indicator = document.querySelector(`#${idPrefix}-update-indicator`);
             const moreButton = document.querySelector(`#${idPrefix}-more-open`);
             const hasUpdate = Boolean(info?.hasUpdate);
@@ -44,9 +46,15 @@ export function createUpdateView({ root, idPrefix, classPrefix, translate, escap
                         : info ? translate('upToDateStatus') : translate('checkUpdates');
             }
             if (checkButton) {
-                checkButton.disabled = checking;
+                checkButton.disabled = checking || updating;
                 checkButton.classList.toggle('checking', checking);
                 checkButton.querySelector('span')?.replaceChildren(document.createTextNode(translate(checking ? 'checkingUpdates' : 'checkUpdates')));
+            }
+            if (updateButton) {
+                updateButton.disabled = checking || updating || !hasUpdate;
+                updateButton.classList.toggle('checking', updating);
+                const label = updating ? 'updatingNow' : hasUpdate ? 'updateNow' : info && !info.error ? 'upToDateStatus' : 'updateNow';
+                updateButton.querySelector('span')?.replaceChildren(document.createTextNode(translate(label)));
             }
             const log = menu.querySelector(`#${idPrefix}-update-log`);
             if (log) log.innerHTML = info?.changelog?.length ? info.changelog.map((entry, index) => {

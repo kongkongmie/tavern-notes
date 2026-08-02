@@ -3,11 +3,26 @@ export function renderThemeStudioMarkup({
     escapeHtml,
     idPrefix = 'tavern-notes',
     classPrefix = 'tn',
+    uiFontScale = 1,
+    floatingButtonScale = 1,
+    floatingButtonOpacity = 0.9,
 }) {
     const t = translate;
     const escape = escapeHtml;
     return `
         <div class="${classPrefix}-theme-studio" data-theme-studio>
+            <div class="${classPrefix}-ui-font-control">
+                <label for="${idPrefix}-ui-font-scale"><i class="fa-solid fa-text-height"></i><span>${escape(t('uiFontSize'))}</span><output id="${idPrefix}-ui-font-scale-value">${Math.round(uiFontScale * 100)}%</output></label>
+                <div><input id="${idPrefix}-ui-font-scale" type="range" min="80" max="120" step="5" value="${Math.round(uiFontScale * 100)}" /><button id="${idPrefix}-ui-font-reset" type="button">${escape(t('resetDefault'))}</button></div>
+            </div>
+            <div class="${classPrefix}-ui-font-control">
+                <label for="${idPrefix}-floating-button-scale"><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>${escape(t('floatingButtonSize'))}</span><output id="${idPrefix}-floating-button-scale-value">${Math.round(floatingButtonScale * 100)}%</output></label>
+                <div><input id="${idPrefix}-floating-button-scale" type="range" min="40" max="150" step="5" value="${Math.round(floatingButtonScale * 100)}" /><button id="${idPrefix}-floating-button-scale-reset" type="button">${escape(t('resetDefault'))}</button></div>
+            </div>
+            <div class="${classPrefix}-ui-font-control">
+                <label for="${idPrefix}-floating-button-opacity"><i class="fa-solid fa-circle-half-stroke"></i><span>${escape(t('floatingButtonOpacity'))}</span><output id="${idPrefix}-floating-button-opacity-value">${Math.round(floatingButtonOpacity * 100)}%</output></label>
+                <div><input id="${idPrefix}-floating-button-opacity" type="range" min="30" max="100" step="5" value="${Math.round(floatingButtonOpacity * 100)}" /><button id="${idPrefix}-floating-button-opacity-reset" type="button">${escape(t('resetDefault'))}</button></div>
+            </div>
             <input id="${idPrefix}-theme-name-input" class="${classPrefix}-theme-input" type="text" placeholder="${escape(t('themeName'))}" />
             <button id="${idPrefix}-theme-merge-st" class="${classPrefix}-theme-merge-button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>${escape(t('mergeTheme'))}</span></button>
             <div class="${classPrefix}-theme-actions">
@@ -33,6 +48,10 @@ export function createThemeStudio({
     themeController,
     translate,
     notify,
+    getUiFontScale = () => 1,
+    updateUiFontScale = async () => {},
+    getFloatingAppearance = () => ({ scale: 1, opacity: 0.9 }),
+    updateFloatingAppearance = async () => {},
     idPrefix = 'tavern-notes',
 }) {
     const t = translate;
@@ -330,12 +349,43 @@ export function createThemeStudio({
         });
     }
 
-    function listen(selector, action) {
+    function listen(selector, action, eventName = 'click') {
         const element = document.querySelector(selector);
         if (!element) return;
-        const listener = () => Promise.resolve(action()).catch(error => notify(error.message, 'error'));
-        element.addEventListener('click', listener);
-        listeners.push([element, listener]);
+        const listener = event => Promise.resolve(action(event)).catch(error => notify(error.message, 'error'));
+        element.addEventListener(eventName, listener);
+        listeners.push([element, listener, eventName]);
+    }
+
+    function syncUiFontScale(value = getUiFontScale()) {
+        const percent = Math.round(Number(value || 1) * 100);
+        const input = document.querySelector(`#${idPrefix}-ui-font-scale`);
+        const output = document.querySelector(`#${idPrefix}-ui-font-scale-value`);
+        if (input) input.value = String(percent);
+        if (output) output.textContent = `${percent}%`;
+        document.querySelector(`#${idPrefix}-panel`)?.style.setProperty('--tavern-notes-ui-scale', String(percent / 100));
+    }
+
+    async function saveUiFontScale(percent) {
+        const value = Math.min(120, Math.max(80, Number(percent) || 100)) / 100;
+        syncUiFontScale(value);
+        await updateUiFontScale(value);
+    }
+
+    function syncFloatingControl(kind, value) {
+        const percent = Math.round(Number(value) * 100);
+        const input = document.querySelector(`#${idPrefix}-floating-button-${kind}`);
+        const output = document.querySelector(`#${idPrefix}-floating-button-${kind}-value`);
+        if (input) input.value = String(percent);
+        if (output) output.textContent = `${percent}%`;
+        const launcher = document.querySelector(`#${idPrefix}-floating-launcher`);
+        launcher?.style.setProperty(`--tavern-notes-floating-${kind}`, String(value));
+    }
+
+    async function saveFloatingControl(kind, percent) {
+        const value = Number(percent) / 100;
+        syncFloatingControl(kind, value);
+        await updateFloatingAppearance({ [kind === 'scale' ? 'floatingButtonScale' : 'floatingButtonOpacity']: value });
     }
 
     function mount() {
@@ -343,12 +393,24 @@ export function createThemeStudio({
         listen(`#${idPrefix}-theme-preview-save`, previewAndSaveFromEditor);
         listen(`#${idPrefix}-theme-merge-st`, mergeCurrentSillyTavernTheme);
         listen(`#${idPrefix}-theme-save-as`, saveAsFromEditor);
+        listen(`#${idPrefix}-ui-font-scale`, event => syncUiFontScale(Number(event.target.value) / 100), 'input');
+        listen(`#${idPrefix}-ui-font-scale`, event => saveUiFontScale(event.target.value), 'change');
+        listen(`#${idPrefix}-ui-font-reset`, () => saveUiFontScale(100));
+        for (const [kind, fallback] of [['scale', 1], ['opacity', 0.9]]) {
+            listen(`#${idPrefix}-floating-button-${kind}`, event => syncFloatingControl(kind, Number(event.target.value) / 100), 'input');
+            listen(`#${idPrefix}-floating-button-${kind}`, event => saveFloatingControl(kind, event.target.value), 'change');
+            listen(`#${idPrefix}-floating-button-${kind}-reset`, () => saveFloatingControl(kind, fallback * 100));
+        }
+        syncUiFontScale();
+        const appearance = getFloatingAppearance();
+        syncFloatingControl('scale', appearance.scale || 1);
+        syncFloatingControl('opacity', appearance.opacity || 0.9);
         mounted = true;
     }
 
     function destroy() {
-        for (const [element, listener] of listeners.splice(0)) {
-            element.removeEventListener('click', listener);
+        for (const [element, listener, eventName] of listeners.splice(0)) {
+            element.removeEventListener(eventName, listener);
         }
         mounted = false;
     }

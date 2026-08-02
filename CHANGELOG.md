@@ -1,5 +1,20 @@
 ﻿# Changelog
 
+## 2.0.5
+
+### Features
+
+- Added a one-click update button to the Version & Updates page. When a newer version is detected, the extension update can be started directly from Tavern Notes.
+- Updates that also require the Full-mode Server Plugin now show an additional prompt to reinstall the backend and fully restart SillyTavern.
+- Added an interface font-size setting with an 80%–120% range and a reset-to-default action.
+- Added a floating-button size setting with a 40%–150% range.
+- Added a floating-button opacity setting with a 30%–100% range.
+- Interface font size, floating-button size, and opacity are saved automatically in both Full and Lite modes.
+
+### Whole-floor capture
+
+- The whole-floor capture button is now inserted directly into SillyTavern's native message action group instead of floating over bookmark, edit, and other original controls.
+
 ## 2.0.4
 
 - Added **Export full-length image** for share cards: PNG output uses a mobile-friendly fixed width of 1080 px and grows vertically to include the complete note body.

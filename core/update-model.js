@@ -26,13 +26,14 @@ export function parseChangelog(markdown, limit = 12) {
     return entries.slice(0, limit);
 }
 
-export function createUpdateInfo({ installedVersion, latestVersion, changelog = [], annotations = [] }) {
+export function createUpdateInfo({ installedVersion, latestVersion, changelog = [], annotations = [], serverPluginUpdateRequired = false }) {
     return {
         installedVersion: String(installedVersion || ''),
         latestVersion: String(latestVersion || ''),
         hasUpdate: compareVersions(latestVersion, installedVersion) > 0,
         changelog,
         annotations,
+        serverPluginUpdateRequired: Boolean(serverPluginUpdateRequired),
     };
 }
 

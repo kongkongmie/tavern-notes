@@ -79,9 +79,11 @@ export function createCaptureView({
     getSelectionSnapshot,
     onSelectionCapture,
     onFloorCapture,
+    onChatChanged = null,
 }) {
     let mounted = false;
     let observer = null;
+    let unsubscribeChatChanged = null;
     let timer = null;
     let abortController = null;
     let lastSelection = null;
@@ -144,18 +146,41 @@ export function createCaptureView({
     function ensureFloorButton(candidate) {
         const message = candidate?.closest?.('.mes') || candidate;
         if (!message?.querySelector) return;
-        if (!isFloorEnabled() || message.querySelector(`:scope > ${selectors.floorButton}`)) return;
-        const button = documentRef.createElement('button');
-        button.type = 'button';
+        if (!isFloorEnabled()) return;
+        const actionBar = message.querySelector(selectors.floorActions || '.mes_buttons');
+        const existing = message.querySelector(selectors.floorButton);
+        if (existing) {
+            if (actionBar && existing.parentElement !== actionBar) {
+                existing.classList.add('mes_button', uiClass('floor-capture-integrated', { classPrefix }));
+                actionBar.prepend(existing);
+            }
+            return;
+        }
+        const button = documentRef.createElement('div');
+        button.setAttribute?.('role', 'button');
+        button.tabIndex = 0;
         button.className = uiClass('floor-capture', { classPrefix });
         button.title = translate('captureFloorTitle');
+        button.setAttribute?.('aria-label', translate('captureFloorTitle'));
         button.innerHTML = `<i class="fa-solid fa-file-lines"></i><span>${escapeHtml(translate('captureFloor'))}</span>`;
-        button.addEventListener('click', event => {
-            event.preventDefault();
-            event.stopPropagation();
-            onFloorCapture(message);
-        }, { signal: abortController.signal });
-        message.append(button);
+        if (actionBar) {
+            button.classList.add('mes_button', uiClass('floor-capture-integrated', { classPrefix }));
+            actionBar.prepend(button);
+        } else {
+            message.append(button);
+        }
+    }
+
+    function handleFloorButton(event) {
+        const button = event.target?.closest?.(selectors.floorButton);
+        if (!button) return;
+        if (event.type === 'keydown' && !['Enter', ' '].includes(event.key)) return;
+        const messageSelector = selectors.message || selectors.messages;
+        const message = button.closest?.(messageSelector);
+        if (!message) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onFloorCapture(message);
     }
 
     function refreshFloorButtons(root = documentRef) {
@@ -179,8 +204,14 @@ export function createCaptureView({
         documentRef.addEventListener('selectionchange', scheduleSelectionButton, { signal: abortController.signal });
         documentRef.addEventListener('mouseup', scheduleSelectionButton, { signal: abortController.signal });
         documentRef.addEventListener('scroll', hideSelectionButton, { capture: true, signal: abortController.signal });
+        documentRef.addEventListener('click', handleFloorButton, { capture: true, signal: abortController.signal });
+        documentRef.addEventListener('keydown', handleFloorButton, { capture: true, signal: abortController.signal });
         windowRef.addEventListener('resize', hideSelectionButton, { signal: abortController.signal });
         refreshFloorButtons();
+        unsubscribeChatChanged = onChatChanged?.(() => {
+            windowRef.setTimeout(() => refreshFloorButtons(), 0);
+            windowRef.setTimeout(() => refreshFloorButtons(), 120);
+        }) || null;
         // Observe the stable page body because SillyTavern may replace #chat.
         const observationRoot = documentRef.body || documentRef.querySelector(selectors.chat);
         if (observationRoot) {
@@ -201,6 +232,8 @@ export function createCaptureView({
         timer = null;
         observer?.disconnect();
         observer = null;
+        unsubscribeChatChanged?.();
+        unsubscribeChatChanged = null;
         abortController?.abort();
         abortController = null;
         documentRef.querySelector(selectors.selectionButton)?.remove();

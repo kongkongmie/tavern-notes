@@ -26,6 +26,8 @@ export const DEFAULT_SETTINGS = deepFreeze({
     language: 'auto',
     launcherMode: 'toolbar',
     floatingPosition: null,
+    floatingButtonScale: 1,
+    floatingButtonOpacity: 0.9,
     autoCaptureUserInput: true,
     collapseRepeatedUserInput: true,
     userInputIgnoreExact: [],
@@ -36,6 +38,7 @@ export const DEFAULT_SETTINGS = deepFreeze({
     floorCaptureExcludedTags: [],
     appleGlassMode: 'day',
     defaultThemeMode: 'day',
+    uiFontScale: 1,
     currentUserName: '',
     recentTags: [],
     shareCard: {
@@ -148,12 +151,17 @@ export function normalizeSettings(raw) {
         && settings.floorCaptureSelector !== LEGACY_FLOOR_CAPTURE_SELECTOR
         ? settings.floorCaptureSelector
         : DEFAULT_FLOOR_CAPTURE_SELECTOR;
+    const uiFontScale = Number(settings.uiFontScale);
+    const floatingButtonScale = Number(settings.floatingButtonScale);
+    const floatingButtonOpacity = Number(settings.floatingButtonOpacity);
     return {
         schemaVersion: SETTINGS_SCHEMA_VERSION,
         storageMode,
         language: LANGUAGES.has(settings.language) ? settings.language : DEFAULT_SETTINGS.language,
         launcherMode: ['toolbar', 'floating'].includes(settings.launcherMode) ? settings.launcherMode : DEFAULT_SETTINGS.launcherMode,
         floatingPosition: normalizeFloatingPosition(settings.floatingPosition),
+        floatingButtonScale: Number.isFinite(floatingButtonScale) ? Math.min(1.5, Math.max(0.4, floatingButtonScale)) : DEFAULT_SETTINGS.floatingButtonScale,
+        floatingButtonOpacity: Number.isFinite(floatingButtonOpacity) ? Math.min(1, Math.max(0.3, floatingButtonOpacity)) : DEFAULT_SETTINGS.floatingButtonOpacity,
         autoCaptureUserInput: settings.autoCaptureUserInput !== false,
         collapseRepeatedUserInput: settings.collapseRepeatedUserInput !== false,
         userInputIgnoreExact: normalizeInputRules(settings.userInputIgnoreExact),
@@ -164,6 +172,7 @@ export function normalizeSettings(raw) {
         floorCaptureExcludedTags: normalizeExcludedTags(settings.floorCaptureExcludedTags),
         appleGlassMode: settings.appleGlassMode === 'night' ? 'night' : 'day',
         defaultThemeMode: settings.defaultThemeMode === 'night' ? 'night' : 'day',
+        uiFontScale: Number.isFinite(uiFontScale) ? Math.min(1.2, Math.max(0.8, uiFontScale)) : DEFAULT_SETTINGS.uiFontScale,
         currentUserName: typeof settings.currentUserName === 'string' ? settings.currentUserName : '',
         recentTags: uniqueStrings(settings.recentTags, 100),
         shareCard: normalizeShareCard(settings.shareCard),

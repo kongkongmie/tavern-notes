@@ -227,7 +227,7 @@ export function renderAppShellMarkup({
                     <button class="${ui('icon-button')} ${ui('update-close')}" type="button" title="${htmlEscape(t('close'))}" aria-label="${htmlEscape(t('close'))}"><i class="fa-solid fa-xmark"></i></button>
                     <div class="${ui('update-heading')}"><span><i class="fa-solid fa-clock-rotate-left"></i></span><div><div class="${ui('export-title')}">${htmlEscape(t('updateCenter'))}</div><p>${htmlEscape(t('updateCenterIntro'))}</p></div></div>
                     <div class="${classPrefix}-update-summary"><div><small>${htmlEscape(t('installedVersion'))}</small><b data-update-installed>v${htmlEscape(extensionVersion)}</b></div><i class="fa-solid fa-arrow-right"></i><div><small>${htmlEscape(t('latestVersion'))}</small><b data-update-latest>—</b></div><strong data-update-status>${htmlEscape(t('checkUpdates'))}</strong></div>
-                    <div class="${classPrefix}-update-actions"><button id="${idPrefix}-update-check" type="button"><i class="fa-solid fa-rotate"></i><span>${htmlEscape(t('checkUpdates'))}</span></button><button id="${idPrefix}-update-manager" type="button"><i class="fa-solid fa-cubes"></i><span>${htmlEscape(t('openExtensionManager'))}</span></button><button id="${idPrefix}-update-repository" type="button"><i class="fa-brands fa-github"></i><span>${htmlEscape(t('openRepository'))}</span></button></div>
+                    <div class="${classPrefix}-update-actions"><button id="${idPrefix}-update-check" type="button"><i class="fa-solid fa-rotate"></i><span>${htmlEscape(t('checkUpdates'))}</span></button><button id="${idPrefix}-update-install" type="button" disabled><i class="fa-solid fa-cloud-arrow-down"></i><span>${htmlEscape(t('upToDateStatus'))}</span></button><button id="${idPrefix}-update-manager" type="button"><i class="fa-solid fa-cubes"></i><span>${htmlEscape(t('openExtensionManager'))}</span></button><button id="${idPrefix}-update-repository" type="button"><i class="fa-brands fa-github"></i><span>${htmlEscape(t('openRepository'))}</span></button></div>
                     <small class="${classPrefix}-update-instructions">${htmlEscape(t('updateInstructions'))}</small>
                     <div class="${classPrefix}-update-log-heading"><i class="fa-regular fa-clipboard"></i><b>${htmlEscape(t('changelogTitle'))}</b></div>
                     <div id="${idPrefix}-update-log" class="${classPrefix}-update-log"><div class="${classPrefix}-update-empty">${htmlEscape(t('noChangelog'))}</div></div>
@@ -258,6 +258,9 @@ export function renderAppShellMarkup({
                     escapeHtml: htmlEscape,
                     idPrefix,
                     classPrefix,
+                    uiFontScale: state.uiFontScale,
+                    floatingButtonScale: state.floatingButtonScale,
+                    floatingButtonOpacity: state.floatingButtonOpacity,
                 }),
             })}
             <div id="${idPrefix}-share-menu" aria-hidden="true">

@@ -44,6 +44,11 @@ export function createQuickReplyView({ documentRef = document, windowRef = windo
             windowRef.addEventListener('pointercancel', up, { passive: false });
         });
     };
+    const applyAppearance = launcher => {
+        const appearance = actions.getAppearance?.() || {};
+        launcher?.style.setProperty('--tavern-notes-floating-scale', String(appearance.scale || 1));
+        launcher?.style.setProperty('--tavern-notes-floating-opacity', String(appearance.opacity || 0.9));
+    };
     return {
         mount(nextActions = {}) { actions = nextActions; },
         updateModeButton(mode) {
@@ -93,6 +98,7 @@ export function createQuickReplyView({ documentRef = document, windowRef = windo
                 launcher.querySelector(selectors.floatingCapture)?.addEventListener('click', () => { if (!dragMoved) actions.capture?.(); });
                 bindDrag(launcher);
             }
+            applyAppearance(launcher);
             requestAnimationFrame(() => position(launcher));
             actions.iconsChanged?.();
         },

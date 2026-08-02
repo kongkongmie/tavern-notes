@@ -9,6 +9,9 @@ export function createUpdateRepository({
     annotationUrl = '',
     noticeStorage,
     noticeKey,
+    updateUrl = '/api/extensions/update',
+    extensionName = '/tavern-notes',
+    getRequestHeaders = () => ({ 'Content-Type': 'application/json' }),
 }) {
     async function getInstalledVersion() {
         try {
@@ -30,14 +33,28 @@ export function createUpdateRepository({
                 annotationUrl ? fetchImpl(`${annotationUrl}?t=${stamp}`, { cache: 'no-store' }).catch(() => null) : null,
             ]);
             if (!manifestResponse.ok) throw new Error(`manifest:${manifestResponse.status}`);
-            const latestVersion = String((await manifestResponse.json()).version || '').trim();
+            const manifest = await manifestResponse.json();
+            const latestVersion = String(manifest.version || '').trim();
             if (!latestVersion) throw new Error('manifest:missing-version');
             return createUpdateInfo({
                 installedVersion,
                 latestVersion,
                 changelog: changelogResponse?.ok ? parseChangelog(await changelogResponse.text()) : [],
                 annotations: annotationResponse?.ok ? parseChangelog(await annotationResponse.text()) : [],
+                serverPluginUpdateRequired: manifest.server_plugin_update_required === true,
             });
+        },
+        async update() {
+            const response = await fetchImpl(updateUrl, {
+                method: 'POST',
+                headers: getRequestHeaders(),
+                body: JSON.stringify({ extensionName, global: false }),
+            });
+            if (!response.ok) {
+                const message = String(await response.text().catch(() => '') || response.statusText || `HTTP ${response.status}`).trim();
+                throw new Error(message);
+            }
+            return response.json();
         },
         getInstalledVersion,
         readNotice() {

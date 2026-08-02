@@ -17,21 +17,30 @@ assert.equal(shouldShowBackupReminder({ totalNotes: 500, approximateBytes: 30 * 
 
 let updateResolvers = [];
 let updateRenders = [];
+let updateHandlers = null;
+let updateRuns = 0;
+let updateCompleted = 0;
 const updateController = createUpdateController({
     repository: {
         check: () => new Promise(resolve => updateResolvers.push(resolve)),
         getInstalledVersion: async () => '1.0.0',
         readNotice: () => ({}),
         writeNotice() {},
+        update: async () => { updateRuns += 1; return { isUpToDate: false, shortCommitHash: 'abc1234' }; },
     },
-    view: { mount() {}, render: state => updateRenders.push(state), close() {}, destroy() {} },
+    view: { mount(handlers) { updateHandlers = handlers; }, render: state => updateRenders.push(state), close() {}, destroy() {} },
     fallbackVersion: '1.0.0',
+    confirmUpdate: async () => true,
+    onUpdated: async () => { updateCompleted += 1; },
 });
 updateController.mount();
 const first = updateController.check();
 const second = updateController.check();
 updateResolvers[1]({ installedVersion: '1', latestVersion: '2', hasUpdate: true });
 assert.equal((await second).latestVersion, '2');
+assert.equal((await updateHandlers.onUpdate()).ok, true);
+assert.equal(updateRuns, 1);
+assert.equal(updateCompleted, 1);
 updateResolvers[0]({ installedVersion: '1', latestVersion: '9', hasUpdate: true });
 assert.equal((await first).stale, true);
 updateController.destroy();
