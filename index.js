@@ -2480,6 +2480,25 @@ shareCardController = createShareCardController({
     getSettings: () => state.shareCardSettings,
     updateSettings: patch => updateSettings({ shareCard: patch }),
     resetSettings: () => updateSettings({ shareCard: DEFAULT_SETTINGS.shareCard }),
+    prepareDownload: async filename => {
+        if (typeof window.showSaveFilePicker !== 'function') return null;
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: filename,
+                types: [{ description: 'PNG 图片', accept: { 'image/png': ['.png'] } }],
+            });
+            return {
+                async save(blob) {
+                    const writable = await handle.createWritable();
+                    await writable.write(blob);
+                    await writable.close();
+                },
+            };
+        } catch (error) {
+            if (error?.name === 'AbortError') return { cancelled: true };
+            throw error;
+        }
+    },
     downloadBlob: (blob, filename) => {
         const url = URL.createObjectURL(blob);
         exportFile(url, filename);

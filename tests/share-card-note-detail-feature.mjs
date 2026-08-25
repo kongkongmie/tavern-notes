@@ -29,6 +29,8 @@ assert.equal(detail.variants.length, 2);
 let settings = normalizeShareCardSettings();
 let renders = [];
 let filenames = [];
+let preparedFilename = '';
+let preparedBlob = null;
 let resolver = [];
 const shareView = {
     mount() {}, destroy() {}, open() {}, close() {}, sync() {},
@@ -46,6 +48,10 @@ const shareController = createShareCardController({
     getSettings: () => settings,
     updateSettings: async patch => { settings = { ...settings, ...patch }; return { ok: true }; },
     resetSettings: async () => ({ ok: true }),
+    prepareDownload: async filename => {
+        preparedFilename = filename;
+        return { save: async blob => { preparedBlob = blob; } };
+    },
     downloadBlob: (blob, filename) => { renders.push(blob); filenames.push(filename); },
     brand: 'TN',
 });
@@ -57,12 +63,59 @@ assert.equal(await latest, 'latest');
 resolver[0]('stale');
 await Promise.resolve();
 await Promise.all([shareController.exportImage(), shareController.exportImage()]);
-assert.equal(renders.length, 1);
-assert.equal(renders[0], exportBlob);
+assert.equal(renders.length, 0);
+assert.equal(preparedBlob, exportBlob);
+assert.match(preparedFilename, /\.png$/);
 await shareController.exportFullLengthImage();
-assert.equal(renders.length, 2);
-assert.match(filenames[1], /-全文长图\.png$/);
+assert.equal(renders.length, 0);
+assert.match(preparedFilename, /-全文长图\.png$/);
 shareController.destroy();
+
+let fallbackDownload = null;
+let cancelledRenderCount = 0;
+const fallbackController = createShareCardController({
+    view: shareView,
+    renderer: {
+        renderPreview: async () => null,
+        renderExport: async () => ({ blob: exportBlob }),
+        renderFullLengthExport: async () => ({ blob: exportBlob }),
+        destroy() {},
+    },
+    getSettings: () => settings,
+    updateSettings: async () => ({ ok: true }),
+    resetSettings: async () => ({ ok: true }),
+    prepareDownload: async () => null,
+    downloadBlob: (blob, filename) => { fallbackDownload = { blob, filename }; },
+    brand: 'TN',
+});
+fallbackController.mount();
+fallbackController.open({ id: 'fallback', content: 'note' });
+await fallbackController.exportImage();
+assert.equal(fallbackDownload.blob, exportBlob);
+assert.match(fallbackDownload.filename, /\.png$/);
+fallbackController.destroy();
+
+const cancelledController = createShareCardController({
+    view: shareView,
+    renderer: {
+        renderPreview: async () => null,
+        renderExport: async () => { cancelledRenderCount += 1; return { blob: exportBlob }; },
+        renderFullLengthExport: async () => ({ blob: exportBlob }),
+        destroy() {},
+    },
+    getSettings: () => settings,
+    updateSettings: async () => ({ ok: true }),
+    resetSettings: async () => ({ ok: true }),
+    prepareDownload: async () => ({ cancelled: true }),
+    downloadBlob: () => { throw new Error('cancelled export must not download'); },
+    brand: 'TN',
+});
+cancelledController.mount();
+cancelledController.open({ id: 'cancelled', content: 'note' });
+const cancelled = await cancelledController.exportImage();
+assert.equal(cancelled.cancelled, true);
+assert.equal(cancelledRenderCount, 0);
+cancelledController.destroy();
 
 const calls = [];
 const detailView = { mount() {}, open(model) { calls.push(model.content); }, close() {}, destroy() {} };
