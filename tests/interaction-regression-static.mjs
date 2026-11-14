@@ -3,7 +3,6 @@ import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('../index.js', import.meta.url), 'utf8');
 const themeView = await readFile(new URL('../features/theme-view.js', import.meta.url), 'utf8');
-const systemStatusView = await readFile(new URL('../features/system-status-view.js', import.meta.url), 'utf8');
 const quickReplyView = await readFile(new URL('../features/quick-reply-view.js', import.meta.url), 'utf8');
 const style = await readFile(new URL('../style.css', import.meta.url), 'utf8');
 
@@ -13,8 +12,7 @@ for (const functionName of ['setActiveFilter', 'setCharacterFilter', 'clearChara
     assert.match(match[0], /noteListRenderer\.render\(\)/, `${functionName} must refresh the view even when the data query is unchanged`);
 }
 
-assert.match(style, /#tavern-notes-install-guide,[^]*?#tavern-notes-storage-choice\s*\{[^]*?z-index:\s*120000;/);
-assert.match(systemStatusView, /await chooseLite\(\);\s*overlay\.remove\(\);/, 'closing onboarding must remove the full-screen interaction blocker');
+assert.doesNotMatch(style, /#tavern-notes-install-guide|#tavern-notes-storage-choice/, 'there is no install guide or storage choice overlay any more');
 assert.doesNotMatch(themeView, /button\.classList\.toggle\('active',\s*supported && isNight\)/, 'the day/night action must not look permanently selected');
 assert.equal((quickReplyView.match(/floatingCapture\)\?\.addEventListener\('mousedown', event => event\.preventDefault\(\)\)/g) || []).length, 1);
 assert.match(quickReplyView, /capture\.addEventListener\('mousedown', event => event\.preventDefault\(\)\)/, 'the toolbar capture action must preserve the selected chat text until click');

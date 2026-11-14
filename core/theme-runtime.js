@@ -1,8 +1,7 @@
 const PRESERVED_INLINE_SUFFIXES = new Set(['background-image', 'scope-avatar']);
 
 export function normalizeThemeFlavor(value) {
-    const flavor = String(value || '').replace(/[^a-z0-9_-]/gi, '').toLowerCase();
-    return flavor === 'archive' ? 'default' : flavor;
+    return String(value || '').replace(/[^a-z0-9_-]/gi, '').toLowerCase();
 }
 export function replaceThemeVariables(element, variables, prefix) {
     if (!element) return [];

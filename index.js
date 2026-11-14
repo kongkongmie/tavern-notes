@@ -12,18 +12,16 @@ import {
 } from '../../../../script.js';
 import { buildFloorExcludeSelector, extractFloorText, normalizeExcludedTagNames, stripExcludedTagsFromHtml } from './floor-capture.js';
 import { closeNoteActionMenus, renderNoteCards, toggleNoteActionMenu } from './core/note-card.js';
-import { createRepositoryRouter } from './core/repository-router.js';
 import { createLocalThemeRepository } from './core/local-theme-repository.js';
-import { createModeThemeRepository, createThemeRepository } from './core/theme-repository.js';
-import { prepareStorageModeSwitch, shouldResumeFullMode } from './core/storage-mode-settings.js';
-import { createBuiltInThemeRecords, isRetiredLegacyTheme } from './core/theme-presets.js';
+import { createThemeRepository } from './core/theme-repository.js';
+import { createBuiltInThemeRecords } from './core/theme-presets.js';
 import { createThemeModel } from './core/theme-model.js';
+import { compileThemeCss } from './core/theme-css.js';
 import { createAppStore } from './core/app-store.js';
-import { createApplicationCapabilities } from './core/application-capabilities.js';
 import { DEFAULT_SETTINGS, normalizeSettings } from './core/settings-model.js';
 import { createSettingsRepository } from './core/settings-repository.js';
 import { NOTE_LIST_INITIAL_STATE, NOTE_UI_INITIAL_STATE, createNoteUiQuery } from './core/note-list-model.js';
-import { toFullThemeVariables } from './theme-compat.js';
+import { toThemeVariables } from './core/theme-compat.js';
 import { createThemeStudio, renderThemeStudioMarkup } from './features/theme-studio.js';
 import { createThemeController } from './features/theme-controller.js';
 import { createThemeView, renderThemeViewMarkup } from './features/theme-view.js';
@@ -44,6 +42,8 @@ import { createUserInputCaptureController } from './features/user-input-capture-
 import { createUserInputMaintenanceController } from './features/user-input-maintenance-controller.js';
 import { createUserInputMaintenanceView } from './features/user-input-maintenance-view.js';
 import { createShareCardRenderer } from './features/share-card-renderer.js';
+import { createFloorSnapshotRenderer } from './features/floor-snapshot-renderer.js';
+import { createFloorSnapshotFilename } from './core/floor-snapshot-model.js';
 import { createShareCardView } from './features/share-card-view.js';
 import { createShareCardController } from './features/share-card-controller.js';
 import { createNoteDetailView, renderNoteDetailContent } from './features/note-detail-view.js';
@@ -51,78 +51,76 @@ import { createNoteDetailController } from './features/note-detail-controller.js
 import { createUpdateRepository } from './repositories/update-repository.js';
 import { createUpdateController } from './features/update-controller.js';
 import { createUpdateView } from './features/update-view.js';
-import { createFullFontRepository } from './repositories/full-font-repository.js';
+import { createFontRepository } from './repositories/font-repository.js';
 import { createFontController } from './features/font-controller.js';
 import { createFontView } from './features/font-view.js';
 import { stripFontQuotes } from './core/font-model.js';
-import { createFullSystemStatusRepository } from './repositories/full-system-status-repository.js';
-import { createLiteSystemStatusRepository } from './repositories/lite-system-status-repository.js';
+import { createSystemStatusRepository } from './repositories/system-status-repository.js';
 import { createSystemStatusController } from './features/system-status-controller.js';
 import { createSystemStatusView } from './features/system-status-view.js';
-import { createStorageModeController } from './features/storage-mode-controller.js';
-import { createStorageModeView } from './features/storage-mode-view.js';
 import { createQuickReplyView } from './features/quick-reply-view.js';
 import { createQuickReplyController } from './features/quick-reply-controller.js';
 import { createMutationObserverFactory, createObserverController, createResizeObserverFactory } from './features/observer-controller.js';
 import { createAppShellView, ensureAppMenuEntry, insertAppShellMarkup } from './features/app-shell-view.js';
+import { renderAppShellMarkup } from './features/app-shell-markup.js';
 import { createApplication } from './services/application.js';
 import { bootstrapApplication } from './services/application-bootstrap.js';
 import { createSillyTavernEventAdapter } from './services/sillytavern-event-adapter.js';
 import { createLifecycleRegistry } from './services/lifecycle-registry.js';
-import { renderFullAppShellMarkup } from './repositories/full-app-shell-markup.js';
-import { createFullHttpAdapter } from './repositories/full-http-adapter.js';
 import { normalizeTagKey } from './core/tag-model.js';
 import { normalizeInputIgnoreRules } from './core/capture-model.js';
 import { createSettingsService } from './services/settings-service.js';
-import { createFullNoteRepository } from './repositories/full-note-repository.js';
-import { createLiteNoteRepository } from './repositories/lite-note-repository.js';
-import { createModeNoteRepository } from './repositories/mode-note-repository.js';
-import { createFullTagRepository } from './repositories/full-tag-repository.js';
-import { createLiteTagRepository } from './repositories/lite-tag-repository.js';
-import { createFullUserInputMaintenanceRepository } from './repositories/full-user-input-maintenance-repository.js';
-import { createLiteUserInputMaintenanceRepository } from './repositories/lite-user-input-maintenance-repository.js';
+import { createNoteRepository } from './repositories/note-repository.js';
+import { createTagRepository } from './repositories/tag-repository.js';
+import { createUserInputMaintenanceRepository } from './repositories/user-input-maintenance-repository.js';
 import {
-    getAllLiteNotes,
-    getLiteExport,
-    getLiteStorageInfo,
-    importLiteExport,
-    liteApi,
-    markLiteBackupReminderShown,
-    markLiteExported,
+    buildNotesExport,
+    configureNoteBackend,
+    getAllNotes,
+    getNotesExport,
+    getStorageInfo,
+    hasStoredNotes,
+    importNotes,
+    markNotesExported,
+    notesApi,
+    readNotesFresh,
+    replaceAllNotes,
+    saveMigrationSnapshot,
+    saveNamedBackup,
 } from './storage.js';
+import { createStFileClient, createStFileNoteBackend } from './repositories/st-file-note-backend.js';
+import { createStFileKeyValueStore } from './repositories/st-file-kv-store.js';
+import { createLegacyMigration } from './features/legacy-migration.js';
+import { createLegacyServerRequest, readLegacyBrowserNotes } from './repositories/legacy-sources.js';
+import { createNoteBackupView } from './features/note-backup-view.js';
 
-const API_BASE = '/api/plugins/tavern-notes';
+const FONT_DB_CHOICE_KEY = 'tavern-notes-font-db';
+const MIGRATION_DISMISSED_KEY = 'tavern-notes-file-migration-dismissed';
+const THEME_FILE = 'tavern-notes__themes.json';
 const SETTINGS_KEY = 'tavern-notes-settings';
-const FULL_SETTINGS_PROFILE_KEY = 'tavern-notes-unified-full-settings';
-const LITE_SETTINGS_PROFILE_KEY = 'tavern-notes-unified-lite-settings';
-const LEGACY_LITE_SETTINGS_KEY = 'tavern-notes-lite-settings';
-const UNIFIED_ONBOARDING_KEY = 'tavern-notes-unified-onboarding-v1';
 const UPDATE_NOTICE_KEY = 'tavern-notes-update-notice';
-const EXTENSION_VERSION = '2.0.5';
+const EXTENSION_VERSION = '3.0.0';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/manifest.json';
 const REMOTE_CHANGELOG_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/CHANGELOG.md';
 const REMOTE_CHANGELOG_ANNOTATION_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/CHANGELOG.zh-CN.md';
 const REPOSITORY_URL = 'https://github.com/kongkongmie/tavern-notes';
-const LITE_THEME_STORAGE_KEY = 'tavern-notes-lite-themes';
-const LITE_ACTIVE_THEME_KEY = 'tavern-notes-lite-active-theme';
+// Keys inside the theme file (tavern-notes__themes.json). The names come from 2.x and are kept so
+// existing theme files keep working.
+const THEMES_KEY = 'tavern-notes-lite-themes';
+const ACTIVE_THEME_KEY = 'tavern-notes-lite-active-theme';
+// Imported share-card fonts stay in a browser database; 2.x used one per storage mode.
 const FULL_FONT_DB_NAME = 'tavern-notes-fonts';
 const LITE_FONT_DB_NAME = 'tavern-notes-lite-fonts';
 const FONT_DB_STORE = 'fonts';
-const BACKEND_INSTALL_WINDOWS_PATH = 'SillyTavern\\public\\scripts\\extensions\\third-party\\tavern-notes\\install-server-plugin.bat';
-const BACKEND_INSTALL_SHELL_COMMAND = 'node SillyTavern/public/scripts/extensions/third-party/tavern-notes/install-server-plugin.js';
 const DEFAULT_OPEN_ICON_URL = '/scripts/extensions/third-party/tavern-notes/assets/tavern-notes-open.png';
 const DEFAULT_CAPTURE_ICON_URL = '/scripts/extensions/third-party/tavern-notes/assets/tavern-notes-capture.png';
 const APPLE_THEME_ID = 'apple-glass';
 const THEME_CAPABILITIES = Object.freeze({
     themeStudio: true,
     exportTheme: true,
-    openThemeFolder: true,
 });
-const APPLICATION_CAPABILITIES = createApplicationCapabilities({ coexistenceGuard: false });
 const sillyTavernEvents = createSillyTavernEventAdapter({ eventSource, eventTypes: event_types });
 const MOBILE_VIEWPORT_QUERY = '(max-width: 1000px)';
-const LITE_STORAGE_NOTICE_BYTES = 20 * 1024 * 1024;
-const LITE_BACKUP_NOTICE_DAYS = 30;
 const LEGACY_APPLE_THEME_DAY_ID = 'apple-glass-day';
 const LEGACY_APPLE_THEME_NIGHT_ID = 'apple-glass-night';
 const LEGACY_FLOOR_CAPTURE_SELECTOR = '.comment, [data-tavern-notes-content], [data-note-content], .mes_text';
@@ -175,7 +173,6 @@ const appStore = createAppStore({
 });
 const settingsRepository = createSettingsRepository({ storage: localStorage, key: SETTINGS_KEY });
 const settingsService = createSettingsService({ store: appStore, repository: settingsRepository });
-let hasLegacyFullSettings = false;
 
 const state = {
     open: false,
@@ -187,7 +184,6 @@ const state = {
     editingTags: [],
     characterFilter: null,
     status: null,
-    storageModeResolved: false,
     variantIndexByGroup: {},
     exportScope: 'all',
     floatingDragMoved: false,
@@ -210,7 +206,6 @@ for (const [field, [slice, key]] of Object.entries(NOTE_STATE_FIELDS)) {
 }
 
 const SETTINGS_STATE_FIELDS = {
-    storageMode: 'storageMode',
     language: 'language',
     currentUserName: 'currentUserName',
     recentTags: 'recentTags',
@@ -218,6 +213,7 @@ const SETTINGS_STATE_FIELDS = {
     floatingPosition: 'floatingPosition',
     floatingButtonScale: 'floatingButtonScale',
     floatingButtonOpacity: 'floatingButtonOpacity',
+    themeAnimationsEnabled: 'themeAnimationsEnabled',
     autoCaptureUserInput: 'autoCaptureUserInput',
     collapseRepeatedUserInput: 'collapseRepeatedUserInput',
     userInputIgnoreExact: 'userInputIgnoreExact',
@@ -304,7 +300,6 @@ const TEXT_ZH_CN = {
     importJson: '导入 JSON 笔记',
     importDone: '导入完成：新增 {imported} 条，跳过 {skipped} 条重复或空笔记。',
     invalidBackup: '无法导入：请选择酒馆笔记导出的 JSON 备份。',
-    exportFailed: '导出失败：{status}',
     noPageNotesToExport: '当前页面没有可导出的笔记。',
     exportStarted: '已开始导出。',
     themeFiles: '主题文件',
@@ -319,6 +314,11 @@ const TEXT_ZH_CN = {
     uiFontSize: '界面字体大小',
     floatingButtonSize: '悬浮按钮大小',
     floatingButtonOpacity: '悬浮按钮透明度',
+    themeAnimations: '启用主题动画',
+    advancedThemeCss: '高级 CSS',
+    advancedThemeCssHelp: '样式会自动限制在酒馆笔记面板内。支持伪元素、动画和响应式规则。',
+    themeCssValid: 'CSS 检查通过',
+    themeBasics: '基础主题设置', mainBackground: '主背景', secondaryBackground: '次级背景', bodyText: '正文颜色', mutedText: '次要文字', accentColor: '强调色', themeFontFamily: '字体', themeFontSize: '字号', themeRoundness: '圆角', themeShadow: '阴影', shadowNone: '无', shadowSoft: '柔和', shadowStrong: '明显', shadowCustom: '主题自定义', backgroundImage: '背景图片', backgroundOpacity: '背景透明度',
     shareCard: '分享卡片',
     font: '字体',
     savedFonts: '已导入字体',
@@ -408,44 +408,45 @@ const TEXT_ZH_CN = {
     shownCharacters: '已显示 {count} 个角色',
     shownNotes: '已显示 {shown} 条，当前筛选共 {total} 条',
     connected: '已连接：{user}，V{version}，总记录约 {count} 条',
-    backendDisconnected: '后端未连接：{message}',
     updateAvailableTitle: '酒馆笔记有新版本',
     updateAvailable: '检测到 v{version}。请在 SillyTavern 扩展面板里更新；如果当初用黑窗安装，也可以重新运行安装器。',
     updateCenter: '版本与更新', updateCenterIntro: '查看当前版本、最新版本和更新日志。是否更新完全由你决定。', checkUpdates: '检查更新', checkingUpdates: '正在检查…', installedVersion: '当前版本', latestVersion: '最新版本', updateAvailableStatus: '发现新版本 v{version}', upToDateStatus: '已经是最新版本', updateCheckFailed: '暂时无法连接更新服务器', openExtensionManager: '打开扩展管理', openRepository: '打开项目页面', updateInstructions: '更新由 SillyTavern 扩展管理器执行；酒馆笔记不会静默安装或覆盖文件。', changelogTitle: '更新日志', latestBadge: '最新', noChangelog: '暂时没有取得更新日志。', viewUpdate: '查看更新', authorAnnotation: '作者中文注释',
-    updateNow: '立即更新', updatingNow: '正在更新…', confirmAutoUpdate: '确定让 SillyTavern 立即更新酒馆笔记到 v{version} 吗？', updateCompletedReload: '酒馆笔记前端已经更新完成。\n\n点击“确定”刷新页面并启用新版本。', updateFailedMessage: '自动更新失败：{message}', serverPluginUpdatePrompt: '酒馆笔记前端已经更新，但这个版本同时需要更新 Server Plugin。\n\n请重新运行：\n{path}\n\n然后完整重启 SillyTavern。',
-    backendInstallTitle: 'Lite 浏览器版已安装成功',
-    backendInstallMessage: '现在已经可以直接使用酒馆笔记。数据会保存在当前浏览器中，关闭此窗口即可开始。',
-    backendInstallFullTitle: '想把笔记保存为本地文件？',
-    backendInstallFullBenefits: 'Full 本地文件模式支持文件存储、自动备份和主题文件夹管理。请运行一次对应系统的后端安装器，重启 SillyTavern，再从“保存方式”切换到 Full。',
-    continueWithLite: '关闭并使用 Lite 浏览器版',
-    backendInstallWindows: 'Windows：打开并运行这个文件',
-    backendInstallOther: 'Mac / Linux / 安卓 Termux / 云服务器：在终端运行',
-    storageChoiceTitle: '选择酒馆笔记的保存方式',
-    storageChoiceMessage: '只需要安装这一个扩展。请选择笔记保存在 SillyTavern 文件中，还是当前浏览器中。两边数据彼此独立，不会自动搬移或删除。',
-    storageFullTitle: 'Full · 本地文件',
-    storageFullDescription: '适合电脑或可安装 Server Plugin 的环境。沿用原 Full 笔记、自动备份和完整主题工具，需要完成一次后端安装。',
-    storageLiteTitle: 'Lite · 浏览器存储',
-    storageLiteDescription: '适合手机、Termux 限制环境或不能安装后端的用户。立即使用 IndexedDB，也会连接此浏览器中原有的 Lite 笔记。',
-    storageModeFull: 'Full 文件模式',
-    storageModeLite: 'Lite 浏览器模式',
-    liteBackupReminder: 'Lite 笔记已占用约 {size}。建议导出 JSON 备份；本提醒 30 天内不会重复。',
-    storageModeCurrent: '当前保存方式：{mode}',
-    chooseStorageMode: '保存方式',
-    changeStorageModeWarning: '切换保存方式不会迁移或删除笔记。切换后将显示另一存储中的内容，是否继续？',
-    copyWindowsPath: '复制 Windows 路径',
-    copyShellCommand: '复制终端命令',
-    copiedInstallCommand: '已复制后端安装命令。',
-    backendNetworkHelp: '酒馆笔记后端没有响应。请确认 SillyTavern 已重启，server plugin 已安装到 plugins/tavern-notes，并且 config.yaml 已开启 enableServerPlugins。',
-    backendMissingHelp: '找不到酒馆笔记后端。通常是还没运行后端安装器，或运行后没有重启 SillyTavern。',
-    backendOutdatedHelp: '后端已经连接，但当前运行中的版本还不支持这个功能。请先重启 SillyTavern；如果仍然失败，请重新运行后端安装器后再重启。',
-    backendRequestHelp: '酒馆笔记请求失败：{message}',
-    cleanupBackendRestart: '历史清理服务尚未加载，请完整重启一次酒馆后再试。',
-    backupFailedHelp: '笔记已写入失败前停止：自动备份没有完成。请检查 SillyTavern 是否有本地文件写入权限。',
+    updateNow: '立即更新', updatingNow: '正在更新…', confirmAutoUpdate: '确定让 SillyTavern 立即更新酒馆笔记到 v{version} 吗？', updateCompletedReload: '酒馆笔记前端已经更新完成。\n\n点击“确定”刷新页面并启用新版本。', updateFailedMessage: '自动更新失败：{message}',
     openNotes: '打开酒馆笔记',
     captureSelected: '摘录选中',
     captureSelectedTitle: '摘录选中的聊天文字',
     captureFloor: '摘录整层',
     captureFloorTitle: '摘录这一整层楼的文字',
+    floorSnapshot: '整层长图',
+    floorSnapshotTitle: '把这一整层（含状态栏和美化）按屏幕上的样子截成长图',
+    floorSnapshotWorking: '正在生成整层长图…',
+    floorSnapshotDone: '整层长图已导出。',
+    floorSnapshotParts: '这一层太长，已分成 {count} 张图导出。',
+    floorSnapshotFailed: '整层长图生成失败，请重试或打开浏览器控制台查看原因。',
+    storageModeFiles: "文件模式",
+    backupsOpen: "自动备份",
+    backupsTitle: "自动备份",
+    backupsIntro: "每天第一次保存笔记时自动备份一份，保留最近 7 份；恢复前会先把当前笔记另存一份。文件在酒馆的 data/用户/user/files 里，名字以 tavern-notes__ 开头。",
+    backupsEmpty: "还没有自动备份。保存一条笔记后就会有第一份。",
+    backupsCount: "{count} 条",
+    backupLabelBeforeRestore: "恢复前的副本",
+    backupLabelMigration: "迁移完成时的备份",
+    shareImportFonts: "导入更多字体（网络 / 本地）",
+    backupRestore: "恢复",
+    backupRestoreConfirm: "确定恢复到 {day} 的这份备份（{count} 条）吗？\n\n当前的笔记会先另存一份备份，之后也能再恢复回来。",
+    backupRestored: "已恢复 {count} 条笔记。",
+    backupsLoadFailed: "读取备份列表失败：{message}",
+    migrateOpen: "从旧版迁移",
+    migratePrompt: "酒馆笔记改成了「文件模式」：笔记直接存在酒馆自己的数据文件夹里，手机电脑共用，不再需要后端。\n\n检测到旧版的笔记 {count} 条，现在搬过来吗？\n旧数据原样保留，不会被修改或删除。",
+    migrateNothing: "没有找到需要迁移的旧数据。",
+    migrateWorking: "正在迁移旧数据，请稍等…",
+    migrateDone: "迁移完成：{count} 条笔记已逐条核对，内容一致。",
+    migrateDoneThemes: "另外搬了 {count} 个自定义主题。",
+    migrateProblems: "迁移完成，但有 {count} 处对不上。旧数据没有动，请打开浏览器控制台查看详情。",
+    storageReadFailed: '读取笔记文件失败：{message}',
+    migrateRemoveBackend: '旧版的后端（Server Plugin）已经用不到了。确认笔记都在之后，可以删掉 SillyTavern/plugins/tavern-notes 文件夹，再重启酒馆。不删也不影响使用。',
+    migrateLater: "可以随时在「更多 → 从旧版迁移」里再迁移。",
+    migrateFailed: "迁移失败：{message}\n旧数据没有动。",
     captureFloorEmpty: '没有找到这一层楼的正文。',
     floorCaptureEntry: '整楼摘录',
     floorCaptureEntryTitle: '是否开启整楼摘录功能，点击查看配置说明',
@@ -495,7 +496,7 @@ const TEXT_ZH_CN = {
     inputRulesSaved: 'User 输入整理规则已保存。',
     scanDuplicates: '清除历史重复',
     scanNoDuplicates: '没有发现可折叠的连续重复输入。',
-    scanPreview: '发现 {duplicates} 条重复输入，可折叠为 {groups} 组。',
+    scanPreview: '发现 {duplicates} 条重复输入或同楼层旧版本，可整理为 {groups} 组（同楼层只保留最新一次）。',
     cleanupConfirm: '将移除 {duplicates} 条重复记录，并把次数保留在原条目上。是否继续？',
     cleanupDone: '已折叠 {duplicates} 条历史重复输入。',
     dedupeOccurrences: '共 {count} 条，将移除 {duplicates} 条', confirmCleanup: '确认清理这些条目', cancelCleanup: '取消',
@@ -515,7 +516,6 @@ const TEXT_ZH_CN = {
     switchTheme: '切换主题',
     importTheme: '导入主题',
     exportCurrentTheme: '导出当前主题',
-    openThemeFolder: '打开主题文件夹',
     deleteTheme: '删除主题',
     builtInThemeCannotDelete: '内置主题不能删除。',
     appleThemeMode: '日夜',
@@ -552,7 +552,6 @@ assets 控制标题图标和背景图；输入栏与摘录按钮使用固定默�
     savedTheme: '主题已保存。',
     switchedTheme: '主题已切换。',
     importedTheme: '主题已导入并切换。',
-    requestedThemeFolder: '已请求打开主题文件夹。默认主题是内嵌的，不在这个文件夹里。',
     defaultThemeCannotDelete: '默认主题不能删除。',
     confirmDeleteTheme: '确定删除主题“{name}”吗？',
     deletedTheme: '主题已删除。',
@@ -598,7 +597,6 @@ const TEXTS = {
         importJson: '匯入 JSON 筆記',
         importDone: '匯入完成：新增 {imported} 條，略過 {skipped} 條重複或空白筆記。',
         invalidBackup: '無法匯入：請選擇酒館筆記匯出的 JSON 備份。',
-        exportFailed: '匯出失敗：{status}',
         noPageNotesToExport: '目前頁面沒有可匯出的筆記。',
         exportStarted: '已開始匯出。',
         closeNotes: '關閉酒館筆記',
@@ -614,7 +612,12 @@ const TEXTS = {
         resetDefault: '恢復預設',
         uiFontSize: '介面字體大小',
         floatingButtonSize: '懸浮按鈕大小',
-        floatingButtonOpacity: '懸浮按鈕透明度',
+    floatingButtonOpacity: '懸浮按鈕透明度',
+    themeAnimations: '啟用主題動畫',
+    advancedThemeCss: '進階 CSS',
+    advancedThemeCssHelp: '樣式會自動限制在酒館筆記面板內。支援偽元素、動畫和響應式規則。',
+    themeCssValid: 'CSS 檢查通過',
+    themeBasics: '基礎主題設定', mainBackground: '主背景', secondaryBackground: '次級背景', bodyText: '正文顏色', mutedText: '次要文字', accentColor: '強調色', themeFontFamily: '字體', themeFontSize: '字號', themeRoundness: '圓角', themeShadow: '陰影', shadowNone: '無', shadowSoft: '柔和', shadowStrong: '明顯', shadowCustom: '主題自訂', backgroundImage: '背景圖片', backgroundOpacity: '背景透明度',
         importFont: '匯入網路字體',
         importLocalFont: '匯入本機字體',
         customBackground: '自訂背景色',
@@ -672,37 +675,39 @@ const TEXTS = {
         updateAvailableTitle: '酒館筆記有新版本',
         updateAvailable: '偵測到 v{version}。請在 SillyTavern 擴充面板裡更新；如果當初用黑窗安裝，也可以重新執行安裝器。',
         updateCenter: '版本與更新', updateCenterIntro: '查看目前版本、最新版本和更新日誌。是否更新完全由你決定。', checkUpdates: '檢查更新', checkingUpdates: '正在檢查…', installedVersion: '目前版本', latestVersion: '最新版本', updateAvailableStatus: '發現新版本 v{version}', upToDateStatus: '已經是最新版本', updateCheckFailed: '暫時無法連線更新伺服器', openExtensionManager: '開啟擴充管理', openRepository: '開啟專案頁面', updateInstructions: '更新由 SillyTavern 擴充管理器執行；酒館筆記不會靜默安裝或覆蓋檔案。', changelogTitle: '更新日誌', latestBadge: '最新', noChangelog: '暫時沒有取得更新日誌。', viewUpdate: '查看更新', authorAnnotation: '作者中文註釋',
-        updateNow: '立即更新', updatingNow: '正在更新…', confirmAutoUpdate: '確定讓 SillyTavern 立即更新酒館筆記到 v{version} 嗎？', updateCompletedReload: '酒館筆記前端已更新完成。\n\n點擊「確定」重新整理頁面並啟用新版本。', updateFailedMessage: '自動更新失敗：{message}', serverPluginUpdatePrompt: '酒館筆記前端已更新，但此版本同時需要更新 Server Plugin。\n\n請重新執行：\n{path}\n\n然後完整重啟 SillyTavern。',
-        backendInstallTitle: 'Lite 瀏覽器版已安裝成功',
-        backendInstallMessage: '現在已經可以直接使用酒館筆記。資料會儲存在目前瀏覽器中，關閉此視窗即可開始。',
-        backendInstallFullTitle: '想把筆記儲存為本機檔案？',
-        backendInstallFullBenefits: 'Full 本機檔案模式支援檔案儲存、自動備份和主題資料夾管理。請執行一次對應系統的後端安裝器，重新啟動 SillyTavern，再從「儲存方式」切換到 Full。',
-        continueWithLite: '關閉並使用 Lite 瀏覽器版',
-        backendInstallWindows: 'Windows：打開並執行這個檔案',
-        backendInstallOther: 'Mac / Linux / Android Termux / 雲端伺服器：在終端執行',
-        storageChoiceTitle: '選擇酒館筆記的儲存方式',
-        storageChoiceMessage: '只需要安裝這一個擴充。請選擇將筆記儲存在 SillyTavern 檔案中，或目前瀏覽器中。兩邊資料彼此獨立，不會自動搬移或刪除。',
-        storageFullTitle: 'Full · 本機檔案',
-        storageFullDescription: '適合電腦或可安裝 Server Plugin 的環境。沿用原 Full 筆記、自動備份和完整主題工具，需要完成一次後端安裝。',
-        storageLiteTitle: 'Lite · 瀏覽器儲存',
-        storageLiteDescription: '適合手機、Termux 受限環境或無法安裝後端的使用者。立即使用 IndexedDB，也會連接此瀏覽器中原有的 Lite 筆記。',
-        storageModeFull: 'Full 檔案模式',
-        storageModeLite: 'Lite 瀏覽器模式',
-        liteBackupReminder: 'Lite 筆記已占用約 {size}。建議匯出 JSON 備份；此提醒 30 天內不會重複。',
-        storageModeCurrent: '目前儲存方式：{mode}',
-        chooseStorageMode: '儲存方式',
-        changeStorageModeWarning: '切換儲存方式不會移轉或刪除筆記。切換後將顯示另一個儲存空間中的內容，是否繼續？',
-        copyWindowsPath: '複製 Windows 路徑',
-        copyShellCommand: '複製終端命令',
-        copiedInstallCommand: '已複製後端安裝命令。',
-        backendNetworkHelp: '酒館筆記後端沒有回應。請確認 SillyTavern 已重啟、server plugin 已安裝到 plugins/tavern-notes，且 config.yaml 已開啟 enableServerPlugins。',
-        backendMissingHelp: '找不到酒館筆記後端。通常是還沒執行後端安裝器，或執行後沒有重啟 SillyTavern。',
-        backendOutdatedHelp: '後端已連接，但目前執行中的版本還不支援此功能。請先重啟 SillyTavern；若仍失敗，請重新執行後端安裝器後再重啟。',
-        backendRequestHelp: '酒館筆記請求失敗：{message}',
-        cleanupBackendRestart: '歷史清理服務尚未載入，請完整重啟一次酒館後再試。',
-        backupFailedHelp: '筆記在寫入前停止：自動備份沒有完成。請檢查 SillyTavern 是否有本機檔案寫入權限。',
+        updateNow: '立即更新', updatingNow: '正在更新…', confirmAutoUpdate: '確定讓 SillyTavern 立即更新酒館筆記到 v{version} 嗎？', updateCompletedReload: '酒館筆記前端已更新完成。\n\n點擊「確定」重新整理頁面並啟用新版本。', updateFailedMessage: '自動更新失敗：{message}',
         captureFloor: '摘錄整層',
         captureFloorTitle: '摘錄這一整層樓的文字',
+        floorSnapshot: '整層長圖',
+        floorSnapshotTitle: '把這一整層（含狀態欄和美化）按螢幕上的樣子截成長圖',
+        floorSnapshotWorking: '正在生成整層長圖…',
+        floorSnapshotDone: '整層長圖已匯出。',
+        floorSnapshotParts: '這一層太長，已分成 {count} 張圖匯出。',
+        floorSnapshotFailed: '整層長圖生成失敗，請重試或開啟瀏覽器主控台查看原因。',
+        storageModeFiles: "檔案模式",
+        backupsOpen: "自動備份",
+        backupsTitle: "自動備份",
+        backupsIntro: "每天第一次儲存筆記時自動備份一份，保留最近 7 份；還原前會先把目前的筆記另存一份。檔案在酒館的 data/使用者/user/files 裡，名稱以 tavern-notes__ 開頭。",
+        backupsEmpty: "還沒有自動備份。儲存一條筆記後就會有第一份。",
+        backupsCount: "{count} 條",
+        backupLabelBeforeRestore: "還原前的副本",
+        backupLabelMigration: "遷移完成時的備份",
+        shareImportFonts: "匯入更多字型（網路 / 本機）",
+        backupRestore: "還原",
+        backupRestoreConfirm: "確定還原到 {day} 的這份備份（{count} 條）嗎？\n\n目前的筆記會先另存一份備份，之後也能再還原回來。",
+        backupRestored: "已還原 {count} 條筆記。",
+        backupsLoadFailed: "讀取備份清單失敗：{message}",
+        migrateOpen: "從舊版遷移",
+        migratePrompt: "酒館筆記改成了「檔案模式」：筆記直接存在酒館自己的資料夾裡，手機電腦共用，不再需要後端。\n\n偵測到舊版的筆記 {count} 條，現在搬過來嗎？\n舊資料原樣保留，不會被修改或刪除。",
+        migrateNothing: "沒有找到需要遷移的舊資料。",
+        migrateWorking: "正在遷移舊資料，請稍等…",
+        migrateDone: "遷移完成：{count} 條筆記已逐條核對，內容一致。",
+        migrateDoneThemes: "另外搬了 {count} 個自訂主題。",
+        migrateProblems: "遷移完成，但有 {count} 處對不上。舊資料沒有動，請開啟瀏覽器主控台查看詳情。",
+        storageReadFailed: '讀取筆記檔案失敗：{message}',
+        migrateRemoveBackend: '舊版的後端（Server Plugin）已經用不到了。確認筆記都在之後，可以刪掉 SillyTavern/plugins/tavern-notes 資料夾，再重啟酒館。不刪也不影響使用。',
+        migrateLater: "可以隨時在「更多 → 從舊版遷移」裡再遷移。",
+        migrateFailed: "遷移失敗：{message}\n舊資料沒有動。",
         captureFloorEmpty: '沒有找到這一層樓的正文。',
         floorCaptureEntry: '整樓摘錄',
         floorCaptureEntryTitle: '是否開啟整樓摘錄功能，點擊查看配置說明',
@@ -752,7 +757,7 @@ const TEXTS = {
         inputRulesSaved: 'User 輸入整理規則已儲存。',
         scanDuplicates: '清除歷史重複',
         scanNoDuplicates: '沒有發現可摺疊的連續重複輸入。',
-        scanPreview: '發現 {duplicates} 條重複輸入，可摺疊為 {groups} 組。',
+        scanPreview: '發現 {duplicates} 條重複輸入或同樓層舊版本，可整理為 {groups} 組（同樓層只保留最新一次）。',
         cleanupConfirm: '將移除 {duplicates} 條重複記錄，並把次數保留在原項目上。是否繼續？',
         cleanupDone: '已摺疊 {duplicates} 條歷史重複輸入。',
         dedupeOccurrences: '共 {count} 條，將移除 {duplicates} 條', confirmCleanup: '確認清理這些項目', cancelCleanup: '取消',
@@ -772,7 +777,6 @@ const TEXTS = {
         switchTheme: '切換主題',
         importTheme: '匯入主題',
         exportCurrentTheme: '匯出目前主題',
-        openThemeFolder: '打開主題資料夾',
         deleteTheme: '刪除主題',
         builtInThemeCannotDelete: '內建主題不能刪除。',
         appleThemeMode: '日夜',
@@ -807,7 +811,6 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         savedTheme: '主題已儲存。',
         switchedTheme: '主題已切換。',
         importedTheme: '主題已匯入並切換。',
-        requestedThemeFolder: '已請求打開主題資料夾。預設主題是內嵌的，不在這個資料夾裡。',
         defaultThemeCannotDelete: '預設主題不能刪除。',
         confirmDeleteTheme: '確定刪除主題「{name}」嗎？',
         deletedTheme: '主題已刪除。',
@@ -827,7 +830,7 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         savedFontMissing: '這個字體缺少可讀取資料，請重新匯入。',
         subtitle: '柔和筆記・角色記憶', prevPage: '上一頁', nextPage: '下一頁', jumpPage: '跳頁', exportScope: '匯出範圍', allNotes: '全部筆記', exportHint: '匯出的檔案可重新匯入 Tavern Notes。', themeGuide: '主題製作說明', preview: '預覽', save: '儲存', shareCard: '分享卡片', font: '字體', fontSize: '字體大小', fontImport: '字體網址或 @import', background: '背景', display: '顯示', characterName: '角色名稱', date: '日期',
         filtersAll: '全部筆記', filtersCharacters: '角色瀏覽', filtersUserInput: 'User 輸入', filtersExcerpt: '摘錄', excerpt: '摘錄', manual: '手動筆記', noNotes: '暫無筆記', noNotesHint: '選取聊天文字後，按下摘錄選中即可儲存。', noCharacterNotes: '這個角色暫無筆記', noCharacterNotesHint: '切換角色或返回角色瀏覽。', priority: '優先', browseByCharacter: '依角色瀏覽', characterCount: '{count} 則筆記', otherCharactersEmpty: '沒有其他角色筆記。', viewingCharacter: '正在查看 {name}', backCharacters: '返回角色瀏覽',
-        fillInput: '重新輸入', copy: '複製', share: '分享', delete: '刪除', viewFull: '查看全文', captured: '已摘錄選中文字。', deleted: '已刪除筆記。', selectTextFirst: '請先選取聊天文字，再按摘錄選中。', noInput: '輸入框沒有內容。', shownCharacters: '已顯示 {count} 個角色', shownNotes: '已顯示 {shown} 則，目前篩選共 {total} 則', connected: '已連線', backendDisconnected: '後端未連線', captureSelected: '摘錄選中', captureSelectedTitle: '摘錄選中的聊天文字',
+        fillInput: '重新輸入', copy: '複製', share: '分享', delete: '刪除', viewFull: '查看全文', captured: '已摘錄選中文字。', deleted: '已刪除筆記。', selectTextFirst: '請先選取聊天文字，再按摘錄選中。', noInput: '輸入框沒有內容。', shownCharacters: '已顯示 {count} 個角色', shownNotes: '已顯示 {shown} 則，目前篩選共 {total} 則', connected: '已連線', captureSelected: '摘錄選中', captureSelectedTitle: '摘錄選中的聊天文字',
     },
     en: {
         ...TEXT_ZH_CN,
@@ -865,7 +868,6 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         importJson: 'Import JSON notes',
         importDone: 'Import complete: {imported} added, {skipped} duplicates or empty notes skipped.',
         invalidBackup: 'Import failed. Choose a JSON backup exported by Tavern Notes.',
-        exportFailed: 'Export failed: {status}',
         noPageNotesToExport: 'There are no notes to export on this page.',
         exportStarted: 'Export started.',
         themeFiles: 'Theme Files',
@@ -879,7 +881,12 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         resetDefault: 'Reset default',
         uiFontSize: 'Interface font size',
         floatingButtonSize: 'Floating button size',
-        floatingButtonOpacity: 'Floating button opacity',
+    floatingButtonOpacity: 'Floating button opacity',
+    themeAnimations: 'Enable theme animations',
+    advancedThemeCss: 'Advanced CSS',
+    advancedThemeCssHelp: 'Styles are automatically scoped to the Tavern Notes panel. Pseudo-elements, animations, and responsive rules are supported.',
+    themeCssValid: 'CSS is valid',
+    themeBasics: 'Basic theme settings', mainBackground: 'Main background', secondaryBackground: 'Secondary background', bodyText: 'Body text', mutedText: 'Muted text', accentColor: 'Accent color', themeFontFamily: 'Font', themeFontSize: 'Font size', themeRoundness: 'Roundness', themeShadow: 'Shadow', shadowNone: 'None', shadowSoft: 'Soft', shadowStrong: 'Strong', shadowCustom: 'Theme custom', backgroundImage: 'Background image', backgroundOpacity: 'Background opacity',
         shareCard: 'Share Card',
         font: 'Font',
         savedFonts: 'Imported fonts',
@@ -966,44 +973,45 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         shownCharacters: 'Showing {count} characters',
         shownNotes: 'Showing {shown}; {total} in current filter',
         connected: 'Connected: {user}, V{version}, about {count} total notes',
-        backendDisconnected: 'Backend disconnected: {message}',
         updateAvailableTitle: 'Tavern Notes update available',
         updateAvailable: 'Version {version} is available. Update it in the SillyTavern extensions panel, or rerun the installer if you originally used the installer.',
         updateCenter: 'Version & updates', updateCenterIntro: 'View the installed version, latest version, and release notes. You decide whether to update.', checkUpdates: 'Check for updates', checkingUpdates: 'Checking…', installedVersion: 'Installed', latestVersion: 'Latest', updateAvailableStatus: 'Version {version} is available', upToDateStatus: 'You are up to date', updateCheckFailed: 'Could not reach the update server', openExtensionManager: 'Open extension manager', openRepository: 'Open project page', updateInstructions: 'Updates are performed by the SillyTavern extension manager. Tavern Notes never installs silently or overwrites files on its own.', changelogTitle: 'Release notes', latestBadge: 'Latest', noChangelog: 'Release notes are not available right now.', viewUpdate: 'View update', authorAnnotation: 'Author’s Chinese notes',
-        updateNow: 'Update now', updatingNow: 'Updating…', confirmAutoUpdate: 'Let SillyTavern update Tavern Notes to v{version} now?', updateCompletedReload: 'The Tavern Notes frontend has been updated.\n\nSelect OK to reload the page and use the new version.', updateFailedMessage: 'Automatic update failed: {message}', serverPluginUpdatePrompt: 'The Tavern Notes frontend was updated, but this release also requires a Server Plugin update.\n\nRun this again:\n{path}\n\nThen fully restart SillyTavern.',
-        backendInstallTitle: 'Lite browser edition installed successfully',
-        backendInstallMessage: 'Tavern Notes is ready to use. Your data will be stored in this browser; close this dialog to begin.',
-        backendInstallFullTitle: 'Want to save notes as local files?',
-        backendInstallFullBenefits: 'Full local-file mode adds file storage, automatic backups, and theme-folder management. Run the installer for your system once, restart SillyTavern, then switch to Full from Storage mode.',
-        continueWithLite: 'Close and use Lite browser edition',
-        backendInstallWindows: 'Windows: open and run this file',
-        backendInstallOther: 'Mac / Linux / Android Termux / cloud server: run this in a terminal',
-        storageChoiceTitle: 'Choose how Tavern Notes stores notes',
-        storageChoiceMessage: 'Install this extension only once, then choose SillyTavern file storage or storage in this browser. The two stores remain separate and are never moved or deleted automatically.',
-        storageFullTitle: 'Full · Local files',
-        storageFullDescription: 'For computers or environments that support Server Plugins. Keeps existing Full notes, automatic backups, and complete theme tools; one backend installation is required.',
-        storageLiteTitle: 'Lite · Browser storage',
-        storageLiteDescription: 'For phones, restricted Termux setups, or users who cannot install a backend. Uses IndexedDB immediately and reconnects existing Lite notes in this browser.',
-        storageModeFull: 'Full file mode',
-        storageModeLite: 'Lite browser mode',
-        liteBackupReminder: 'Lite notes use about {size}. Export a JSON backup; this reminder will not repeat for 30 days.',
-        storageModeCurrent: 'Current storage: {mode}',
-        chooseStorageMode: 'Storage mode',
-        changeStorageModeWarning: 'Switching storage does not migrate or delete notes. The app will show notes from the other store. Continue?',
-        copyWindowsPath: 'Copy Windows path',
-        copyShellCommand: 'Copy terminal command',
-        copiedInstallCommand: 'Backend install command copied.',
-        backendNetworkHelp: 'Tavern Notes backend did not respond. Restart SillyTavern, make sure the server plugin is installed in plugins/tavern-notes, and enableServerPlugins is enabled in config.yaml.',
-        backendMissingHelp: 'Tavern Notes backend was not found. Usually the backend installer has not been run, or SillyTavern was not restarted afterward.',
-        backendOutdatedHelp: 'The backend is connected, but the running version does not support this feature yet. Restart SillyTavern first. If it still fails, rerun the backend installer and restart again.',
-        backendRequestHelp: 'Tavern Notes request failed: {message}',
-        cleanupBackendRestart: 'The history cleanup service is not loaded. Restart SillyTavern completely and try again.',
-        backupFailedHelp: 'The note was stopped before completion because automatic backup failed. Check that SillyTavern can write local files.',
+        updateNow: 'Update now', updatingNow: 'Updating…', confirmAutoUpdate: 'Let SillyTavern update Tavern Notes to v{version} now?', updateCompletedReload: 'The Tavern Notes frontend has been updated.\n\nSelect OK to reload the page and use the new version.', updateFailedMessage: 'Automatic update failed: {message}',
         openNotes: 'Open Tavern Notes',
         captureSelected: 'Capture selected',
         captureSelectedTitle: 'Capture selected chat text',
         captureFloor: 'Capture floor',
         captureFloorTitle: 'Capture this whole message',
+        floorSnapshot: 'Floor image',
+        floorSnapshotTitle: 'Save this whole message, status bars and styling included, as one long screenshot',
+        floorSnapshotWorking: 'Rendering the floor image…',
+        floorSnapshotDone: 'Floor image exported.',
+        floorSnapshotParts: 'This message is very long, so it was exported as {count} images.',
+        floorSnapshotFailed: 'Could not render the floor image. Try again or check the browser console.',
+        storageModeFiles: "File mode",
+        backupsOpen: "Auto backups",
+        backupsTitle: "Automatic backups",
+        backupsIntro: "A full backup is saved the first time notes change each day; the latest 7 are kept, and restoring first saves a copy of your current notes. Files live in SillyTavern data/<user>/user/files and start with tavern-notes__.",
+        backupsEmpty: "No automatic backups yet. The first one is made when you save a note.",
+        backupsCount: "{count} notes",
+        backupLabelBeforeRestore: "Copy before restore",
+        backupLabelMigration: "Right after migration",
+        shareImportFonts: "Import more fonts (web / local)",
+        backupRestore: "Restore",
+        backupRestoreConfirm: "Restore the backup from {day} ({count} notes)?\n\nYour current notes are saved as a backup first, so you can switch back.",
+        backupRestored: "Restored {count} notes.",
+        backupsLoadFailed: "Could not load backups: {message}",
+        migrateOpen: "Migrate old data",
+        migratePrompt: "Tavern Notes now uses File mode: notes are stored in SillyTavern's own data folder, shared by phone and computer, with no Server Plugin.\n\nFound {count} notes from the old version. Move them now?\nThe old data is left untouched.",
+        migrateNothing: "No old data to migrate was found.",
+        migrateWorking: "Migrating old data…",
+        migrateDone: "Migration finished: all {count} notes were checked one by one and match.",
+        migrateDoneThemes: "Also moved {count} custom themes.",
+        migrateProblems: "Migration finished, but {count} fields do not match. The old data is untouched; see the browser console for details.",
+        storageReadFailed: 'Could not read the notes files: {message}',
+        migrateRemoveBackend: 'The old backend (Server Plugin) is no longer needed. Once you have checked your notes, you can delete the SillyTavern/plugins/tavern-notes folder and restart SillyTavern. Keeping it does no harm.',
+        migrateLater: "You can migrate later from More → Migrate old data.",
+        migrateFailed: "Migration failed: {message}\nThe old data is untouched.",
         captureFloorEmpty: 'No message text found in this floor.',
         floorCaptureEntry: 'Floor capture',
         floorCaptureEntryTitle: 'Enable or configure whole-message floor capture',
@@ -1053,7 +1061,7 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         inputRulesSaved: 'User input cleanup rules saved.',
         scanDuplicates: 'Clear historical duplicates',
         scanNoDuplicates: 'No consecutive duplicate inputs were found.',
-        scanPreview: 'Found {duplicates} duplicate inputs in {groups} groups.',
+        scanPreview: 'Found {duplicates} duplicate or superseded inputs in {groups} groups (each chat floor keeps only its latest input).',
         cleanupConfirm: 'Remove {duplicates} duplicate records and preserve their counts on the original entries?',
         cleanupDone: 'Collapsed {duplicates} historical duplicate inputs.',
         dedupeOccurrences: '{count} entries; {duplicates} will be removed', confirmCleanup: 'Confirm cleanup', cancelCleanup: 'Cancel',
@@ -1073,7 +1081,6 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         switchTheme: 'Switch theme',
         importTheme: 'Import theme',
         exportCurrentTheme: 'Export current theme',
-        openThemeFolder: 'Open theme folder',
         deleteTheme: 'Delete theme',
         builtInThemeCannotDelete: 'Built-in themes cannot be deleted.',
         appleThemeMode: 'Day/Night',
@@ -1108,7 +1115,6 @@ Click Preview & save or Save as to create a theme file.`,
         savedTheme: 'Theme saved.',
         switchedTheme: 'Theme switched.',
         importedTheme: 'Theme imported and activated.',
-        requestedThemeFolder: 'Theme folder open requested. The default theme is built in, so it is not in that folder.',
         defaultThemeCannotDelete: 'The default theme cannot be deleted.',
         confirmDeleteTheme: 'Delete theme "{name}"?',
         deletedTheme: 'Theme deleted.',
@@ -1164,7 +1170,6 @@ Click Preview & save or Save as to create a theme file.`,
         importJson: 'JSON 노트 가져오기',
         importDone: '가져오기 완료: {imported}개 추가, 중복 또는 빈 노트 {skipped}개 건너뜀.',
         invalidBackup: '가져올 수 없습니다. Tavern Notes에서 내보낸 JSON 백업을 선택하세요.',
-        exportFailed: '내보내기 실패: {status}',
         noPageNotesToExport: '현재 페이지에 내보낼 노트가 없습니다.',
         exportStarted: '내보내기를 시작했습니다.',
         themeFiles: '테마 파일',
@@ -1178,7 +1183,12 @@ Click Preview & save or Save as to create a theme file.`,
         resetDefault: '기본값 복원',
         uiFontSize: '인터페이스 글자 크기',
         floatingButtonSize: '플로팅 버튼 크기',
-        floatingButtonOpacity: '플로팅 버튼 투명도',
+    floatingButtonOpacity: '플로팅 버튼 투명도',
+    themeAnimations: '테마 애니메이션 사용',
+    advancedThemeCss: '고급 CSS',
+    advancedThemeCssHelp: '스타일은 Tavern Notes 패널 내부로 자동 제한됩니다. 의사 요소, 애니메이션 및 반응형 규칙을 지원합니다.',
+    themeCssValid: 'CSS 검사 통과',
+    themeBasics: '기본 테마 설정', mainBackground: '기본 배경', secondaryBackground: '보조 배경', bodyText: '본문 색상', mutedText: '보조 텍스트', accentColor: '강조 색상', themeFontFamily: '글꼴', themeFontSize: '글자 크기', themeRoundness: '둥근 모서리', themeShadow: '그림자', shadowNone: '없음', shadowSoft: '부드럽게', shadowStrong: '강하게', shadowCustom: '테마 사용자 지정', backgroundImage: '배경 이미지', backgroundOpacity: '배경 투명도',
         shareCard: '공유 카드',
         font: '글꼴',
         savedFonts: '가져온 글꼴',
@@ -1265,44 +1275,45 @@ Click Preview & save or Save as to create a theme file.`,
         shownCharacters: '캐릭터 {count}명 표시 중',
         shownNotes: '{shown}개 표시 중, 현재 필터 전체 {total}개',
         connected: '연결됨: {user}, V{version}, 전체 약 {count}개',
-        backendDisconnected: '백엔드 연결 안 됨: {message}',
         updateAvailableTitle: 'Tavern Notes 업데이트 가능',
         updateAvailable: 'v{version} 버전이 있습니다. SillyTavern 확장 패널에서 업데이트하거나, 설치기로 설치했다면 설치기를 다시 실행하세요.',
         updateCenter: '버전 및 업데이트', updateCenterIntro: '현재 버전, 최신 버전과 변경 사항을 확인합니다. 업데이트 여부는 사용자가 결정합니다.', checkUpdates: '업데이트 확인', checkingUpdates: '확인 중…', installedVersion: '현재 버전', latestVersion: '최신 버전', updateAvailableStatus: '새 버전 v{version} 사용 가능', upToDateStatus: '최신 버전입니다', updateCheckFailed: '업데이트 서버에 연결할 수 없습니다', openExtensionManager: '확장 관리 열기', openRepository: '프로젝트 페이지 열기', updateInstructions: '업데이트는 SillyTavern 확장 관리자가 수행합니다. Tavern Notes는 자동으로 설치하거나 파일을 덮어쓰지 않습니다.', changelogTitle: '업데이트 기록', latestBadge: '최신', noChangelog: '현재 업데이트 기록을 가져올 수 없습니다.', viewUpdate: '업데이트 보기', authorAnnotation: '작성자 중국어 주석',
-        updateNow: '지금 업데이트', updatingNow: '업데이트 중…', confirmAutoUpdate: 'SillyTavern에서 Tavern Notes를 v{version}(으)로 지금 업데이트할까요?', updateCompletedReload: 'Tavern Notes 프런트엔드 업데이트가 완료되었습니다.\n\n확인을 눌러 페이지를 새로고침하고 새 버전을 적용하세요.', updateFailedMessage: '자동 업데이트 실패: {message}', serverPluginUpdatePrompt: 'Tavern Notes 프런트엔드는 업데이트되었지만 이 버전은 Server Plugin 업데이트도 필요합니다.\n\n다음을 다시 실행하세요:\n{path}\n\n그런 다음 SillyTavern을 완전히 재시작하세요.',
-        backendInstallTitle: 'Lite 브라우저 버전 설치 완료',
-        backendInstallMessage: '이제 Tavern Notes를 바로 사용할 수 있습니다. 데이터는 현재 브라우저에 저장되며, 이 창을 닫으면 시작할 수 있습니다.',
-        backendInstallFullTitle: '노트를 로컬 파일로 저장하고 싶나요?',
-        backendInstallFullBenefits: 'Full 로컬 파일 모드는 파일 저장, 자동 백업, 테마 폴더 관리를 지원합니다. 운영체제에 맞는 설치기를 한 번 실행하고 SillyTavern을 다시 시작한 다음 저장 방식에서 Full로 전환하세요.',
-        continueWithLite: '닫고 Lite 브라우저 버전 사용',
-        backendInstallWindows: 'Windows: 이 파일을 열어 실행하세요',
-        backendInstallOther: 'Mac / Linux / Android Termux / 클라우드 서버: 터미널에서 실행하세요',
-        storageChoiceTitle: 'Tavern Notes 저장 방식을 선택하세요',
-        storageChoiceMessage: '이 확장 하나만 설치한 뒤 SillyTavern 파일 저장소 또는 현재 브라우저 저장소를 선택하세요. 두 저장소의 데이터는 서로 분리되며 자동으로 이동하거나 삭제되지 않습니다.',
-        storageFullTitle: 'Full · 로컬 파일',
-        storageFullDescription: 'PC 또는 Server Plugin을 설치할 수 있는 환경용입니다. 기존 Full 노트, 자동 백업, 전체 테마 도구를 사용하며 백엔드를 한 번 설치해야 합니다.',
-        storageLiteTitle: 'Lite · 브라우저 저장소',
-        storageLiteDescription: '휴대폰, 제한된 Termux 환경 또는 백엔드를 설치할 수 없는 사용자용입니다. IndexedDB를 즉시 사용하며 이 브라우저의 기존 Lite 노트에도 다시 연결합니다.',
-        storageModeFull: 'Full 파일 모드',
-        storageModeLite: 'Lite 브라우저 모드',
-        liteBackupReminder: 'Lite 노트가 약 {size}를 사용 중입니다. JSON 백업을 내보내세요. 이 알림은 30일 동안 반복되지 않습니다.',
-        storageModeCurrent: '현재 저장 방식: {mode}',
-        chooseStorageMode: '저장 방식',
-        changeStorageModeWarning: '저장 방식을 바꿔도 노트를 이전하거나 삭제하지 않습니다. 전환 후 다른 저장소의 노트가 표시됩니다. 계속할까요?',
-        copyWindowsPath: 'Windows 경로 복사',
-        copyShellCommand: '터미널 명령 복사',
-        copiedInstallCommand: '백엔드 설치 명령을 복사했습니다.',
-        backendNetworkHelp: 'Tavern Notes 백엔드가 응답하지 않습니다. SillyTavern을 다시 시작했고, server plugin이 plugins/tavern-notes에 설치되어 있으며, config.yaml의 enableServerPlugins가 켜져 있는지 확인하세요.',
-        backendMissingHelp: 'Tavern Notes 백엔드를 찾을 수 없습니다. 보통 백엔드 설치기를 아직 실행하지 않았거나, 실행 후 SillyTavern을 다시 시작하지 않은 경우입니다.',
-        backendOutdatedHelp: '백엔드는 연결되어 있지만 현재 실행 중인 버전이 이 기능을 아직 지원하지 않습니다. 먼저 SillyTavern을 다시 시작하세요. 계속 실패하면 백엔드 설치기를 다시 실행한 뒤 재시작하세요.',
-        backendRequestHelp: 'Tavern Notes 요청 실패: {message}',
-        cleanupBackendRestart: '기록 정리 서비스가 아직 로드되지 않았습니다. SillyTavern을 완전히 다시 시작한 후 시도하세요.',
-        backupFailedHelp: '자동 백업이 완료되지 않아 노트 저장을 중단했습니다. SillyTavern에 로컬 파일 쓰기 권한이 있는지 확인하세요.',
+        updateNow: '지금 업데이트', updatingNow: '업데이트 중…', confirmAutoUpdate: 'SillyTavern에서 Tavern Notes를 v{version}(으)로 지금 업데이트할까요?', updateCompletedReload: 'Tavern Notes 프런트엔드 업데이트가 완료되었습니다.\n\n확인을 눌러 페이지를 새로고침하고 새 버전을 적용하세요.', updateFailedMessage: '자동 업데이트 실패: {message}',
         openNotes: '술집 노트 열기',
         captureSelected: '선택 발췌',
         captureSelectedTitle: '선택한 채팅 글 발췌',
         captureFloor: '전체 발췌',
         captureFloorTitle: '이 메시지 전체를 발췌',
+        floorSnapshot: '전체 긴 이미지',
+        floorSnapshotTitle: '상태창과 꾸밈을 포함해 이 메시지를 화면 그대로 긴 스크린샷으로 저장',
+        floorSnapshotWorking: '긴 이미지를 만드는 중…',
+        floorSnapshotDone: '긴 이미지를 내보냈습니다.',
+        floorSnapshotParts: '메시지가 너무 길어 {count}장의 이미지로 나누어 내보냈습니다.',
+        floorSnapshotFailed: '긴 이미지를 만들지 못했습니다. 다시 시도하거나 브라우저 콘솔을 확인하세요.',
+        storageModeFiles: "파일 모드",
+        backupsOpen: "자동 백업",
+        backupsTitle: "자동 백업",
+        backupsIntro: "매일 처음 노트를 저장할 때 전체 백업을 하나 만들고 최근 7개를 보관합니다. 복원하기 전에 현재 노트를 먼저 저장합니다. 파일은 SillyTavern data/사용자/user/files 안에 있으며 tavern-notes__ 로 시작합니다.",
+        backupsEmpty: "아직 자동 백업이 없습니다. 노트를 저장하면 첫 백업이 생깁니다.",
+        backupsCount: "{count}개",
+        backupLabelBeforeRestore: "복원 전 사본",
+        backupLabelMigration: "옮기기 직후 백업",
+        shareImportFonts: "글꼴 더 가져오기 (웹 / 로컬)",
+        backupRestore: "복원",
+        backupRestoreConfirm: "{day} 백업({count}개)으로 복원할까요?\n\n현재 노트는 먼저 백업으로 저장되므로 다시 되돌릴 수 있습니다.",
+        backupRestored: "노트 {count}개를 복원했습니다.",
+        backupsLoadFailed: "백업 목록을 불러오지 못했습니다: {message}",
+        migrateOpen: "이전 데이터 옮기기",
+        migratePrompt: "술집 노트가 파일 모드로 바뀌었습니다. 노트는 SillyTavern 데이터 폴더에 저장되어 휴대폰과 컴퓨터가 함께 쓰며, 서버 플러그인이 필요 없습니다.\n\n이전 버전 노트 {count}개를 찾았습니다. 지금 옮길까요?\n이전 데이터는 그대로 둡니다.",
+        migrateNothing: "옮길 이전 데이터가 없습니다.",
+        migrateWorking: "이전 데이터를 옮기는 중…",
+        migrateDone: "옮기기 완료: 노트 {count}개를 하나씩 확인했고 모두 일치합니다.",
+        migrateDoneThemes: "사용자 테마 {count}개도 옮겼습니다.",
+        migrateProblems: "옮기기는 끝났지만 {count}곳이 일치하지 않습니다. 이전 데이터는 그대로이며, 자세한 내용은 브라우저 콘솔을 확인하세요.",
+        storageReadFailed: '노트 파일을 읽지 못했습니다: {message}',
+        migrateRemoveBackend: '이전 백엔드(Server Plugin)는 더 이상 필요하지 않습니다. 노트를 확인한 뒤 SillyTavern/plugins/tavern-notes 폴더를 삭제하고 SillyTavern을 다시 시작해도 됩니다. 그대로 두어도 문제는 없습니다.',
+        migrateLater: "나중에 더보기 → 이전 데이터 옮기기에서 다시 할 수 있습니다.",
+        migrateFailed: "옮기기 실패: {message}\n이전 데이터는 그대로입니다.",
         captureFloorEmpty: '이 메시지의 본문을 찾지 못했습니다.',
         floorCaptureEntry: '전체 발췌',
         floorCaptureEntryTitle: '전체 메시지 발췌 기능 켜기 및 설정',
@@ -1352,7 +1363,7 @@ Click Preview & save or Save as to create a theme file.`,
         inputRulesSaved: 'User 입력 정리 규칙을 저장했습니다.',
         scanDuplicates: '이전 중복 기록 정리',
         scanNoDuplicates: '접을 수 있는 연속 중복 입력이 없습니다.',
-        scanPreview: '중복 입력 {duplicates}개를 {groups}개 그룹에서 찾았습니다.',
+        scanPreview: '중복되었거나 같은 메시지 위치의 이전 입력 {duplicates}개를 {groups}개 그룹에서 찾았습니다(위치마다 최신 입력만 유지).',
         cleanupConfirm: '중복 기록 {duplicates}개를 제거하고 원본 항목에 횟수를 보존할까요?',
         cleanupDone: '과거 중복 입력 {duplicates}개를 접었습니다.',
         dedupeOccurrences: '총 {count}개, {duplicates}개 제거 예정', confirmCleanup: '이 항목 정리 확인', cancelCleanup: '취소',
@@ -1368,7 +1379,6 @@ Click Preview & save or Save as to create a theme file.`,
         switchTheme: '테마 전환',
         importTheme: '테마 가져오기',
         exportCurrentTheme: '현재 테마 내보내기',
-        openThemeFolder: '테마 폴더 열기',
         deleteTheme: '테마 삭제',
         previewTheme: '미리보기: {name}',
         tempMergedTheme: '임시 병합: {name}',
@@ -1392,7 +1402,6 @@ assets는 제목 아이콘과 배경 이미지를 제어합니다. 입력창과 
         savedTheme: '테마를 저장했습니다.',
         switchedTheme: '테마를 전환했습니다.',
         importedTheme: '테마를 가져오고 적용했습니다.',
-        requestedThemeFolder: '테마 폴더 열기를 요청했습니다. 기본 테마는 내장되어 있어 이 폴더에 없습니다.',
         defaultThemeCannotDelete: '기본 테마는 삭제할 수 없습니다.',
         confirmDeleteTheme: '"{name}" 테마를 삭제할까요?',
         deletedTheme: '테마를 삭제했습니다.',
@@ -1457,6 +1466,7 @@ const DEFAULT_THEME = {
         '--tn-radius-panel': '28px',
         '--tn-radius-card': '24px',
         '--tn-font-family': 'var(--mainFontFamily, inherit)',
+        '--tn-font-size': '15px',
         '--tn-panel-border': 'rgba(188, 183, 171, 0.42)',
         '--tn-panel-shadow': '0 18px 48px rgba(74, 68, 58, 0.18), 0 1px 0 rgba(255, 255, 255, 0.62)',
         // 控件与卡片：搜索框、筛选卡、按钮、弹层背景。
@@ -1523,6 +1533,7 @@ const DEFAULT_THEME = {
         openIcon: 'fa-book-open',
         captureIcon: 'fa-highlighter',
         backgroundImage: '',
+        backgroundOpacity: 1,
         buttonImage: '',
     },
 };
@@ -1726,7 +1737,7 @@ backgroundImage 可填空、url(...) 或 CSS 渐变。
 
 const themeModel = createThemeModel({
     defaultTheme: DEFAULT_THEME,
-    convertVariables: toFullThemeVariables,
+    convertVariables: toThemeVariables,
     variablePrefix: '--tn-',
     appleThemeId: APPLE_THEME_ID,
     legacyAppleThemeIds: [LEGACY_APPLE_THEME_DAY_ID, LEGACY_APPLE_THEME_NIGHT_ID],
@@ -1748,7 +1759,7 @@ function getChatName() {
     return getCurrentChatId?.() || '';
 }
 
-function getLiteUserName() {
+function getUserName() {
     return String(name1 || state.currentUserName || 'default-user').trim() || 'default-user';
 }
 
@@ -1763,48 +1774,40 @@ function getLocalBuiltInThemes() {
     });
 }
 
+// Notes and themes live as files in the SillyTavern user folder (data/<user>/user/files),
+// written through SillyTavern's own file API, so no Server Plugin is needed and every device
+// that opens this SillyTavern sees the same notes.
+const stFileClient = createStFileClient({ getHeaders: getRequestHeaders });
+configureNoteBackend(createStFileNoteBackend({
+    client: stFileClient,
+    buildBackup: notes => buildNotesExport(notes, getUserName(), 'auto-backup'),
+}));
+const themeFileStore = createStFileKeyValueStore({
+    client: stFileClient,
+    file: THEME_FILE,
+    seed: () => Object.fromEntries([THEMES_KEY, ACTIVE_THEME_KEY]
+        .map(key => [key, localStorage.getItem(key)])
+        .filter(([, value]) => value !== null)),
+});
+
 const localThemeApi = createLocalThemeRepository({
-    storage: localStorage,
-    themeStorageKey: LITE_THEME_STORAGE_KEY,
-    activeThemeKey: LITE_ACTIVE_THEME_KEY,
+    storage: themeFileStore,
+    themeStorageKey: THEMES_KEY,
+    activeThemeKey: ACTIVE_THEME_KEY,
     appleThemeId: APPLE_THEME_ID,
     getBuiltInThemes: getLocalBuiltInThemes,
     normalizeTheme: themeModel.normalizeTheme,
     normalizeThemeId: themeModel.normalizeAppleThemeId,
-    isRetiredTheme: isRetiredLegacyTheme,
     translate: t,
 });
 
-const { request: serverApi, requestFile: serverFileRequest } = createFullHttpAdapter({
-    apiBase: API_BASE,
-    getHeaders: getRequestHeaders,
-    translate: t,
-});
-
-const api = createRepositoryRouter({
-    getMode: () => state.storageMode,
-    serverRequest: serverApi,
-    liteRequest: liteApi,
-    localThemeRequest: localThemeApi,
-    getLiteUser: getLiteUserName,
-    getRuntimeVersion: () => EXTENSION_VERSION,
-});
-
-const noteRepository = createModeNoteRepository({
-    getMode: () => state.storageMode,
-    repositories: {
-        full: createFullNoteRepository({
-            request: serverApi,
-            requestFile: serverFileRequest,
-        }),
-        lite: createLiteNoteRepository({
-            request: (path, options) => liteApi(path, options, getLiteUserName(), EXTENSION_VERSION),
-            getAllNotes: getAllLiteNotes,
-            importData: importLiteExport,
-            exportData: getLiteExport,
-            markExported: markLiteExported,
-        }),
-    },
+const notesRequest = (path, options) => notesApi(path, options, getUserName(), EXTENSION_VERSION);
+const noteRepository = createNoteRepository({
+    request: notesRequest,
+    getAllNotes,
+    importData: importNotes,
+    exportData: getNotesExport,
+    markExported: markNotesExported,
 });
 const noteStoreAdapter = {
     getListState: () => appStore.getSlice('noteList'),
@@ -1851,7 +1854,7 @@ const noteExportController = createNoteExportController({
         getActiveVariant,
     }),
     download: (...args) => noteTransferView.download(...args),
-    getExportOptions: () => ({ user: getLiteUserName() }),
+    getExportOptions: () => ({ user: getUserName() }),
     getCurrentPageMeta: () => ({
         filter: state.filter,
         query: state.query,
@@ -1859,14 +1862,7 @@ const noteExportController = createNoteExportController({
     }),
 });
 [noteListController, noteFilterController, noteMutationController, noteExportController].forEach(controller => controller.mount());
-const tagRepositories = {
-    full: createFullTagRepository({ request: serverApi }),
-    lite: createLiteTagRepository({ request: (path, options) => liteApi(path, options, getLiteUserName(), EXTENSION_VERSION) }),
-};
-const tagRepository = {
-    renameTag: (...args) => tagRepositories[state.storageMode].renameTag(...args),
-    deleteTag: (...args) => tagRepositories[state.storageMode].deleteTag(...args),
-};
+const tagRepository = createTagRepository({ request: notesRequest });
 const tagController = createTagController({
     repository: tagRepository,
     listController: noteListController,
@@ -1885,14 +1881,7 @@ const tagController = createTagController({
     },
 });
 tagController.mount();
-const maintenanceRepositories = {
-    full: createFullUserInputMaintenanceRepository({ request: serverApi }),
-    lite: createLiteUserInputMaintenanceRepository({ request: (path, options) => liteApi(path, options, getLiteUserName(), EXTENSION_VERSION) }),
-};
-const maintenanceRepository = {
-    preview: options => maintenanceRepositories[state.storageMode].preview(options),
-    apply: options => maintenanceRepositories[state.storageMode].apply(options),
-};
+const maintenanceRepository = createUserInputMaintenanceRepository({ request: notesRequest });
 const readCaptureSelection = createSelectionSnapshotReader({
     ignoredSelector: '#tavern-notes-panel, #tavern-notes-selection-capture, select',
     inputSelector: '#send_textarea, #send_form textarea',
@@ -1947,6 +1936,7 @@ const userInputCaptureController = createUserInputCaptureController({
         messageId,
         chatId: getChatName(),
         character: getCurrentCharacter(),
+        isOpeningUserInput: chat?.findIndex(item => item?.is_user) === Number(messageId),
     }),
     notify: (kind, error) => { if (kind === 'error') notify(error.message, 'error'); },
 });
@@ -2045,6 +2035,7 @@ const noteListRenderer = createNoteListRenderer({
     getActiveVariant,
     renderTagShelf: () => tagView.renderShelf(),
     getBatchState: () => noteBatchController?.getState() || ({ active: false, selectedIds: new Set() }),
+    afterRender: () => themeView.refreshDecorations(),
 });
 noteBatchController = createNoteBatchController({
     root: () => document.querySelector('#tavern-notes-panel'),
@@ -2181,12 +2172,14 @@ const tagView = createTagView({
     onQuery: query => { state.tagManagerQuery = query; },
     onSort: sort => { state.tagManagerSort = sort; },
 });
+const floorSnapshotRenderer = createFloorSnapshotRenderer();
 const captureView = createCaptureView({
     classPrefix: 'tn',
     selectors: {
         selectionButton: '#tavern-notes-selection-capture',
         selectionClass: 'tn-selection-capture',
-        floorButton: '.tn-floor-capture',
+        floorButton: '.tn-floor-capture:not(.tn-floor-snapshot)',
+        floorSnapshotButton: '.tn-floor-snapshot',
         floorActions: '.mes_buttons',
         chat: '#chat',
         messages: '.mes, [mesid], [data-mesid]',
@@ -2199,6 +2192,7 @@ const captureView = createCaptureView({
     getSelectionSnapshot: readCaptureSelection,
     onSelectionCapture: snapshot => captureController.handleManualCapture(snapshot),
     onFloorCapture: message => captureController.captureWholeFloor(message),
+    onFloorSnapshot: message => exportFloorSnapshot(message),
     onChatChanged: handler => sillyTavernEvents.onChatChanged(handler),
 });
 const userInputMaintenanceView = createUserInputMaintenanceView({
@@ -2224,13 +2218,7 @@ const noteFeatureLifecycle = createLifecycleRegistry();
     userInputCaptureController, userInputMaintenanceController, noteBatchController]
     .forEach(resource => noteFeatureLifecycle.registerDestroy(() => resource.destroy()));
 function destroyNoteFeatureLayer() { noteFeatureLifecycle.destroyAll(); }
-const themeRepository = createModeThemeRepository({
-    getMode: () => state.storageMode,
-    repositories: {
-        full: createThemeRepository({ request: serverApi }),
-        lite: createThemeRepository({ request: localThemeApi }),
-    },
-});
+const themeRepository = createThemeRepository({ request: localThemeApi });
 
 const themeView = createThemeView({
     document,
@@ -2243,6 +2231,7 @@ const themeView = createThemeView({
     translate: t,
     scheduleLayout: scheduleHeaderActionLayout,
     exportFile,
+    getAnimationsEnabled: () => state.themeAnimationsEnabled,
     iconConfig: {
         defaultIconClass: 'tavern-notes-default-icon',
         lightIconClass: 'tavern-notes-default-icon-light',
@@ -2279,6 +2268,7 @@ const themeController = createThemeController({
     notify,
     confirm: message => window.confirm(message),
     beforeOpen: closeHeaderPopovers,
+    validateThemeCss: compileThemeCss,
 });
 
 const themeStudio = createThemeStudio({
@@ -2302,11 +2292,14 @@ const themeStudio = createThemeStudio({
         if (result.ok) quickReplyController.refresh();
         return result;
     },
+    getThemeAnimationsEnabled: () => state.themeAnimationsEnabled,
+    updateThemeAnimationsEnabled: async enabled => updateSettings({ themeAnimationsEnabled: enabled }),
+    validateThemeCss: compileThemeCss,
 });
 themeController.attachStudio(themeStudio);
 
-const fontRepository = createFullFontRepository({
-    getDatabaseName: () => state.storageMode === 'lite' ? LITE_FONT_DB_NAME : FULL_FONT_DB_NAME,
+const fontRepository = createFontRepository({
+    getDatabaseName: () => localStorage.getItem(FONT_DB_CHOICE_KEY) || FULL_FONT_DB_NAME,
     storeName: FONT_DB_STORE,
     unsupportedError: () => new Error(t('localFontUnsupported')),
 });
@@ -2373,75 +2366,25 @@ const updateController = createUpdateController({
         return true;
     },
     confirmUpdate: info => window.confirm(t('confirmAutoUpdate', { version: info.latestVersion })),
-    onUpdated: async (_result, info) => {
-        if (info.serverPluginUpdateRequired && state.storageMode === 'full') {
-            window.alert(t('serverPluginUpdatePrompt', { path: BACKEND_INSTALL_WINDOWS_PATH }));
-            return;
-        }
+    onUpdated: async () => {
         window.alert(t('updateCompletedReload'));
         window.location.reload();
     },
     setStatus: info => setStatus(`${t('updateAvailableTitle')}: ${t('updateAvailable', { version: info.latestVersion })}`),
 });
-let storageModeController;
-const systemStatusView = createSystemStatusView({
-    statusSelector: '.tavern-notes-status',
-    classPrefix: 'tn',
-    translate: t,
-    escapeHtml: htmlEscape,
-    copyText: copyTextToClipboard,
-    notify,
-    install: { id: 'tavern-notes-install-guide', windowsPath: BACKEND_INSTALL_WINDOWS_PATH, shellCommand: BACKEND_INSTALL_SHELL_COMMAND },
-    chooseLite: () => storageModeController.select('lite', { skipConfirm: true }),
-});
-const fullSystemStatusRepository = createFullSystemStatusRepository({ request: serverApi });
-const liteSystemStatusRepository = createLiteSystemStatusRepository({
-    getStorageInfo: getLiteStorageInfo,
-    estimateStorage: () => navigator.storage?.estimate?.() || Promise.resolve({}),
+const systemStatusView = createSystemStatusView({ statusSelector: '.tavern-notes-status' });
+const systemStatusRepository = createSystemStatusRepository({
+    getStorageInfo: async () => ({ ...await getStorageInfo(), user: getUserName(), version: EXTENSION_VERSION }),
 });
 const systemStatusController = createSystemStatusController({
-    repository: { getStatus: () => (state.storageMode === 'lite' ? liteSystemStatusRepository : fullSystemStatusRepository).getStatus() },
+    repository: systemStatusRepository,
     view: systemStatusView,
-    capabilities: { backendStatus: true, installGuide: true, storageModeSwitch: true, storageQuota: true },
-    formatStatus: status => `${t(state.storageMode === 'lite' ? 'storageModeLite' : 'storageModeFull')} · ${t('connected', { user: status.user, version: status.version || EXTENSION_VERSION, count: status.totalNotes })}`,
-    notifyReminder: async status => {
-        if (state.storageMode !== 'lite') return;
-        notify(t('liteBackupReminder', { size: formatStorageBytes(status.approximateBytes) }), 'info');
-        await markLiteBackupReminderShown();
-    },
-    reminderOptions: { storageNoticeBytes: LITE_STORAGE_NOTICE_BYTES, backupNoticeDays: LITE_BACKUP_NOTICE_DAYS },
+    formatStatus: status => `${t('storageModeFiles')} · ${t('connected', { user: status.user, version: status.version || EXTENSION_VERSION, count: status.totalNotes })}`,
     onStatus: status => { if (status.user) updateSettings({ currentUserName: status.user }); },
-    onError: error => {
-        notify(t('backendDisconnected', { message: error.message }), 'error');
-        if (['backend_missing', 'backend_unreachable'].includes(error.code)) systemStatusController.showInstallGuide();
-    },
-});
-const storageModeView = createStorageModeView({
-    overlayId: 'tavern-notes-storage-choice',
-    classPrefix: 'tn',
-    translate: t,
-    escapeHtml: htmlEscape,
-});
-storageModeController = createStorageModeController({
-    view: storageModeView,
-    getMode: () => state.storageMode,
-    prepareSwitch: (currentMode, targetMode) => prepareStorageModeSwitch({
-        storage: localStorage,
-        currentSettingsKey: SETTINGS_KEY,
-        fullProfileKey: FULL_SETTINGS_PROFILE_KEY,
-        liteProfileKey: LITE_SETTINGS_PROFILE_KEY,
-        legacyLiteSettingsKey: LEGACY_LITE_SETTINGS_KEY,
-        currentMode,
-        targetMode,
-        persistCurrent: false,
-    }),
-    replaceSettings: settings => settingsService.replace(settings),
-    confirmSwitch: () => window.confirm(t('changeStorageModeWarning')),
-    reload: () => window.location.reload(),
+    onError: error => notify(t('storageReadFailed', { message: error.message }), 'error'),
 });
 fontController.mount();
 systemStatusController.mount();
-storageModeController.mount();
 let shareCardController;
 const shareCardRenderer = createShareCardRenderer({
     resolveFont: () => fontController.resolveFont(),
@@ -2480,30 +2423,8 @@ shareCardController = createShareCardController({
     getSettings: () => state.shareCardSettings,
     updateSettings: patch => updateSettings({ shareCard: patch }),
     resetSettings: () => updateSettings({ shareCard: DEFAULT_SETTINGS.shareCard }),
-    prepareDownload: async filename => {
-        if (typeof window.showSaveFilePicker !== 'function') return null;
-        try {
-            const handle = await window.showSaveFilePicker({
-                suggestedName: filename,
-                types: [{ description: 'PNG 图片', accept: { 'image/png': ['.png'] } }],
-            });
-            return {
-                async save(blob) {
-                    const writable = await handle.createWritable();
-                    await writable.write(blob);
-                    await writable.close();
-                },
-            };
-        } catch (error) {
-            if (error?.name === 'AbortError') return { cancelled: true };
-            throw error;
-        }
-    },
-    downloadBlob: (blob, filename) => {
-        const url = URL.createObjectURL(blob);
-        exportFile(url, filename);
-        setTimeout(() => URL.revokeObjectURL(url), 1000);
-    },
+    prepareDownload: pickPngDestination,
+    downloadBlob: downloadBlobFile,
     brand: t('brandForShare'),
     onEvent: (type, value) => {
         if (type === 'exported') notify(t('shareCardExported'), 'success');
@@ -2567,32 +2488,6 @@ async function copyTextToClipboard(text) {
     textarea.remove();
 }
 
-async function resolveInitialStorageMode() {
-    if (state.storageModeResolved && state.storageMode) return null;
-    try {
-        const status = await systemStatusController.refresh();
-        if (shouldResumeFullMode({ hasLegacySettings: hasLegacyFullSettings, totalNotes: status.totalNotes })) {
-            const result = await settingsService.update({ storageMode: 'full', currentUserName: status.user || state.currentUserName || '' });
-            if (!result.ok) throw result.error;
-            state.storageModeResolved = true;
-        }
-        return status;
-    } catch {
-        state.storageModeResolved = false;
-        return null;
-    }
-}
-
-export function showInstallGuide() {
-    setTimeout(async () => {
-        if (!state.storageMode) await resolveInitialStorageMode();
-        if (!state.storageMode) storageModeController.open();
-        else if (state.storageMode === 'full') {
-            try { await systemStatusController.refresh(); } catch { systemStatusController.showInstallGuide(); }
-        }
-    }, 500);
-}
-
 function setStatus(message) {
     state.status = message;
     systemStatusView.renderStatus(message);
@@ -2616,7 +2511,6 @@ async function saveLanguageSetting(language) {
     updateFloorCaptureButtonSetting();
     updateFloorCaptureSelectorInput();
     themeController.render();
-    applyStorageCapabilities();
     quickReplyController.refresh();
     quickReplyController.refresh();
     notify(t('languageSaved'), 'success');
@@ -3081,7 +2975,7 @@ function layoutHeaderActions() {
     const buttons = HEADER_ACTION_IDS.map(id => document.getElementById(id)).filter(Boolean);
     const activeButtons = buttons.filter(button => !button.classList.contains('tn-hidden'));
     const panelWidth = panel.getBoundingClientRect().width || panel.clientWidth || 480;
-    const directLimit = Math.max(3, Math.floor((Math.max(0, panelWidth - 48) + 8) / 78) - 1);
+    const directLimit = Math.min(4, Math.max(3, Math.floor((Math.max(0, panelWidth - 48) + 8) / 78) - 1));
     const directButtons = activeButtons.slice(0, directLimit);
     const overflowButtons = activeButtons.slice(directLimit);
     const hiddenButtons = buttons.filter(button => button.classList.contains('tn-hidden'));
@@ -3219,17 +3113,6 @@ function clearCharacterFilter() {
     noteFilterController.setCharacter(null);
 }
 
-function applyStorageCapabilities() {
-    const isLite = state.storageMode === 'lite';
-    const panel = document.querySelector('#tavern-notes-panel');
-    if (panel) panel.dataset.storageMode = isLite ? 'lite' : 'full';
-    const badge = document.querySelector('#tavern-notes-storage-mode');
-    if (badge) {
-        badge.textContent = t(isLite ? 'storageModeLite' : 'storageModeFull');
-        badge.title = t('storageModeCurrent', { mode: badge.textContent });
-    }
-}
-
 function applyUiFontScale() {
     const panel = document.querySelector('#tavern-notes-panel');
     if (panel) panel.style.setProperty('--tavern-notes-ui-scale', String(state.uiFontScale || 1));
@@ -3238,7 +3121,7 @@ function applyUiFontScale() {
 function buildPanel() {
     if (document.querySelector('#tavern-notes-panel')) return;
 
-    insertAppShellMarkup(document, renderFullAppShellMarkup({
+    insertAppShellMarkup(document, renderAppShellMarkup({
         state,
         translate: t,
         escapeHtml: htmlEscape,
@@ -3247,13 +3130,13 @@ function buildPanel() {
         getFloorCaptureTagName,
         extensionVersion: EXTENSION_VERSION,
         renderThemeViewMarkup,
-        themeCapabilities: {
-            ...THEME_CAPABILITIES,
-            openThemeFolder: state.storageMode === 'full',
-        },
+        themeCapabilities: THEME_CAPABILITIES,
         renderThemeStudioMarkup,
         shareCardThemes: SHARE_CARD_THEMES,
         shareCardBackgrounds: SHARE_CARD_BACKGROUNDS,
+        idPrefix: 'tavern-notes',
+        classPrefix: 'tn',
+        brandIconMarkup: '<i class="fa-solid fa-book-open"></i>',
     }));
 
     const dialogIds = [
@@ -3277,7 +3160,6 @@ function buildPanel() {
     updateFloorCaptureButtonSetting();
     updateFloorCaptureSelectorInput();
     bindEvents();
-    applyStorageCapabilities();
     applyUiFontScale();
 }
 
@@ -3305,16 +3187,18 @@ function bindEvents() {
     fontController.mount();
     updateController.mount();
     systemStatusController.mount();
-    storageModeController.mount();
     window.addEventListener('resize', () => quickReplyController.refresh(), { passive: true });
     document.querySelector('#tavern-notes-new-note-open')?.addEventListener('click', () => newNoteView.open());
     document.querySelector('#tavern-notes-more-open')?.addEventListener('click', () => toggleHeaderPopover('tavern-notes-more-menu'));
-    document.querySelector('#tavern-notes-storage-mode')?.addEventListener('click', () => storageModeController.open({ allowClose: true }));
-    document.querySelector('#tavern-notes-storage-mode-open')?.addEventListener('click', () => {
-        closeHeaderPopovers();
-        storageModeController.open({ allowClose: true });
-    });
     document.querySelector('#tavern-notes-reset-floating')?.addEventListener('click', () => quickReplyController.resetPosition());
+    document.querySelector('#tavern-notes-backups-open')?.addEventListener('click', () => {
+        closeHeaderPopovers();
+        noteBackupView.open();
+    });
+    document.querySelector('#tavern-notes-migrate-open')?.addEventListener('click', () => {
+        closeHeaderPopovers();
+        runLegacyMigration();
+    });
     document.querySelector('#tavern-notes-new-note-menu')?.addEventListener('click', event => { if (event.target.id === 'tavern-notes-new-note-menu') newNoteView.close(); });
     document.querySelector('#tavern-notes-language')?.addEventListener('change', event => saveLanguageSetting(event.target.value));
     document.querySelector('#tavern-notes-launcher-mode')?.addEventListener('click', () => quickReplyController.toggle());
@@ -3389,6 +3273,72 @@ function bindEvents() {
         themeController.close();
         closeShareCard();
     });
+}
+
+async function pickPngDestination(filename) {
+    if (typeof window.showSaveFilePicker !== 'function') return null;
+    try {
+        const handle = await window.showSaveFilePicker({
+            suggestedName: filename,
+            types: [{ description: 'PNG 图片', accept: { 'image/png': ['.png'] } }],
+        });
+        return {
+            async save(blob) {
+                const writable = await handle.createWritable();
+                await writable.write(blob);
+                await writable.close();
+            },
+        };
+    } catch (error) {
+        if (error?.name === 'AbortError') return { cancelled: true };
+        throw error;
+    }
+}
+
+function downloadBlobFile(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    exportFile(url, filename);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+let floorSnapshotRunning = false;
+
+async function exportFloorSnapshot(message) {
+    if (floorSnapshotRunning || !message) return;
+    floorSnapshotRunning = true;
+    try {
+        const messageId = message.getAttribute?.('mesid') ?? message.dataset?.mesid ?? '';
+        const characterName = chat?.[Number(messageId)]?.name
+            || message.querySelector?.('.name_text')?.textContent?.trim()
+            || getCurrentCharacter().name;
+        const plan = floorSnapshotRenderer.measure(message);
+        const parts = plan.slices.length;
+        const filenames = plan.slices.map((_, index) => createFloorSnapshotFilename({
+            brand: t('brandForShare'),
+            characterName,
+            messageId,
+            part: index + 1,
+            parts,
+        }));
+        // The save dialog needs the click's user activation, so ask before the slow render.
+        const destination = parts === 1 ? await pickPngDestination(filenames[0]) : null;
+        if (destination?.cancelled) return;
+        notify(t('floorSnapshotWorking'), 'info');
+        const result = await floorSnapshotRenderer.render(message);
+        for (const [index, blob] of result.blobs.entries()) {
+            if (index === 0 && destination?.save) await destination.save(blob);
+            else {
+                downloadBlobFile(blob, filenames[index] || filenames[0]);
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        }
+        notify(result.blobs.length > 1 ? t('floorSnapshotParts', { count: result.blobs.length }) : t('floorSnapshotDone'), 'success');
+    } catch (error) {
+        console.error('[Tavern Notes] floor snapshot error', error);
+        notify(t('floorSnapshotFailed'), 'error');
+    } finally {
+        floorSnapshotRunning = false;
+    }
 }
 
 function exportFile(url, filename) {
@@ -3479,6 +3429,7 @@ async function confirmDelete(note) {
 }
 
 function openFullNote(note) {
+    resetArchiveReadingMode();
     noteDetailController.open(note);
 }
 
@@ -3584,7 +3535,6 @@ quickReplyController = createQuickReplyController({
     createObserverController: () => quickReplyObserverController,
     notify: mode => notify(t(mode === 'floating' ? 'floatingLauncherShown' : 'toolbarLauncherShown'), 'success'),
     capabilities: {
-        ...APPLICATION_CAPABILITIES,
         open: () => { if (state.open) closePanel(); else openPanel(); },
         capture: () => captureController.handleManualCapture().catch(error => notify(error.message, 'error')),
         getPosition: () => state.floatingPosition,
@@ -3594,7 +3544,7 @@ quickReplyController = createQuickReplyController({
 });
 
 const applicationLifecycle = createLifecycleRegistry();
-[appStore, settingsService, storageModeController, systemStatusController, fontController, updateController,
+[appStore, settingsService, systemStatusController, fontController, updateController,
     shareCardController, noteDetailController, themeController, { destroy: destroyNoteFeatureLayer },
     appShellView, headerLayoutObserverController, quickReplyController]
     .forEach(resource => applicationLifecycle.registerDestroy(() => resource.destroy()));
@@ -3621,6 +3571,7 @@ async function openPanel() {
     if (!panel) return;
     state.open = true;
     panel.classList.remove('tn-archive-reading', 'tn-reading-mode');
+    readingModeExpandedAtScrollTop = document.querySelector('#tavern-notes-list')?.scrollTop || 0;
     panel.classList.add('open');
     scheduleHeaderActionLayout();
     quickReplyController.refresh();
@@ -3647,33 +3598,106 @@ function closePanel() {
     quickReplyController.refresh();
 }
 
+// 2.x kept imported fonts in a browser database named after its storage mode. Read that mode once,
+// before the settings are normalized (3.0 settings no longer have it), so those fonts stay available.
+async function rememberFontDatabase() {
+    if (localStorage.getItem(FONT_DB_CHOICE_KEY)) return;
+    const previous = await settingsRepository.load().catch(() => null);
+    localStorage.setItem(FONT_DB_CHOICE_KEY, previous?.storageMode === 'lite' ? LITE_FONT_DB_NAME : FULL_FONT_DB_NAME);
+}
+
 async function init() {
+    await rememberFontDatabase();
     const loadedSettings = await settingsService.load();
-    const needsUnifiedOnboarding = localStorage.getItem(UNIFIED_ONBOARDING_KEY) !== 'done';
-    hasLegacyFullSettings = loadedSettings.found && !loadedSettings.settings.storageMode;
-    state.storageModeResolved = Boolean(state.storageMode);
     appStore.patch('theme', {
         appleMode: loadedSettings.settings.appleGlassMode,
         defaultMode: loadedSettings.settings.defaultThemeMode,
     });
-    if (needsUnifiedOnboarding) {
-        localStorage.setItem(UNIFIED_ONBOARDING_KEY, 'done');
-    }
-    await resolveInitialStorageMode();
-    if (!state.storageMode) {
-        storageModeController.open();
-        return;
-    }
     installMobileViewportGuard();
     appShellView.mount();
     observeHeaderActionLayout();
     fontController.applyCss();
+    await themeFileStore.ready().catch(error => console.error('[Tavern Notes] theme file unavailable', error));
     await themeController.load();
     quickReplyController.mount();
     setTimeout(() => checkForTavernNotesUpdate(), 5000);
 
-    await systemStatusController.refresh({ showReminder: state.storageMode === 'lite' }).catch(() => {});
+    await systemStatusController.refresh().catch(() => {});
+    if (localStorage.getItem(MIGRATION_DISMISSED_KEY) !== '1') runLegacyMigration({ automatic: true });
 }
+
+const legacyMigration = createLegacyMigration({
+    serverRequest: createLegacyServerRequest({ getHeaders: getRequestHeaders }),
+    readLegacyBrowserNotes,
+    storage: {
+        buildNotesExport,
+        saveSnapshot: saveMigrationSnapshot,
+        hasStoredNotes,
+        importNotes,
+        replaceAllNotes,
+        readNotesFresh,
+    },
+    themeStore: themeFileStore,
+    themeKeys: { themes: THEMES_KEY, active: ACTIVE_THEME_KEY },
+    user: () => getUserName(),
+});
+let migrationRunning = false;
+
+async function runLegacyMigration({ automatic = false } = {}) {
+    if (migrationRunning) return;
+    migrationRunning = true;
+    try {
+        if (automatic && await hasStoredNotes()) return;
+        const found = await legacyMigration.detect();
+        if (!found.count) {
+            if (!automatic) notify(t('migrateNothing'), 'info');
+            return;
+        }
+        if (!window.confirm(t('migratePrompt', { count: found.count }))) {
+            if (automatic) {
+                localStorage.setItem(MIGRATION_DISMISSED_KEY, '1');
+                notify(t('migrateLater'), 'info');
+            }
+            return;
+        }
+        notify(t('migrateWorking'), 'info');
+        const report = await legacyMigration.run(found);
+        localStorage.setItem(MIGRATION_DISMISSED_KEY, '1');
+        // First listed backup = the state right after migration.
+        await saveNamedBackup('migration').catch(error => console.error('[Tavern Notes] backup after migration failed', error));
+        if (report.ok) {
+            window.alert([
+                t('migrateDone', { count: report.expected }),
+                report.themes ? t('migrateDoneThemes', { count: report.themes }) : '',
+                found.full ? t('migrateRemoveBackend') : '',
+            ].filter(Boolean).join('\n\n'));
+        } else {
+            console.warn('[Tavern Notes] migration mismatches', report);
+            window.alert(t('migrateProblems', { count: report.problems.length }));
+        }
+        if (report.themes) await themeController.load();
+        await noteListController.load(noteStoreAdapter.getQueryState());
+        systemStatusController.refresh().catch(() => {});
+    } catch (error) {
+        console.error('[Tavern Notes] migration failed', error);
+        window.alert(t('migrateFailed', { message: error.message }));
+    } finally {
+        migrationRunning = false;
+    }
+}
+
+const noteBackupView = createNoteBackupView({
+    root: () => document.querySelector('#tavern-notes-panel'),
+    translate: t,
+    escapeHtml: htmlEscape,
+    listBackups: async () => (await notesRequest('/backups')).backups,
+    restoreBackup: name => notesRequest('/backups/restore', { method: 'POST', body: JSON.stringify({ name }) }),
+    notify,
+    onRestored: async () => {
+        await noteListController.load(noteStoreAdapter.getQueryState());
+        systemStatusController.refresh().catch(() => {});
+    },
+});
 
 const application = createApplication({
     modules: [{ mount: init, destroy: destroyApplicationModules }],

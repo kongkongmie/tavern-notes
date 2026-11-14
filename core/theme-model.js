@@ -1,3 +1,5 @@
+import { normalizeThemeDecorations } from './theme-decorations.js';
+
 export function createThemeModel({
     defaultTheme,
     convertVariables = variables => ({ ...(variables || {}) }),
@@ -11,9 +13,14 @@ export function createThemeModel({
     const flavorVariable = `${variablePrefix}theme-flavor`;
 
     function normalizeTheme(theme) {
+        const description = String(theme?.description || '');
+        const customCss = String(theme?.customCss || '');
+        const decorations = normalizeThemeDecorations(theme?.decorations);
+        const usesVersionTwo = Boolean(description || customCss || decorations.length);
         return {
             ...defaultTheme,
             ...(theme || {}),
+            version: usesVersionTwo ? 2 : (theme?.version ?? defaultTheme.version),
             variables: {
                 ...defaultTheme.variables,
                 ...convertVariables(theme?.variables),
@@ -22,6 +29,9 @@ export function createThemeModel({
                 ...defaultTheme.assets,
                 ...(theme?.assets || {}),
             },
+            description,
+            customCss,
+            decorations,
         };
     }
 

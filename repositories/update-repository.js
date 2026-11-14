@@ -10,6 +10,7 @@ export function createUpdateRepository({
     noticeStorage,
     noticeKey,
     updateUrl = '/api/extensions/update',
+    discoverUrl = '/api/extensions/discover',
     extensionName = '/tavern-notes',
     getRequestHeaders = () => ({ 'Content-Type': 'application/json' }),
 }) {
@@ -20,6 +21,18 @@ export function createUpdateRepository({
             return (await response.json()).version || fallbackVersion;
         } catch {
             return fallbackVersion;
+        }
+    }
+
+    // An extension installed "for all users" lives in the global folder; the update request must say so.
+    async function isGlobalInstall() {
+        try {
+            const response = await fetchImpl(discoverUrl, { headers: getRequestHeaders() });
+            if (!response.ok) return false;
+            const name = `third-party/${String(extensionName).replace(/^\/+/, '')}`;
+            return (await response.json()).some(item => item?.name === name && item.type === 'global');
+        } catch {
+            return false;
         }
     }
 
@@ -41,14 +54,13 @@ export function createUpdateRepository({
                 latestVersion,
                 changelog: changelogResponse?.ok ? parseChangelog(await changelogResponse.text()) : [],
                 annotations: annotationResponse?.ok ? parseChangelog(await annotationResponse.text()) : [],
-                serverPluginUpdateRequired: manifest.server_plugin_update_required === true,
             });
         },
         async update() {
             const response = await fetchImpl(updateUrl, {
                 method: 'POST',
                 headers: getRequestHeaders(),
-                body: JSON.stringify({ extensionName, global: false }),
+                body: JSON.stringify({ extensionName, global: await isGlobalInstall() }),
             });
             if (!response.ok) {
                 const message = String(await response.text().catch(() => '') || response.statusText || `HTTP ${response.status}`).trim();

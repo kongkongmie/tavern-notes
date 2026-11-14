@@ -6,8 +6,7 @@ import { createTagController } from '../features/tag-controller.js';
 import { createCaptureController } from '../features/capture-controller.js';
 import { createUserInputCaptureController } from '../features/user-input-capture-controller.js';
 import { createUserInputMaintenanceController } from '../features/user-input-maintenance-controller.js';
-import { createFullTagRepository, TagRepositoryError } from '../repositories/full-tag-repository.js';
-import { createLiteTagRepository } from '../repositories/lite-tag-repository.js';
+import { createTagRepository, TagRepositoryError } from '../repositories/tag-repository.js';
 
 assert.equal(normalizeTagName('  Plot  '), 'Plot');
 assert.equal(isSameTag('Plot', 'plot'), true);
@@ -19,7 +18,7 @@ assert.equal(createCaptureDedupeKey('chat', 2), 'chat::2');
 assert.equal(buildExcerptNoteInput({ content: ' x ', character: {}, chat: 'c', messageId: 1 }).content, 'x');
 assert.equal(prepareUserInputCapture({ is_user: true, mes: 'x' }, { chatId: 'c', messageId: 1, character: {} }, { enabled: true }, { 'c::1': 'x' }), null);
 
-for (const factory of [createFullTagRepository, createLiteTagRepository]) {
+for (const factory of [createTagRepository]) {
     const calls = [];
     const repository = factory({ request: async (path, options) => {
         calls.push([path, options]);
@@ -30,7 +29,7 @@ for (const factory of [createFullTagRepository, createLiteTagRepository]) {
     assert.equal(calls.length, 2);
 }
 await assert.rejects(
-    createFullTagRepository({ request: async () => { const error = new Error('missing'); error.status = 404; throw error; } }).deleteTag('x'),
+    createTagRepository({ request: async () => { const error = new Error('missing'); error.status = 404; throw error; } }).deleteTag('x'),
     error => error instanceof TagRepositoryError && error.code === 'TAG_NOT_FOUND',
 );
 

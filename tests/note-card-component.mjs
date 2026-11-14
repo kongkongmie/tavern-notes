@@ -32,6 +32,7 @@ assert.match(html, /class="tn-note-menu-toggle"/);
 assert.match(html, /class="tn-note-quick-fill tn-fill"/);
 assert.match(html, /aria-expanded="false"/);
 assert.match(html, /class="tn-note-actions"/);
+assert.match(html, /data-tn-theme-slot="card-decoration"/);
 assert.doesNotMatch(html, /class="tn-note-fade"/);
 assert.doesNotMatch(html, /class="tn-expand"/);
 for (const action of ['fill', 'copy', 'share', 'edit', 'delete']) assert.match(html, new RegExp(`tn-${action}`));

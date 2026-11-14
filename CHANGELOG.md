@@ -1,4 +1,41 @@
-﻿# Changelog
+# Changelog
+
+## 3.0.0
+
+Tavern Notes now has one edition. Full mode, Lite mode and the Server Plugin are gone: install the extension and it works, on computers and phones alike.
+
+### One edition, saved as files
+
+- Notes and themes are saved as files in SillyTavern's own user folder (`data/<user>/user/files/`, names starting with `tavern-notes__`) through SillyTavern's built-in file API. No backend, no installer and no restart are needed.
+- Every device that opens the same SillyTavern sees the same notes and themes.
+- Notes are split into monthly files, so saving one note rewrites only that month.
+- An automatic backup is written on the first change of each day; the last 7 are kept. **More → Auto backups** lists them and can restore one (the current notes are backed up first).
+- Requires SillyTavern 1.12.0 or later.
+
+### Upgrading from 2.x
+
+- On first start, Tavern Notes looks for notes from the old Server Plugin (Full) and from this browser (Lite), asks once, copies them, and checks every note against the source. The old data is only read, never changed or deleted. A copy of what was migrated is kept as a file.
+- Custom themes from the Server Plugin and from Lite are moved too.
+- After migrating from the Server Plugin, a note explains that `SillyTavern/plugins/tavern-notes` can now be deleted. Keeping it does no harm.
+- Used Lite in several browsers? Open SillyTavern once in each; their notes are merged without duplicates. **More → Migrate old data** runs the check again at any time.
+- Already removed the backend? Import its daily backup file (`data/<user>/tavern-notes/backups/tavern-notes-daily-backup.json`) with **More → Import / Export Notes → Import JSON notes**.
+- The standalone Tavern Notes Lite extension has a final release that installs Tavern Notes, removes itself and reloads.
+
+### New
+
+- **Whole-floor long image**: a camera button on each message exports the whole floor (status bars included) as one PNG, as it looks on screen.
+- **Blueprint Pixel** built-in theme: a Win98-style pixel skin whose colors follow the SillyTavern Blueprint Pixel theme, day and night.
+- Share-card dialog redesigned: the preview stays in view, options are grouped, extra fonts are folded away, and the export buttons stay at the bottom on phones.
+- The title bar shows @KKM on every screen size.
+
+### Fixes
+
+- Re-sending or editing the same message keeps only the newest user input for that floor (its tags are kept).
+- Tag and character filters now count the same way as the list, so a filter never shows a number with no notes behind it. Character cards include user inputs written in their chats.
+- Batch delete removes every selected note, including all versions of grouped user inputs (it used to delete only the first).
+- The **More** menu is no longer covered by the search box.
+- One-click update now also works when Tavern Notes was installed for all users (global extension).
+
 
 ## 2.0.5
 

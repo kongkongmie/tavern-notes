@@ -35,6 +35,7 @@ export function renderNoteCards(notes, options) {
 
         return `
             <article class="${uiClass('note', { classPrefix })} ${c(`note-${escapeHtml(noteTypeClass(note.type))}`)}${variants.length > 1 ? ` ${c('note-has-variants')}` : ''}${selectedIds.has(String(note.id)) ? ` ${c('batch-selected')}` : ''}" data-note-id="${escapeHtml(note.id)}" data-chat-name="${escapeHtml(chatName)}" tabindex="0" aria-label="${escapeHtml(translate('viewFull'))}">
+                <div class="${c('theme-slot')}" data-tn-theme-slot="card-decoration" aria-hidden="true"></div>
                 ${batchMode ? `<label class="${c('batch-check')}" title="${escapeHtml(translate('selectNote'))}"><input class="${c('batch-checkbox')}" type="checkbox" value="${escapeHtml(note.id)}" ${selectedIds.has(String(note.id)) ? 'checked' : ''} /><span><i class="fa-solid fa-check"></i></span></label>` : ''}
                 ${variantControls}
                 <div class="${c('note-topline')}">
@@ -56,10 +57,10 @@ export function renderNoteCards(notes, options) {
                     </button>
                 </div>
                 <div class="${c('note-actions')}" aria-hidden="true">
-                    <button class="menu_button ${c('copy')}" title="${escapeHtml(translate('copy'))}"><i class="fa-regular fa-copy"></i><span>${escapeHtml(translate('copy'))}</span></button>
-                    <button class="menu_button ${c('share')}" title="${escapeHtml(translate('share'))}"><i class="fa-solid fa-share-nodes"></i><span>${escapeHtml(translate('share'))}</span></button>
-                    <button class="menu_button ${c('edit')}" title="${escapeHtml(translate('editNote'))}"><i class="fa-solid fa-pen"></i><span>${escapeHtml(translate('edit'))}</span></button>
-                    <button class="menu_button ${c('delete')}" title="${escapeHtml(translate('delete'))}"><i class="fa-regular fa-trash-can"></i><span>${escapeHtml(translate('delete'))}</span></button>
+                    <button class="tn-action-button ${c('copy')}" title="${escapeHtml(translate('copy'))}"><i class="fa-regular fa-copy"></i><span>${escapeHtml(translate('copy'))}</span></button>
+                    <button class="tn-action-button ${c('share')}" title="${escapeHtml(translate('share'))}"><i class="fa-solid fa-share-nodes"></i><span>${escapeHtml(translate('share'))}</span></button>
+                    <button class="tn-action-button ${c('edit')}" title="${escapeHtml(translate('editNote'))}"><i class="fa-solid fa-pen"></i><span>${escapeHtml(translate('edit'))}</span></button>
+                    <button class="tn-action-button ${c('delete')}" title="${escapeHtml(translate('delete'))}"><i class="fa-regular fa-trash-can"></i><span>${escapeHtml(translate('delete'))}</span></button>
                 </div>
             </article>
         `;
@@ -79,7 +80,7 @@ export function toggleNoteActionMenu(article, classPrefix) {
     const actions = article?.querySelector(`.${classPrefix}-note-actions`);
     if (!actions) return false;
     const willOpen = !actions.classList.contains('open');
-    closeNoteActionMenus(article.closest(`#tavern-notes-panel, #tavern-notes-lite-panel`) || document, classPrefix);
+    closeNoteActionMenus(article.closest('#tavern-notes-panel') || document, classPrefix);
     actions.classList.toggle('open', willOpen);
     actions.setAttribute('aria-hidden', String(!willOpen));
     article.querySelector(`.${classPrefix}-note-menu-toggle`)?.setAttribute('aria-expanded', String(willOpen));

@@ -6,6 +6,9 @@ function element(value = '') {
     const listeners = new Set();
     return {
         value,
+        textContent: '',
+        checked: true,
+        classList: { add() {}, remove() {}, toggle() {} },
         addEventListener(type, listener) { if (type === 'click') listeners.add(listener); },
         removeEventListener(type, listener) { if (type === 'click') listeners.delete(listener); },
         listeners,
@@ -14,9 +17,13 @@ function element(value = '') {
 const elements = new Map([
     ['#tavern-notes-theme-name-input', element()],
     ['#tavern-notes-theme-code', element()],
+    ['#tavern-notes-theme-custom-css', element()],
+    ['#tavern-notes-theme-css-status', element()],
     ['#tavern-notes-theme-preview-save', element()],
     ['#tavern-notes-theme-merge-st', element()],
     ['#tavern-notes-theme-save-as', element()],
+    ...['paper', 'paper-2', 'ink', 'muted', 'gold', 'font', 'font-size', 'radius', 'shadow', 'background', 'background-opacity']
+        .map(name => [`#tavern-notes-theme-basic-${name}`, element()]),
 ]);
 const document = {
     body: {},
@@ -27,8 +34,8 @@ const defaultTheme = {
     format: 'tavern-notes-theme',
     version: 1,
     name: 'Default',
-    variables: { '--tn-paper': '#fff' },
-    assets: {},
+    variables: { '--tn-paper': '#ffffff', '--tn-paper-2': '#f5f5f5', '--tn-ink': '#222222', '--tn-muted': '#777777', '--tn-gold': '#cc9900', '--tn-font-family': 'inherit', '--tn-font-size': '15px', '--tn-radius-panel': '24px', '--tn-panel-shadow': 'none' },
+    assets: { backgroundImage: '', backgroundOpacity: 1 },
 };
 const normalizeTheme = theme => ({
     ...defaultTheme,
@@ -57,12 +64,30 @@ const studio = createThemeStudio({
     notify: () => {},
 });
 
-studio.syncEditor({ ...defaultTheme, name: 'Edited' });
+studio.syncEditor({ ...defaultTheme, name: 'Edited', customCss: '.tn-note { color: red; }' });
 assert.equal(elements.get('#tavern-notes-theme-name-input').value, 'Edited');
 assert.equal(JSON.parse(elements.get('#tavern-notes-theme-code').value).name, 'Edited');
+assert.equal(elements.get('#tavern-notes-theme-custom-css').value, '.tn-note { color: red; }');
+assert.equal(elements.get('#tavern-notes-theme-basic-paper').value, '#ffffff');
+assert.equal(elements.get('#tavern-notes-theme-basic-background-opacity').value, '100');
+elements.get('#tavern-notes-theme-code').value = JSON.stringify({ name: 'JSON CSS', customCss: '.tn-note { color: blue; }' });
+assert.equal(studio.getThemeFromEditor().customCss, '.tn-note { color: blue; }', 'direct JSON edits remain supported when the separate CSS editor was untouched');
 elements.get('#tavern-notes-theme-code').value = JSON.stringify({ name: 'From JSON', variables: { '--tn-paper': '#000' } });
 elements.get('#tavern-notes-theme-name-input').value = 'From input';
+elements.get('#tavern-notes-theme-custom-css').value = '.tn-note::before { content: ""; }';
 assert.equal(studio.getThemeFromEditor().name, 'From input');
+assert.equal(studio.getThemeFromEditor().customCss, '.tn-note::before { content: ""; }');
+elements.get('#tavern-notes-theme-basic-paper').value = '#123456';
+elements.get('#tavern-notes-theme-basic-font-size').value = '17';
+elements.get('#tavern-notes-theme-basic-radius').value = '20';
+elements.get('#tavern-notes-theme-basic-background').value = 'https://example.com/paper.png';
+elements.get('#tavern-notes-theme-basic-background-opacity').value = '45';
+const visualTheme = studio.getThemeFromEditor();
+assert.equal(visualTheme.variables['--tn-paper'], '#123456');
+assert.equal(visualTheme.variables['--tn-font-size'], '17px');
+assert.equal(visualTheme.variables['--tn-radius-card'], '16px');
+assert.equal(visualTheme.assets.backgroundImage, 'https://example.com/paper.png');
+assert.equal(visualTheme.assets.backgroundOpacity, 0.45);
 elements.get('#tavern-notes-theme-code').value = JSON.stringify({ format: 'other-format' });
 assert.throws(() => studio.getThemeFromEditor(), /invalidThemeFile/);
 elements.get('#tavern-notes-theme-code').value = JSON.stringify(defaultTheme);
@@ -109,6 +134,12 @@ assert.equal(merged.variables['--tn-input-border'], merged.variables['--tn-panel
 const markup = renderThemeStudioMarkup({ translate: key => key, escapeHtml: value => String(value) });
 assert.match(markup, /data-theme-studio/);
 assert.match(markup, /tavern-notes-theme-code/);
+assert.match(markup, /<details class="tn-theme-advanced">/);
+assert.match(markup, /data-theme-studio data-tn-theme-protected="surface"/);
+assert.match(markup, /theme-preview-save" data-tn-theme-protected="control"/);
+assert.match(markup, /data-theme-basic-field="paper" type="color"/);
+assert.match(markup, /data-theme-basic-field="backgroundOpacity" type="range"/);
+assert.doesNotMatch(markup, /<details class="tn-theme-advanced" open/);
 const liteMarkup = renderThemeStudioMarkup({
     translate: key => key,
     escapeHtml: value => String(value),
@@ -130,5 +161,6 @@ assert.doesNotMatch(source, /\bapplyTheme\b|\bsaveTheme\s*[,}]/);
 assert.match(source, /themeController\.previewTheme/);
 assert.match(source, /themeController\.saveTheme/);
 assert.match(source, /activate:\s*false/);
+assert.match(source, /suffix === 'background' \? 'change' : 'input'/, 'background URLs should preview after editing, not while partially typed');
 
 console.log('Theme studio controller test passed.');

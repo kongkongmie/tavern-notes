@@ -1,14 +1,8 @@
 import assert from 'node:assert/strict';
 import { assertNoteRepository, NoteRepositoryError } from '../core/note-repository-contract.js';
-import { createLiteNoteRepository } from '../repositories/lite-note-repository.js';
+import { createNoteRepository } from '../repositories/note-repository.js';
 
-const adapterFactories = [['lite', createLiteNoteRepository]];
-try {
-    const { createFullNoteRepository } = await import('../repositories/full-note-repository.js');
-    adapterFactories.unshift(['full', createFullNoteRepository]);
-} catch {
-    // Standalone Lite does not ship the Full HTTP adapter.
-}
+const adapterFactories = [['files', createNoteRepository]];
 
 const FIXTURE = [
     ['n1', 1, 'manual', 'Alpha opening', '2026-01-01T00:00:00.000Z', 'c1', 'chat-a', ['Story', 'Blue']],
@@ -60,6 +54,11 @@ function createMemoryBackend(initial = FIXTURE) {
             notes.push(note);
             return { note: clone(note) };
         }
+        if (url.pathname === '/notes/delete-many' && method === 'POST') {
+            const ids = new Set(JSON.parse(options.body || '{}').ids || []);
+            notes = notes.filter(note => !ids.has(note.id));
+            return { ok: true, deleted: ids.size };
+        }
         if (url.pathname.startsWith('/notes/')) {
             const id = decodeURIComponent(url.pathname.slice('/notes/'.length));
             const index = notes.findIndex(note => note.id === id);
@@ -96,25 +95,19 @@ function createMemoryBackend(initial = FIXTURE) {
         getAllNotes: async () => clone(notes),
         importData,
         exportData: async user => ({ format: 'tavern-notes-export', version: 1, user, notes: clone(notes) }),
-        requestFile: async () => 'plain text export',
         markExported: async () => {},
     };
 }
 
 function createRepository(kind, factory, initial = FIXTURE) {
     const backend = createMemoryBackend(initial);
-    return kind === 'full'
-        ? assertNoteRepository(factory({
-            request: backend.request,
-            requestFile: backend.requestFile,
-        }))
-        : assertNoteRepository(factory({
-            request: backend.request,
-            getAllNotes: backend.getAllNotes,
-            importData: backend.importData,
-            exportData: backend.exportData,
-            markExported: backend.markExported,
-        }));
+    return assertNoteRepository(factory({
+        request: backend.request,
+        getAllNotes: backend.getAllNotes,
+        importData: backend.importData,
+        exportData: backend.exportData,
+        markExported: backend.markExported,
+    }));
 }
 
 const queryCases = [
@@ -140,7 +133,6 @@ const queryCases = [
     ['special characters', { search: '你好 & <TAG>' }, result => assert.deepEqual(result.items.map(note => note.id), ['n5'])],
 ];
 
-const semanticResults = new Map();
 for (const [kind, factory] of adapterFactories) {
     const empty = createRepository(kind, factory, []);
     assert.deepEqual(await empty.listNotes({}), {
@@ -163,14 +155,12 @@ for (const [kind, factory] of adapterFactories) {
         if (pathname === '/tags') return { tags: [{ name: 'Story', count: 4 }] };
         throw new Error(`Unexpected legacy path: ${path}`);
     };
-    const legacyRepository = kind === 'full'
-        ? factory({ request: legacyRequest })
-        : factory({
-            request: legacyRequest,
-            getAllNotes: async () => [],
-            importData: async () => ({}),
-            exportData: async () => ({ notes: [] }),
-        });
+    const legacyRepository = factory({
+        request: legacyRequest,
+        getAllNotes: async () => [],
+        importData: async () => ({}),
+        exportData: async () => ({ notes: [] }),
+    });
     const legacy = await legacyRepository.listNotes({
         search: ' Alpha ',
         type: 'manual',
@@ -208,7 +198,6 @@ for (const [kind, factory] of adapterFactories) {
         verify(result);
         results.push([name, result]);
     }
-    semanticResults.set(kind, results);
 
     const created = await repository.createNote({ content: 'Created without optional fields' });
     assert.ok(created.id);
@@ -239,25 +228,14 @@ for (const [kind, factory] of adapterFactories) {
     assert.ok(exported.data.notes.every(note => note.id && note.content));
 }
 
-if (semanticResults.has('full') && semanticResults.has('lite')) {
-    assert.deepEqual(
-        semanticResults.get('full'),
-        semanticResults.get('lite'),
-        'Full and Lite list semantics must be identical',
-    );
-}
-
 for (const [kind, factory] of adapterFactories) {
-    const unavailable = new Error('IndexedDB storage unavailable.');
-    unavailable.code = kind === 'full' ? 'backend_unreachable' : undefined;
-    const repository = kind === 'full'
-        ? factory({ request: async () => { throw unavailable; } })
-        : factory({
-            request: async () => { throw unavailable; },
-            getAllNotes: async () => { throw unavailable; },
-            importData: async () => { throw unavailable; },
-            exportData: async () => { throw unavailable; },
-        });
+    const unavailable = new Error('Note storage unavailable.');
+    const repository = factory({
+        request: async () => { throw unavailable; },
+        getAllNotes: async () => { throw unavailable; },
+        importData: async () => { throw unavailable; },
+        exportData: async () => { throw unavailable; },
+    });
     await assert.rejects(
         () => repository.listNotes({}),
         error => error instanceof NoteRepositoryError && error.code === 'STORAGE_UNAVAILABLE',

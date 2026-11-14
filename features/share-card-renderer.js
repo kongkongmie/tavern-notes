@@ -86,19 +86,29 @@ function roundedRectPath(ctx, x, y, width, height, radius) {
     ctx.closePath();
 }
 
-function drawMultiline(ctx, lines, x, y, lineHeight, maxLines) {
-    const visible = maxLines ? lines.slice(0, maxLines) : lines;
-    visible.forEach((line, index) => {
-        ctx.fillText(line, x, y + index * lineHeight);
-    });
-    if (maxLines && lines.length > maxLines) {
-        ctx.fillText('...', x, y + visible.length * lineHeight);
-    }
+// When text is cut, the ellipsis ends the last visible line instead of adding a line below it,
+// so truncated text never runs into the footer.
+export function fitTruncatedLines(ctx, lines, maxLines, maxWidth = 0) {
+    if (!maxLines || lines.length <= maxLines) return lines;
+    const visible = lines.slice(0, maxLines);
+    while (visible.length > 1 && !visible[visible.length - 1].trim()) visible.pop();
+    const ellipsis = '…';
+    let last = Array.from(visible[visible.length - 1] || '');
+    while (maxWidth && last.length && ctx.measureText(last.join('') + ellipsis).width > maxWidth) last.pop();
+    visible[visible.length - 1] = last.join('').replace(/[，。、,.;；：:\s]+$/u, '') + ellipsis;
+    return visible;
 }
 
-function drawMultilineFit(ctx, lines, x, y, lineHeight, maxY) {
-    const maxLines = Math.max(1, Math.floor((maxY - y) / lineHeight));
-    drawMultiline(ctx, lines, x, y, lineHeight, maxLines);
+function drawMultiline(ctx, lines, x, y, lineHeight, maxLines, maxWidth = 0) {
+    fitTruncatedLines(ctx, lines, maxLines, maxWidth).forEach((line, index) => {
+        ctx.fillText(line, x, y + index * lineHeight);
+    });
+}
+
+// maxY is the lowest allowed text baseline.
+function drawMultilineFit(ctx, lines, x, y, lineHeight, maxY, maxWidth = 0) {
+    const maxLines = Math.max(1, Math.floor((maxY - y) / lineHeight) + 1);
+    drawMultiline(ctx, lines, x, y, lineHeight, maxLines, maxWidth);
 }
 
 function hasLatinText(text) {
@@ -379,12 +389,13 @@ async function drawShareCard({
             y += 76;
         }
 
-        ctx.font = `700 34px ${font}`;
-        const lines = wrapCanvasText(ctx, content, right - left);
-        drawMultiline(ctx, lines, left, y, 68, 11);
-
         const footerY = height - 112;
         const avatarSize = 58;
+        // The default size (80%) keeps the original 34px body; the slider now scales it like other themes.
+        const bodySize = Math.round(34 * fontScale / 0.8);
+        ctx.font = `700 ${bodySize}px ${font}`;
+        const lines = wrapCanvasText(ctx, content, right - left);
+        drawMultilineFit(ctx, lines, left, y, bodySize * 2, footerY - avatarSize - 36, right - left);
         if (characterAvatar) {
             drawCircleImage(ctx, characterAvatar, right - avatarSize, footerY - avatarSize + 18, avatarSize);
         } else {
@@ -439,7 +450,7 @@ async function drawShareCard({
         const footerY = 1154;
         ctx.font = `400 ${s(46)}px ${readFont}`;
         const lines = wrapCanvasText(ctx, content, right - left);
-        drawMultilineFit(ctx, lines, left, 520, s(88), 1016);
+        drawMultilineFit(ctx, lines, left, 520, s(88), 1016, right - left);
 
         ctx.fillStyle = muted;
         ctx.font = `400 ${s(29)}px ${readFont}`;
@@ -497,7 +508,7 @@ async function drawShareCard({
         ctx.textAlign = 'left';
         const contentRight = right - 70;
         const lines = wrapCanvasText(ctx, content, contentRight - left);
-        drawMultilineFit(ctx, lines, left, contentY, s(70), 1042);
+        drawMultilineFit(ctx, lines, left, contentY, s(70), 1042, right - left);
 
         ctx.fillStyle = muted;
         ctx.font = `400 ${s(29)}px ${readFont}`;
@@ -549,7 +560,7 @@ async function drawShareCard({
     ctx.fillStyle = textColor;
     ctx.font = `400 ${s(42)}px ${readFont}`;
     const lines = wrapCanvasText(ctx, content, right - left);
-    drawMultilineFit(ctx, lines, left, settings.showCharacter ? 560 : 300, s(78), 1054);
+    drawMultilineFit(ctx, lines, left, settings.showCharacter ? 560 : 300, s(78), 1054, right - left);
 
     ctx.fillStyle = muted;
     ctx.font = `400 ${s(30)}px ${readFont}`;

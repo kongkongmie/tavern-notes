@@ -18,7 +18,6 @@ const request = createLocalThemeRepository({
         { id: 'apple-glass', name: 'Apple', builtIn: true, theme: appleTheme },
     ],
     normalizeTheme: theme => theme,
-    isRetiredTheme: record => record.id === 'archive',
     translate: key => key,
 });
 
@@ -27,6 +26,11 @@ const saved = await request('/themes', { method: 'POST', body: JSON.stringify({ 
 assert.equal(saved.activeId, saved.id);
 assert.equal((await request(`/themes/${saved.id}/activate`, { method: 'POST' })).activeId, saved.id);
 assert.equal((await request(`/themes/${saved.id}`, { method: 'DELETE' })).activeId, 'default');
-await assert.rejects(() => request('/themes', { method: 'POST', body: JSON.stringify({ id: 'archive', theme: { name: 'Retired' } }) }));
+const archive = await request('/themes', {
+    method: 'POST',
+    body: JSON.stringify({ theme: { name: 'Secret Files', variables: { '--tn-theme-flavor': 'secret-files' } } }),
+});
+assert.equal(archive.activeTheme.name, 'Secret Files');
+assert.equal(archive.activeTheme.variables['--tn-theme-flavor'], 'secret-files');
 
 console.log('Local theme repository test passed.');

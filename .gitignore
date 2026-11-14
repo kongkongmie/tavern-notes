@@ -15,3 +15,6 @@ index.json
 # Temporary files
 *.tmp
 *.bak
+
+# Local handoff notes
+_HANDOFF_*.md

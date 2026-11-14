@@ -1,10 +1,8 @@
-import { shouldShowBackupReminder } from '../core/system-status-model.js';
-
-export function createSystemStatusController({ repository, view, capabilities, formatStatus, notifyReminder = () => {}, reminderOptions, onStatus = () => {}, onError = () => {} }) {
+export function createSystemStatusController({ repository, view, formatStatus, onStatus = () => {}, onError = () => {} }) {
     let mounted = false;
     let generation = 0;
     let lastStatus = null;
-    async function refresh({ showReminder = false } = {}) {
+    async function refresh() {
         const request = ++generation;
         view.setLoading?.(true);
         try {
@@ -13,10 +11,9 @@ export function createSystemStatusController({ repository, view, capabilities, f
             lastStatus = status;
             onStatus(status);
             view.renderStatus?.(formatStatus(status));
-            if (capabilities.storageQuota && showReminder && shouldShowBackupReminder(status, reminderOptions)) await notifyReminder(status);
             return status;
         } catch (error) {
-            if (mounted && request === generation) onError(error, capabilities);
+            if (mounted && request === generation) onError(error);
             throw error;
         } finally {
             if (mounted && request === generation) view.setLoading?.(false);
@@ -25,7 +22,6 @@ export function createSystemStatusController({ repository, view, capabilities, f
     return {
         mount() { if (!mounted) { mounted = true; view.mount?.(); } },
         refresh,
-        showInstallGuide: () => capabilities.installGuide && view.showInstallGuide?.(),
         getStatus: () => lastStatus,
         destroy() { mounted = false; generation += 1; lastStatus = null; view.destroy?.(); },
     };

@@ -6,7 +6,6 @@ export function createLocalThemeRepository({
     getBuiltInThemes,
     normalizeTheme,
     normalizeThemeId = value => value,
-    isRetiredTheme = () => false,
     translate = key => key,
     maxCustomThemes = 20,
 }) {
@@ -14,9 +13,7 @@ export function createLocalThemeRepository({
         try {
             const themes = JSON.parse(storage.getItem(themeStorageKey) || '[]');
             const valid = Array.isArray(themes) ? themes.filter(item => item?.id && item?.theme) : [];
-            const safe = valid.filter(item => !isRetiredTheme(item));
-            if (safe.length !== valid.length) writeCustomThemes(safe);
-            return safe;
+            return valid;
         } catch {
             return [];
         }
@@ -28,6 +25,10 @@ export function createLocalThemeRepository({
 
     function getRecords() {
         return [...getBuiltInThemes(), ...readCustomThemes()];
+    }
+
+    function isBuiltInId(id) {
+        return id === 'default' || id === appleThemeId || getBuiltInThemes().some(item => item.id === id);
     }
 
     function getActiveId() {
@@ -65,9 +66,8 @@ export function createLocalThemeRepository({
         if (url.pathname === '/themes' && method === 'POST') {
             const payload = typeof options.body === 'string' ? JSON.parse(options.body) : (options.body || {});
             const theme = normalizeTheme(payload.theme || {});
-            const existingId = payload.id && !['default', appleThemeId].includes(payload.id) ? String(payload.id) : '';
+            const existingId = payload.id && !isBuiltInId(payload.id) ? String(payload.id) : '';
             const id = existingId || `custom-${Date.now().toString(36)}`;
-            if (isRetiredTheme({ id, name: theme.name, theme })) throw new Error(translate('invalidThemeFile'));
             const customThemes = readCustomThemes().filter(item => item.id !== id);
             customThemes.push({ id, name: theme.name || translate('unnamedTheme'), author: theme.author || '', builtIn: false, theme });
             writeCustomThemes(customThemes);
@@ -78,7 +78,7 @@ export function createLocalThemeRepository({
         const deletion = url.pathname.match(/^\/themes\/([^/]+)$/);
         if (deletion && method === 'DELETE') {
             const id = decodeURIComponent(deletion[1]);
-            if (['default', appleThemeId].includes(id)) throw new Error(translate('builtInThemeCannotDelete'));
+            if (isBuiltInId(id)) throw new Error(translate('builtInThemeCannotDelete'));
             writeCustomThemes(readCustomThemes().filter(item => item.id !== id));
             storage.setItem(activeThemeKey, 'default');
             return response();

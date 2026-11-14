@@ -1,3 +1,5 @@
+import { BLUEPRINT_PIXEL_THEME, BLUEPRINT_PIXEL_THEME_ID } from './blueprint-pixel-theme.js';
+
 export function createAppleGlassSharedVariables(prefix = '--tn-') {
     const variable = name => `${prefix}${name}`;
     return {
@@ -23,7 +25,6 @@ export function createAppleGlassSharedVariables(prefix = '--tn-') {
         [variable('control-shadow')]: `0 10px 28px var(${variable('shadow-dark')}), inset 0 1px 0 rgba(255, 255, 255, 0.16)`,
     };
 }
-
 export function createBuiltInThemeRecords({
     defaultTheme,
     appleDayVariables,
@@ -50,20 +51,10 @@ export function createBuiltInThemeRecords({
             [`${variablePrefix}theme-flavor`]: 'apple',
         },
     });
+    const pixelPreset = normalizeTheme({ ...BLUEPRINT_PIXEL_THEME, id: BLUEPRINT_PIXEL_THEME_ID });
     return [
         { id: 'default', name: defaultPreset.name, author, builtIn: true, theme: defaultPreset },
         { id: appleThemeId, name: applePreset.name, author, builtIn: true, theme: applePreset },
+        { id: BLUEPRINT_PIXEL_THEME_ID, name: pixelPreset.name, author: pixelPreset.author, builtIn: true, theme: pixelPreset },
     ];
-}
-
-export function isRetiredLegacyTheme(record) {
-    const retiredIds = new Set(['secret-files', 'archive']);
-    const id = String(record?.id || record?.theme?.id || '').trim().toLowerCase();
-    const name = String(record?.name || record?.theme?.name || '').trim();
-    const variables = record?.theme?.variables || {};
-    const flavor = String(variables['--tn-theme-flavor'] || variables['--tnl-theme-flavor'] || '').trim().toLowerCase();
-    return retiredIds.has(id)
-        || flavor === 'archive'
-        || /secret\s*files?/i.test(name)
-        || /秘密档案|秘密檔案/.test(name);
 }

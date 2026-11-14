@@ -22,7 +22,6 @@ function clone(value) {
 
 export const DEFAULT_SETTINGS = deepFreeze({
     schemaVersion: SETTINGS_SCHEMA_VERSION,
-    storageMode: null,
     language: 'auto',
     launcherMode: 'toolbar',
     floatingPosition: null,
@@ -39,6 +38,7 @@ export const DEFAULT_SETTINGS = deepFreeze({
     appleGlassMode: 'day',
     defaultThemeMode: 'day',
     uiFontScale: 1,
+    themeAnimationsEnabled: true,
     currentUserName: '',
     recentTags: [],
     shareCard: {
@@ -128,6 +128,8 @@ export function migrateSettings(raw) {
     const version = Number.isInteger(source.schemaVersion) ? source.schemaVersion : 0;
     if (version < 1) source.schemaVersion = SETTINGS_SCHEMA_VERSION;
     if (version > SETTINGS_SCHEMA_VERSION) source.schemaVersion = SETTINGS_SCHEMA_VERSION;
+    // 2.x chose between Full (Server Plugin) and Lite (browser) storage; 3.0 has one file storage.
+    delete source.storageMode;
     return source;
 }
 
@@ -145,7 +147,6 @@ export function mergeSettingsWithDefaults(raw) {
 
 export function normalizeSettings(raw) {
     const settings = mergeSettingsWithDefaults(migrateSettings(raw));
-    const storageMode = ['full', 'lite'].includes(settings.storageMode) ? settings.storageMode : null;
     const floorCaptureSelector = typeof settings.floorCaptureSelector === 'string'
         && settings.floorCaptureSelector.trim()
         && settings.floorCaptureSelector !== LEGACY_FLOOR_CAPTURE_SELECTOR
@@ -156,7 +157,6 @@ export function normalizeSettings(raw) {
     const floatingButtonOpacity = Number(settings.floatingButtonOpacity);
     return {
         schemaVersion: SETTINGS_SCHEMA_VERSION,
-        storageMode,
         language: LANGUAGES.has(settings.language) ? settings.language : DEFAULT_SETTINGS.language,
         launcherMode: ['toolbar', 'floating'].includes(settings.launcherMode) ? settings.launcherMode : DEFAULT_SETTINGS.launcherMode,
         floatingPosition: normalizeFloatingPosition(settings.floatingPosition),
@@ -173,6 +173,7 @@ export function normalizeSettings(raw) {
         appleGlassMode: settings.appleGlassMode === 'night' ? 'night' : 'day',
         defaultThemeMode: settings.defaultThemeMode === 'night' ? 'night' : 'day',
         uiFontScale: Number.isFinite(uiFontScale) ? Math.min(1.2, Math.max(0.8, uiFontScale)) : DEFAULT_SETTINGS.uiFontScale,
+        themeAnimationsEnabled: settings.themeAnimationsEnabled !== false,
         currentUserName: typeof settings.currentUserName === 'string' ? settings.currentUserName : '',
         recentTags: uniqueStrings(settings.recentTags, 100),
         shareCard: normalizeShareCard(settings.shareCard),
@@ -184,7 +185,7 @@ export function validateSettings(raw) {
     const migrated = migrateSettings(raw);
     const errors = [];
     for (const key of Object.keys(DEFAULT_SETTINGS)) {
-        if (key !== 'storageMode' && !(key in migrated)) errors.push(`missing:${key}`);
+        if (!(key in migrated)) errors.push(`missing:${key}`);
     }
     if (JSON.stringify(mergeSettingsWithDefaults(migrated)) !== JSON.stringify(mergeSettingsWithDefaults(normalized))) {
         errors.push('invalid-values');
@@ -194,7 +195,5 @@ export function validateSettings(raw) {
 
 export function pickPersistedSettings(state) {
     const settings = normalizeSettings(state?.settings || state);
-    const persisted = clone(settings);
-    if (persisted.storageMode === null) delete persisted.storageMode;
-    return persisted;
+    return clone(settings);
 }

@@ -21,7 +21,7 @@ for (const id of dialogIds) assert.match(source, new RegExp(`['"]${id}['"]`));
 assert.match(source, /setAttribute\('data-tn-overlay', 'dialog'\)/);
 assert.match(source, /setAttribute\('data-tn-overlay', 'popover'\)/);
 assert.match(css, /#tavern-notes-panel > \[data-tn-overlay="dialog"\]/);
-assert.match(css, /#tavern-notes-panel\[data-theme-flavor="archive"\] > \[data-tn-overlay="dialog"\]/);
+assert.match(css, /#tavern-notes-panel\.tn-secret-files-theme > \[data-tn-overlay="dialog"\]/);
 assert.doesNotMatch(css, /:not\(#tavern-notes-modal\)/, 'Archive must not require an overlay ID whitelist.');
 for (const token of ['--_tn-z-dialog', '--_tn-z-popover', '--_tn-z-archive-dialog']) assert.match(css, new RegExp(token));
 for (const closer of ['closeFullNote', 'closeExportMenu', 'closeFloorCaptureMenu', 'closeUserInputCleanupMenu', 'closeShareCard']) {

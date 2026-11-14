@@ -28,6 +28,7 @@ export function createNoteDetailView({
         },
         open(model) {
             if (!mounted || !model) return;
+            modal.closest(`#${classPrefix}-panel`)?.classList.add(`${classPrefix}-detail-open`);
             modal.querySelector(`.${classPrefix}-modal-kicker`).textContent = model.kicker;
             modal.querySelector(`.${classPrefix}-modal-title`).textContent = model.title;
             modal.querySelector(`.${classPrefix}-modal-content`).innerHTML = renderContent(model);
@@ -37,6 +38,7 @@ export function createNoteDetailView({
         close() {
             modal?.classList.remove('open');
             modal?.setAttribute('aria-hidden', 'true');
+            modal?.closest(`#${classPrefix}-panel`)?.classList.remove(`${classPrefix}-detail-open`);
         },
         destroy() {
             if (mounted) modal?.removeEventListener('click', handleClick);

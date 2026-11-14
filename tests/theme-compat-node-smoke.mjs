@@ -1,16 +1,17 @@
 import assert from 'node:assert/strict';
-import { toFullThemeVariables, toLiteThemeVariables } from '../theme-compat.js';
+import { toThemeVariables } from '../core/theme-compat.js';
 
-const lite = toLiteThemeVariables({
-    '--tn-paper': '#efefeb',
-    '--tn-note-bg': 'linear-gradient(var(--tn-paper), var(--tn-paper-2))',
+const converted = toThemeVariables({
+    '--tnl-paper': '#efefeb',
+    '--tnl-note-bg': 'linear-gradient(var(--tnl-paper), var(--tnl-paper-2))',
     '--tn-ink': '#171717',
+    color: 'red',
 });
-const full = toFullThemeVariables(lite);
 
-assert.equal(full['--tn-paper'], '#efefeb');
-assert.equal(full['--tn-note-bg'], 'linear-gradient(var(--tn-paper), var(--tn-paper-2))');
-assert.equal(full['--tn-ink'], '#171717');
-assert.equal(full['--tnl-paper'], undefined);
+assert.equal(converted['--tn-paper'], '#efefeb');
+assert.equal(converted['--tn-note-bg'], 'linear-gradient(var(--tn-paper), var(--tn-paper-2))');
+assert.equal(converted['--tn-ink'], '#171717');
+assert.equal(converted['--tnl-paper'], undefined);
+assert.equal(converted.color, undefined);
 
-console.log('Unified theme compatibility smoke test passed.');
+console.log('Theme variable compatibility smoke test passed.');

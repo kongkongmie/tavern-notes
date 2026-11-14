@@ -117,7 +117,7 @@ function harness(repository) {
         importNotes: async data => ({ imported: data.notes.length, skipped: 0 }),
         exportNotes: async ({ format }) => {
             exported += 1;
-            return { source: 'full', data: format === 'json' ? { notes: [] } : 'txt', notes: [] };
+            return { source: 'files', data: format === 'json' ? { notes: [] } : 'txt', notes: [] };
         },
     };
     const h = harness(repository);
@@ -140,6 +140,9 @@ function harness(repository) {
     assert.match(downloads[2][0], /"picked"/);
     assert.equal((await controller.importJson({ format: 'tavern-notes-export', notes: [{ id: 'x' }] })).ok, true);
     assert.equal(h.query.page, 1);
+    const daily = await controller.importJson({ format: 'tavern-notes-daily-backup', backedUpAt: '2026-11-14T07:02:19.810Z', notes: [{ id: 'a' }, { id: 'b' }] });
+    assert.equal(daily.ok, true, 'the 2.x Server Plugin daily backup can be imported directly');
+    assert.equal(daily.value.imported, 2);
 }
 
 {

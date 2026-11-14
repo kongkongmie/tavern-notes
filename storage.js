@@ -1,75 +1,33 @@
-const DB_NAME = 'tavern-notes-lite';
-const DB_VERSION = 1;
-const NOTE_STORE = 'notes';
-const META_STORE = 'meta';
+// Note business logic (adding, grouping floors, tags, dedupe, import/export, backups).
+// Persistence is pluggable: the extension stores notes as files in the SillyTavern user folder
+// through repositories/st-file-note-backend.js.
 const MAX_CONTENT_LENGTH = 200000;
-const LITE_VERSION = '0.2.0';
 
-let databasePromise = null;
+let backend = null;
 
-function requestResult(request) {
-    return new Promise((resolve, reject) => {
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error || new Error('IndexedDB request failed.'));
-    });
+export function configureNoteBackend(nextBackend) {
+    backend = nextBackend;
 }
 
-function transactionDone(transaction) {
-    return new Promise((resolve, reject) => {
-        transaction.oncomplete = () => resolve();
-        transaction.onabort = () => reject(transaction.error || new Error('IndexedDB transaction aborted.'));
-        transaction.onerror = () => reject(transaction.error || new Error('IndexedDB transaction failed.'));
-    });
-}
-
-export function openLiteDatabase() {
-    if (databasePromise) return databasePromise;
-    databasePromise = new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = () => {
-            const database = request.result;
-            if (!database.objectStoreNames.contains(NOTE_STORE)) {
-                const notes = database.createObjectStore(NOTE_STORE, { keyPath: 'id' });
-                notes.createIndex('seq', 'seq', { unique: false });
-                notes.createIndex('type', 'type', { unique: false });
-                notes.createIndex('createdAt', 'createdAt', { unique: false });
-            }
-            if (!database.objectStoreNames.contains(META_STORE)) {
-                database.createObjectStore(META_STORE, { keyPath: 'key' });
-            }
-        };
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => {
-            databasePromise = null;
-            reject(request.error || new Error('Unable to open Tavern Notes Lite storage.'));
-        };
-        request.onblocked = () => reject(new Error('Tavern Notes Lite storage is open in another page. Close the other page and retry.'));
-    });
-    return databasePromise;
+function currentBackend() {
+    if (!backend) throw new Error('Tavern Notes storage is not ready yet.');
+    return backend;
 }
 
 async function readMeta(key, fallback = null) {
-    const database = await openLiteDatabase();
-    const transaction = database.transaction(META_STORE, 'readonly');
-    const result = await requestResult(transaction.objectStore(META_STORE).get(key));
-    return result?.value ?? fallback;
+    return currentBackend().readMeta(key, fallback);
 }
 
-async function writeMeta(key, value, transaction = null) {
-    if (transaction) {
-        transaction.objectStore(META_STORE).put({ key, value });
-        return;
-    }
-    const database = await openLiteDatabase();
-    const ownTransaction = database.transaction(META_STORE, 'readwrite');
-    ownTransaction.objectStore(META_STORE).put({ key, value });
-    await transactionDone(ownTransaction);
+async function writeMeta(key, value) {
+    await currentBackend().commit({ meta: { [key]: value } });
 }
 
 async function readAllNotes() {
-    const database = await openLiteDatabase();
-    const transaction = database.transaction(NOTE_STORE, 'readonly');
-    return requestResult(transaction.objectStore(NOTE_STORE).getAll());
+    return currentBackend().readAll();
+}
+
+async function commit(change) {
+    await currentBackend().commit(change);
 }
 
 function safeNumber(value, fallback = 0) {
@@ -162,7 +120,44 @@ function excerptDedupeKey(note) {
     ].map(value => String(value).replaceAll('|', '\\|')).join('|');
 }
 
+function userInputFloorKey(note) {
+    if (note?.type !== 'user_input' || note?.source === 'manual_inspiration') return '';
+    const chatId = note?.chat?.id;
+    const messageId = note?.chat?.messageId;
+    if (chatId === null || chatId === undefined || chatId === '' || messageId === null || messageId === undefined) return '';
+    return [note.character?.avatar || note.character?.name || '', chatId, messageId]
+        .map(value => String(value).replaceAll('|', '\\|')).join('|');
+}
+
+function mergeNoteTags(notes) {
+    return normalizeTags(notes.flatMap(note => normalizeTags(note?.tags)));
+}
+
+function findFloorDedupeGroups(notes) {
+    const floors = new Map();
+    for (const note of [...notes].sort((left, right) => safeNumber(left.seq) - safeNumber(right.seq))) {
+        const key = userInputFloorKey(note);
+        if (!key) continue;
+        if (!floors.has(key)) floors.set(key, []);
+        floors.get(key).push(note);
+    }
+    return Array.from(floors.values())
+        .filter(items => items.length > 1)
+        .map(items => {
+            const latest = items[items.length - 1];
+            return { kind: 'floor', canonical: { ...latest, tags: mergeNoteTags(items) }, duplicates: items.slice(0, -1) };
+        });
+}
+
 function findUserInputDedupeGroups(notes) {
+    const floorGroups = findFloorDedupeGroups(notes);
+    const retired = new Set(floorGroups.flatMap(group => group.duplicates.map(note => note.id)));
+    const merged = new Map(floorGroups.map(group => [group.canonical.id, group.canonical]));
+    const remaining = notes.filter(note => !retired.has(note.id)).map(note => merged.get(note.id) || note);
+    return [...floorGroups, ...findRepeatDedupeGroups(remaining)];
+}
+
+function findRepeatDedupeGroups(notes) {
     const groups = new Map();
     const previousByContext = new Map();
     for (const note of [...notes].sort((left, right) => safeNumber(left.seq) - safeNumber(right.seq))) {
@@ -171,7 +166,7 @@ function findUserInputDedupeGroups(notes) {
         const contentKey = normalizeRepeatContent(note.content);
         const previous = previousByContext.get(contextKey);
         if (previous && previous.contentKey === contentKey) {
-            if (!groups.has(previous.canonical.id)) groups.set(previous.canonical.id, { canonical: previous.canonical, duplicates: [] });
+            if (!groups.has(previous.canonical.id)) groups.set(previous.canonical.id, { kind: 'repeat', canonical: previous.canonical, duplicates: [] });
             groups.get(previous.canonical.id).duplicates.push(note);
             continue;
         }
@@ -252,6 +247,10 @@ function matchesCharacter(note, id, name) {
     if (String(id || '').startsWith(avatarPrefix)) {
         return String(note.character?.avatar || '') === String(id).slice(avatarPrefix.length);
     }
+    const namePrefix = 'tavern-notes-name:';
+    if (String(id || '').startsWith(namePrefix)) {
+        return (note.character?.name || '未命名角色') === String(id).slice(namePrefix.length);
+    }
     if (id !== null && id !== undefined && id !== '') return String(note.character?.id ?? '') === String(id);
     if (name) return String(note.character?.name || '') === String(name);
     return true;
@@ -287,12 +286,16 @@ function countGroups(notes) {
 
 function characterSummaries(notes, userName = 'User') {
     const map = new Map();
-    for (const note of notes) {
+    const userCharacter = { id: 'tavern-notes-user', name: userName || 'User', avatar: null, isUser: true };
+    const targets = [];
+    for (const note of groupNotesForDisplay(notes)) {
         const storedCharacter = note.character || {};
-        const isUser = note.type === 'user_input' || storedCharacter.isUser === true || storedCharacter.id === 'tavern-notes-user';
-        const character = isUser
-            ? { id: 'tavern-notes-user', name: userName || 'User', avatar: null, isUser: true }
-            : storedCharacter;
+        const personaNote = storedCharacter.isUser === true || storedCharacter.id === 'tavern-notes-user';
+        // User inputs belong to the user card and also to the card they were sent to.
+        if (note.type === 'user_input' || personaNote) targets.push([note, userCharacter]);
+        if (!personaNote) targets.push([note, storedCharacter]);
+    }
+    for (const [note, character] of targets) {
         const avatar = String(character.avatar || '');
         const key = character.isUser === true
             ? 'user'
@@ -303,7 +306,11 @@ function characterSummaries(notes, userName = 'User') {
                     : `name|${String(character.name || '').toLocaleLowerCase()}`;
         if (!map.has(key)) {
             map.set(key, {
-                id: avatar ? `tavern-notes-avatar:${avatar}` : character.id ?? null,
+                id: avatar
+                    ? `tavern-notes-avatar:${avatar}`
+                    : character.id !== null && character.id !== undefined && character.id !== ''
+                        ? character.id
+                        : `tavern-notes-name:${character.name || '未命名角色'}`,
                 name: character.name || '未命名角色',
                 avatar: character.avatar ?? null,
                 isUser: character.isUser === true,
@@ -325,7 +332,6 @@ function characterSummaries(notes, userName = 'User') {
 }
 
 async function addNote(payload) {
-    const database = await openLiteDatabase();
     if (payload?.type === 'excerpt') {
         const excerptKey = excerptDedupeKey(payload);
         const duplicate = (await readAllNotes()).find(note => excerptDedupeKey(note) === excerptKey);
@@ -348,21 +354,22 @@ async function addNote(payload) {
                     ? Number(payload.chat.messageId)
                     : (previous.latestMessageId ?? previous.chat?.messageId ?? null),
             };
-            const transaction = database.transaction([NOTE_STORE, META_STORE], 'readwrite');
-            transaction.objectStore(NOTE_STORE).put(updated);
-            transaction.objectStore(META_STORE).put({ key: 'updatedAt', value: repeatedAt });
-            await transactionDone(transaction);
+            await commit({ put: [updated], meta: { updatedAt: repeatedAt } });
             return { note: updated, deduplicated: true };
         }
     }
     const nextSeq = safeNumber(await readMeta('nextSeq', 1), 1);
     const note = cleanNote(payload, nextSeq);
-    const transaction = database.transaction([NOTE_STORE, META_STORE], 'readwrite');
-    transaction.objectStore(NOTE_STORE).add(note);
-    transaction.objectStore(META_STORE).put({ key: 'nextSeq', value: nextSeq + 1 });
-    transaction.objectStore(META_STORE).put({ key: 'updatedAt', value: note.updatedAt });
-    await transactionDone(transaction);
-    return { note, deduplicated: false };
+    // Re-sending or editing the same chat floor replaces the earlier input: only the newest one is kept.
+    const floorKey = userInputFloorKey(note);
+    const replaced = floorKey ? (await readAllNotes()).filter(item => userInputFloorKey(item) === floorKey) : [];
+    if (replaced.length) note.tags = mergeNoteTags([note, ...replaced]);
+    await commit({
+        put: [note],
+        remove: replaced.map(item => item.id),
+        meta: { nextSeq: nextSeq + 1, updatedAt: note.updatedAt },
+    });
+    return { note, deduplicated: false, replaced: replaced.length };
 }
 
 async function dedupeUserInputs(apply = false, selectedIds = null) {
@@ -380,38 +387,36 @@ async function dedupeUserInputs(apply = false, selectedIds = null) {
     }));
     if (!apply || !duplicateNotes) return { groups: groups.length, duplicateNotes, remainingNotes: notes.length - duplicateNotes, items };
     const updatedAt = new Date().toISOString();
-    const database = await openLiteDatabase();
-    const transaction = database.transaction([NOTE_STORE, META_STORE], 'readwrite');
-    const store = transaction.objectStore(NOTE_STORE);
+    const put = [];
+    const remove = [];
     for (const group of groups) {
         const all = [group.canonical, ...group.duplicates];
+        if (group.kind === 'floor') {
+            put.push(group.canonical);
+            group.duplicates.forEach(note => remove.push(note.id));
+            continue;
+        }
         const last = all[all.length - 1];
-        store.put({
+        put.push({
             ...group.canonical,
+            tags: mergeNoteTags(all),
             updatedAt,
             repeatCount: all.reduce((total, note) => total + Math.max(1, safeNumber(note.repeatCount, 1)), 0),
             lastRepeatedAt: last.lastRepeatedAt || last.updatedAt || last.createdAt || updatedAt,
             latestMessageId: last.latestMessageId ?? last.chat?.messageId ?? null,
         });
-        group.duplicates.forEach(note => store.delete(note.id));
+        group.duplicates.forEach(note => remove.push(note.id));
     }
-    transaction.objectStore(META_STORE).put({ key: 'updatedAt', value: updatedAt });
-    await transactionDone(transaction);
+    await commit({ put, remove, meta: { updatedAt } });
     return { groups: groups.length, duplicateNotes, remainingNotes: notes.length - duplicateNotes, items };
 }
 
 async function deleteNote(id) {
-    const database = await openLiteDatabase();
-    const transaction = database.transaction([NOTE_STORE, META_STORE], 'readwrite');
-    transaction.objectStore(NOTE_STORE).delete(String(id));
-    transaction.objectStore(META_STORE).put({ key: 'updatedAt', value: new Date().toISOString() });
-    await transactionDone(transaction);
+    await commit({ remove: [String(id)], meta: { updatedAt: new Date().toISOString() } });
 }
 
 async function updateNote(id, payload) {
-    const database = await openLiteDatabase();
-    const readTransaction = database.transaction(NOTE_STORE, 'readonly');
-    const existing = await requestResult(readTransaction.objectStore(NOTE_STORE).get(String(id)));
+    const existing = (await readAllNotes()).find(note => String(note.id) === String(id));
     if (!existing) throw new Error('Note not found.');
     const content = String(payload?.content || '').trim();
     if (!content) throw new Error('Note content is empty.');
@@ -421,10 +426,7 @@ async function updateNote(id, payload) {
         tags: normalizeTags(payload?.tags),
         updatedAt: new Date().toISOString(),
     };
-    const transaction = database.transaction([NOTE_STORE, META_STORE], 'readwrite');
-    transaction.objectStore(NOTE_STORE).put(updated);
-    transaction.objectStore(META_STORE).put({ key: 'updatedAt', value: updated.updatedAt });
-    await transactionDone(transaction);
+    await commit({ put: [updated], meta: { updatedAt: updated.updatedAt } });
     return updated;
 }
 
@@ -435,18 +437,14 @@ async function removeTagFromAllNotes(tag) {
     const changed = notes.filter(note => normalizeTags(note.tags).some(item => item.toLocaleLowerCase() === key));
     if (!changed.length) return 0;
     const updatedAt = new Date().toISOString();
-    const database = await openLiteDatabase();
-    const transaction = database.transaction([NOTE_STORE, META_STORE], 'readwrite');
-    const store = transaction.objectStore(NOTE_STORE);
-    for (const note of changed) {
-        store.put({
+    await commit({
+        put: changed.map(note => ({
             ...note,
             tags: normalizeTags(note.tags).filter(item => item.toLocaleLowerCase() !== key),
             updatedAt,
-        });
-    }
-    transaction.objectStore(META_STORE).put({ key: 'updatedAt', value: updatedAt });
-    await transactionDone(transaction);
+        })),
+        meta: { updatedAt },
+    });
     return changed.length;
 }
 
@@ -458,20 +456,28 @@ async function renameTagEverywhere(oldTag, newName) {
     const changed = notes.filter(note => normalizeTags(note.tags).some(item => item.toLocaleLowerCase() === oldKey));
     if (!changed.length) return { newTag, updated: 0 };
     const updatedAt = new Date().toISOString();
-    const database = await openLiteDatabase();
-    const transaction = database.transaction([NOTE_STORE, META_STORE], 'readwrite');
-    const store = transaction.objectStore(NOTE_STORE);
-    for (const note of changed) store.put({ ...note, tags: normalizeTags(note.tags.map(item => item.toLocaleLowerCase() === oldKey ? newTag : item)), updatedAt });
-    transaction.objectStore(META_STORE).put({ key: 'updatedAt', value: updatedAt });
-    await transactionDone(transaction);
+    await commit({
+        put: changed.map(note => ({ ...note, tags: normalizeTags(note.tags.map(item => item.toLocaleLowerCase() === oldKey ? newTag : item)), updatedAt })),
+        meta: { updatedAt },
+    });
     return { newTag, updated: changed.length };
 }
 
+// Count tags per displayed entry (input versions of one floor count once) so the shelf matches the list total.
 function summarizeTags(notes) {
-    const counts = new Map();
+    const entries = new Map();
     for (const note of notes) {
+        const entryKey = variantGroupKey(note) || `id|${note.id}`;
+        if (!entries.has(entryKey)) entries.set(entryKey, new Map());
+        const tags = entries.get(entryKey);
         for (const tag of normalizeTags(note.tags)) {
             const key = tag.toLocaleLowerCase();
+            if (!tags.has(key)) tags.set(key, tag);
+        }
+    }
+    const counts = new Map();
+    for (const tags of entries.values()) {
+        for (const [key, tag] of tags) {
             const current = counts.get(key) || { name: tag, count: 0 };
             current.count += 1;
             counts.set(key, current);
@@ -480,37 +486,33 @@ function summarizeTags(notes) {
     return Array.from(counts.values()).sort((left, right) => right.count - left.count || left.name.localeCompare(right.name));
 }
 
-export async function getAllLiteNotes() {
+export async function getAllNotes() {
     const notes = await readAllNotes();
     return notes.sort((left, right) => safeNumber(left.seq) - safeNumber(right.seq));
 }
 
-export async function getLiteExport(user = 'default-user') {
-    const notes = await getAllLiteNotes();
+export async function getNotesExport(user = 'default-user') {
+    const notes = await getAllNotes();
     return {
         ok: true,
         format: 'tavern-notes-export',
         version: 1,
-        source: 'tavern-notes-lite',
+        source: 'tavern-notes',
         exportedAt: new Date().toISOString(),
         user,
         notes,
     };
 }
 
-export async function markLiteExported() {
+export async function markNotesExported() {
     await writeMeta('lastExportAt', new Date().toISOString());
 }
 
-export async function markLiteBackupReminderShown() {
-    await writeMeta('lastBackupReminderAt', new Date().toISOString());
-}
-
-export async function importLiteExport(payload) {
+export async function importNotes(payload) {
     if (!payload || payload.format !== 'tavern-notes-export' || !Array.isArray(payload.notes)) {
         throw new Error('This is not a Tavern Notes JSON backup.');
     }
-    const existing = await getAllLiteNotes();
+    const existing = await getAllNotes();
     const signatures = new Set(existing.map(note => [
         note.type,
         note.content,
@@ -541,39 +543,100 @@ export async function importLiteExport(payload) {
         nextSeq += 1;
     }
     if (!accepted.length) return { imported: 0, skipped: payload.notes.length };
-    const database = await openLiteDatabase();
-    const transaction = database.transaction([NOTE_STORE, META_STORE], 'readwrite');
-    const store = transaction.objectStore(NOTE_STORE);
-    accepted.forEach(note => store.put(note));
-    transaction.objectStore(META_STORE).put({ key: 'nextSeq', value: nextSeq });
-    transaction.objectStore(META_STORE).put({ key: 'updatedAt', value: new Date().toISOString() });
-    await transactionDone(transaction);
+    await commit({ put: accepted, meta: { nextSeq, updatedAt: new Date().toISOString() } });
     return { imported: accepted.length, skipped: payload.notes.length - accepted.length };
 }
 
-export async function getLiteStorageInfo() {
-    const notes = await getAllLiteNotes();
-    const approximateBytes = new Blob([JSON.stringify(notes)]).size;
-    const lastExportAt = await readMeta('lastExportAt', '');
-    const lastReminderAt = await readMeta('lastBackupReminderAt', '');
-    let browserUsage = null;
-    let browserQuota = null;
-    try {
-        const estimate = await navigator.storage?.estimate?.();
-        browserUsage = estimate?.usage ?? null;
-        browserQuota = estimate?.quota ?? null;
-    } catch {
-        // The extension still has its own approximate size when browser estimates are unavailable.
-    }
-    return { count: notes.length, approximateBytes, lastExportAt, lastReminderAt, browserUsage, browserQuota };
+export async function listNoteBackups() {
+    const store = currentBackend();
+    return typeof store.listBackups === 'function' ? store.listBackups() : [];
 }
 
-export async function liteApi(path, options = {}, user = 'default-user', runtimeVersion = LITE_VERSION) {
-    const url = new URL(path, 'https://tavern-notes-lite.local');
+function notesFromExport(payload) {
+    if (!payload || payload.format !== 'tavern-notes-export' || !Array.isArray(payload.notes)) {
+        throw new Error('This is not a Tavern Notes JSON backup.');
+    }
+    const notes = [];
+    const seen = new Set();
+    for (const raw of payload.notes) {
+        if (!String(raw?.content || '').trim()) continue;
+        const note = cleanNote(raw, safeNumber(raw?.seq, notes.length + 1), true);
+        if (seen.has(note.id)) note.id = makeId(note.seq);
+        seen.add(note.id);
+        notes.push(note);
+    }
+    return notes;
+}
+
+// Replace all notes with an exact copy (ids, order and timestamps kept). Used by restore and migration.
+export async function replaceAllNotes(payload, { backup = false } = {}) {
+    const store = currentBackend();
+    if (typeof store.replaceAll !== 'function') throw new Error('Current storage cannot replace notes.');
+    const notes = notesFromExport(payload);
+    const nextSeq = Math.max(0, ...notes.map(note => safeNumber(note.seq))) + 1;
+    await store.replaceAll(notes, { nextSeq, updatedAt: new Date().toISOString() }, { backup });
+    return notes;
+}
+
+export async function restoreNoteBackup(name) {
+    const store = currentBackend();
+    const payload = await store.readBackup(name);
+    if (!payload) throw new Error('找不到这份备份。');
+    await store.saveBackup('before-restore');
+    const notes = await replaceAllNotes(payload);
+    return { restored: notes.length, name };
+}
+
+export async function readNotesFresh() {
+    const store = currentBackend();
+    return typeof store.readFresh === 'function' ? store.readFresh() : readAllNotes();
+}
+
+export async function hasStoredNotes() {
+    const store = currentBackend();
+    return typeof store.hasData === 'function' ? store.hasData() : (await readAllNotes()).length > 0;
+}
+
+export async function saveMigrationSnapshot(payload) {
+    const store = currentBackend();
+    if (typeof store.writeSnapshot !== 'function') return null;
+    const stamp = new Date();
+    const pad = value => String(value).padStart(2, '0');
+    const name = `tavern-notes__migration-source-${stamp.getFullYear()}-${pad(stamp.getMonth() + 1)}-${pad(stamp.getDate())}-${pad(stamp.getHours())}${pad(stamp.getMinutes())}.json`;
+    await store.writeSnapshot(name, payload);
+    return name;
+}
+
+export async function saveNamedBackup(suffix) {
+    const store = currentBackend();
+    return typeof store.saveBackup === 'function' ? store.saveBackup(suffix) : null;
+}
+
+export function buildNotesExport(notes, user = 'default-user', source = 'tavern-notes') {
+    return {
+        ok: true,
+        format: 'tavern-notes-export',
+        version: 1,
+        source,
+        exportedAt: new Date().toISOString(),
+        user,
+        notes: [...notes].sort((left, right) => safeNumber(left.seq) - safeNumber(right.seq)),
+    };
+}
+
+export async function getStorageInfo() {
+    const notes = await getAllNotes();
+    const approximateBytes = new Blob([JSON.stringify(notes)]).size;
+    const lastExportAt = await readMeta('lastExportAt', '');
+    return { count: notes.length, approximateBytes, lastExportAt };
+}
+
+export async function notesApi(path, options = {}, user = 'default-user', runtimeVersion = '') {
+    const url = new URL(path, 'https://tavern-notes.local');
     const method = String(options.method || 'GET').toUpperCase();
     if (url.pathname === '/status') {
         const notes = await readAllNotes();
-        return { ok: true, user, version: runtimeVersion, totalNotes: notes.length, storage: 'IndexedDB' };
+        return { ok: true, user, version: runtimeVersion, totalNotes: notes.length, storage: 'files' };
     }
     if (url.pathname === '/notes' && method === 'POST') {
         const payload = typeof options.body === 'string' ? JSON.parse(options.body) : (options.body || {});
@@ -582,7 +645,7 @@ export async function liteApi(path, options = {}, user = 'default-user', runtime
     }
     if (url.pathname === '/import' && method === 'POST') {
         const payload = typeof options.body === 'string' ? JSON.parse(options.body) : (options.body || {});
-        return { ok: true, ...await importLiteExport(payload) };
+        return { ok: true, ...await importNotes(payload) };
     }
     if (url.pathname === '/notes' && method === 'GET') {
         const allNotes = await readAllNotes();
@@ -632,6 +695,12 @@ export async function liteApi(path, options = {}, user = 'default-user', runtime
         const note = await updateNote(decodeURIComponent(url.pathname.slice('/notes/'.length)), payload);
         return { ok: true, note };
     }
+    if (url.pathname === '/notes/delete-many' && method === 'POST') {
+        const payload = typeof options.body === 'string' ? JSON.parse(options.body) : (options.body || {});
+        const ids = Array.isArray(payload.ids) ? payload.ids.map(String) : [];
+        if (ids.length) await commit({ remove: ids, meta: { updatedAt: new Date().toISOString() } });
+        return { ok: true, deleted: ids.length };
+    }
     if (url.pathname.startsWith('/notes/') && method === 'DELETE') {
         await deleteNote(decodeURIComponent(url.pathname.slice('/notes/'.length)));
         return { ok: true };
@@ -643,5 +712,12 @@ export async function liteApi(path, options = {}, user = 'default-user', runtime
         const payload = typeof options.body === 'string' ? JSON.parse(options.body) : (options.body || {});
         return { ok: true, ...await dedupeUserInputs(true, payload.ids) };
     }
-    throw new Error(`Unsupported Tavern Notes Lite operation: ${method} ${url.pathname}`);
+    if (url.pathname === '/backups' && method === 'GET') {
+        return { ok: true, backups: await listNoteBackups() };
+    }
+    if (url.pathname === '/backups/restore' && method === 'POST') {
+        const payload = typeof options.body === 'string' ? JSON.parse(options.body) : (options.body || {});
+        return { ok: true, ...await restoreNoteBackup(payload.name) };
+    }
+    throw new Error(`Unsupported Tavern Notes operation: ${method} ${url.pathname}`);
 }

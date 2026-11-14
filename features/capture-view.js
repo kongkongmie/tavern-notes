@@ -79,6 +79,7 @@ export function createCaptureView({
     getSelectionSnapshot,
     onSelectionCapture,
     onFloorCapture,
+    onFloorSnapshot = null,
     onChatChanged = null,
 }) {
     let mounted = false;
@@ -143,36 +144,60 @@ export function createCaptureView({
         timer = setTimeout(updateSelectionButton, 80);
     }
 
+    function floorButtonSpecs() {
+        const specs = [{
+            selector: selectors.floorButton,
+            className: uiClass('floor-capture', { classPrefix }),
+            title: 'captureFloorTitle',
+            label: 'captureFloor',
+            icon: 'fa-file-lines',
+        }];
+        // Prepended in reverse so the action bar reads: capture, then long image.
+        if (selectors.floorSnapshotButton && typeof onFloorSnapshot === 'function') {
+            specs.unshift({
+                selector: selectors.floorSnapshotButton,
+                className: `${uiClass('floor-capture', { classPrefix })} ${uiClass('floor-snapshot', { classPrefix })}`,
+                title: 'floorSnapshotTitle',
+                label: 'floorSnapshot',
+                icon: 'fa-camera',
+            });
+        }
+        return specs;
+    }
+
     function ensureFloorButton(candidate) {
         const message = candidate?.closest?.('.mes') || candidate;
         if (!message?.querySelector) return;
         if (!isFloorEnabled()) return;
         const actionBar = message.querySelector(selectors.floorActions || '.mes_buttons');
-        const existing = message.querySelector(selectors.floorButton);
-        if (existing) {
-            if (actionBar && existing.parentElement !== actionBar) {
-                existing.classList.add('mes_button', uiClass('floor-capture-integrated', { classPrefix }));
-                actionBar.prepend(existing);
+        for (const spec of floorButtonSpecs()) {
+            const existing = message.querySelector(spec.selector);
+            if (existing) {
+                if (actionBar && existing.parentElement !== actionBar) {
+                    existing.classList.add('mes_button', uiClass('floor-capture-integrated', { classPrefix }));
+                    actionBar.prepend(existing);
+                }
+                continue;
             }
-            return;
-        }
-        const button = documentRef.createElement('div');
-        button.setAttribute?.('role', 'button');
-        button.tabIndex = 0;
-        button.className = uiClass('floor-capture', { classPrefix });
-        button.title = translate('captureFloorTitle');
-        button.setAttribute?.('aria-label', translate('captureFloorTitle'));
-        button.innerHTML = `<i class="fa-solid fa-file-lines"></i><span>${escapeHtml(translate('captureFloor'))}</span>`;
-        if (actionBar) {
-            button.classList.add('mes_button', uiClass('floor-capture-integrated', { classPrefix }));
-            actionBar.prepend(button);
-        } else {
-            message.append(button);
+            const button = documentRef.createElement('div');
+            button.setAttribute?.('role', 'button');
+            button.tabIndex = 0;
+            button.className = spec.className;
+            button.title = translate(spec.title);
+            button.setAttribute?.('aria-label', translate(spec.title));
+            button.innerHTML = `<i class="fa-solid ${spec.icon}"></i><span>${escapeHtml(translate(spec.label))}</span>`;
+            if (actionBar) {
+                button.classList.add('mes_button', uiClass('floor-capture-integrated', { classPrefix }));
+                actionBar.prepend(button);
+            } else {
+                message.append(button);
+            }
         }
     }
 
     function handleFloorButton(event) {
-        const button = event.target?.closest?.(selectors.floorButton);
+        const snapshotButton = selectors.floorSnapshotButton ? event.target?.closest?.(selectors.floorSnapshotButton) : null;
+        const button = snapshotButton || event.target?.closest?.(selectors.floorButton);
         if (!button) return;
         if (event.type === 'keydown' && !['Enter', ' '].includes(event.key)) return;
         const messageSelector = selectors.message || selectors.messages;
@@ -180,12 +205,14 @@ export function createCaptureView({
         if (!message) return;
         event.preventDefault();
         event.stopPropagation();
-        onFloorCapture(message);
+        if (snapshotButton) onFloorSnapshot?.(message);
+        else onFloorCapture(message);
     }
 
     function refreshFloorButtons(root = documentRef) {
         if (!isFloorEnabled()) {
             documentRef.querySelectorAll(selectors.floorButton).forEach(button => button.remove());
+            if (selectors.floorSnapshotButton) documentRef.querySelectorAll(selectors.floorSnapshotButton).forEach(button => button.remove());
             return;
         }
         const messageSelector = selectors.messages || selectors.message;
@@ -238,6 +265,7 @@ export function createCaptureView({
         abortController = null;
         documentRef.querySelector(selectors.selectionButton)?.remove();
         documentRef.querySelectorAll(selectors.floorButton).forEach(button => button.remove());
+        if (selectors.floorSnapshotButton) documentRef.querySelectorAll(selectors.floorSnapshotButton).forEach(button => button.remove());
     }
 
     return { mount, destroy, refreshFloorButtons, hideSelectionButton };

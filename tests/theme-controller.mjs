@@ -51,7 +51,6 @@ function createHarness(overrides = {}) {
             const themeState = getThemeState();
             return { themes: themeState.themes, activeId: 'default', activeTheme: { name: 'Default', variables: {}, assets: {} } };
         },
-        async openThemeFolder() {},
         ...overrides.repository,
     };
     const themeModel = {
@@ -65,13 +64,14 @@ function createHarness(overrides = {}) {
         themeModel,
         defaultTheme: { name: 'Default', variables: {}, assets: {} },
         appleThemeId: 'apple-glass',
-        capabilities: overrides.capabilities || { exportTheme: true, openThemeFolder: true, themeStudio: false },
+        capabilities: overrides.capabilities || { exportTheme: true, themeStudio: false },
         getThemeState: () => store.getSlice('theme'),
         patchThemeState: patch => store.patch('theme', patch),
         persistThemeSettings: () => { persistCount += 1; },
         translate: key => key,
         notify: () => {},
         confirm: () => true,
+        validateThemeCss: overrides.validateThemeCss,
     });
     return {
         controller,
@@ -129,10 +129,19 @@ function createHarness(overrides = {}) {
 }
 
 {
-    const harness = createHarness({ capabilities: { exportTheme: false, openThemeFolder: false, themeStudio: false } });
+    const harness = createHarness({ capabilities: { exportTheme: false, themeStudio: false } });
     harness.controller.exportTheme();
-    await harness.controller.openThemeFolder();
-    assert.equal(harness.counts().downloadCount, 0, 'Lite capabilities suppress Full-only actions');
+    assert.equal(harness.counts().downloadCount, 0, 'exportTheme capability can switch the export action off');
+}
+
+{
+    let imported = false;
+    const harness = createHarness({
+        validateThemeCss: () => { throw new Error('bad css'); },
+        repository: { importTheme: async () => { imported = true; } },
+    });
+    await assert.rejects(() => harness.controller.saveTheme({ name: 'Broken', customCss: 'body{}' }), /bad css/);
+    assert.equal(imported, false, 'invalid custom CSS must be rejected before repository writes');
 }
 
 console.log('theme controller: ok');

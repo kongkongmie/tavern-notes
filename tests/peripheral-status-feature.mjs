@@ -3,17 +3,14 @@ import { compareVersions, parseChangelog } from '../core/update-model.js';
 import { createUpdateController } from '../features/update-controller.js';
 import { rememberFont, sanitizeFontCss } from '../core/font-model.js';
 import { createFontController } from '../features/font-controller.js';
-import { shouldShowBackupReminder } from '../core/system-status-model.js';
+import { normalizeSystemStatus } from '../core/system-status-model.js';
 import { createSystemStatusController } from '../features/system-status-controller.js';
-import { createStorageModeController } from '../features/storage-mode-controller.js';
 
 assert.equal(compareVersions('1.10.0', '1.9.9'), 1);
 assert.equal(parseChangelog('## 1.2.0\n- A\n## 1.1.0\n- B').length, 2);
 assert.equal(sanitizeFontCss('@font-face { font-family:X; src:url(x) } script{}').includes('script'), false);
 assert.equal(rememberFont([], { type: 'local', name: 'A' }, 1)[0].id, 'local:A:1');
-assert.equal(shouldShowBackupReminder({ count: 500, approximateBytes: 1, lastExportAt: '' }, { now: 1 }), true);
-assert.equal(shouldShowBackupReminder({ count: 1, approximateBytes: 1 }, { now: 1 }), false);
-assert.equal(shouldShowBackupReminder({ totalNotes: 500, approximateBytes: 30 * 1024 * 1024, lastReminderAt: '2026-07-30T00:00:00.000Z' }, { now: Date.parse('2026-07-31T00:00:00.000Z') }), false);
+assert.deepEqual(normalizeSystemStatus({ count: 3, user: 'u', version: '3.0.0' }), { user: 'u', version: '3.0.0', totalNotes: 3, approximateBytes: 0, lastExportAt: '', healthy: true });
 
 let updateResolvers = [];
 let updateRenders = [];
@@ -80,7 +77,6 @@ let statuses = [];
 const statusController = createSystemStatusController({
     repository: { getStatus: () => new Promise(resolve => statusResolvers.push(resolve)) },
     view: { mount() {}, renderStatus: value => statuses.push(value), setLoading() {}, destroy() {} },
-    capabilities: { storageQuota: true },
     formatStatus: status => String(status.totalNotes),
 });
 statusController.mount();
@@ -91,20 +87,5 @@ assert.equal((await statusSecond).totalNotes, 2);
 statusResolvers[0]({ totalNotes: 1 });
 assert.equal((await statusFirst).stale, true);
 statusController.destroy();
-
-let mode = 'full';
-let renderedMode = null;
-const storageController = createStorageModeController({
-    view: { mount() {}, close() {}, setLoading() {}, showError() {}, render: value => { renderedMode = value; }, destroy() {} },
-    getMode: () => mode,
-    prepareSwitch: (from, to) => ({ from, to }),
-    replaceSettings: async () => ({ ok: false, error: new Error('failed') }),
-    confirmSwitch: async () => true,
-    reload() {},
-});
-storageController.mount();
-await storageController.select('lite');
-assert.equal(renderedMode, 'full');
-storageController.destroy();
 
 console.log('peripheral status feature: ok');

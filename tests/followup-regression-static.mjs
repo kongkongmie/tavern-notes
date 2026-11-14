@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const entry = fs.readFileSync(new URL('../index.js', import.meta.url), 'utf8');
-const shell = fs.readFileSync(new URL('../repositories/full-app-shell-markup.js', import.meta.url), 'utf8');
+const shell = fs.readFileSync(new URL('../features/app-shell-markup.js', import.meta.url), 'utf8');
 const sharedShell = fs.readFileSync(new URL('../features/app-shell-markup.js', import.meta.url), 'utf8');
 const observerController = fs.readFileSync(new URL('../features/observer-controller.js', import.meta.url), 'utf8');
 const source = `${entry}\n${shell}\n${sharedShell}`;
@@ -11,8 +11,10 @@ const userCapture = fs.readFileSync(new URL('../features/user-input-capture-cont
 const css = fs.readFileSync(new URL('../style.css', import.meta.url), 'utf8');
 const sharedCss = fs.readFileSync(new URL('../shared/base.css', import.meta.url), 'utf8');
 const effectiveCss = `${sharedCss}\n${css}`;
-const backend = fs.readFileSync(new URL('../server-plugin/tavern-notes/index.js', import.meta.url), 'utf8');
+const noteStore = fs.readFileSync(new URL('../storage.js', import.meta.url), 'utf8');
 const shareRenderer = fs.readFileSync(new URL('../features/share-card-renderer.js', import.meta.url), 'utf8');
+const noteDetailView = fs.readFileSync(new URL('../features/note-detail-view.js', import.meta.url), 'utf8');
+const noteCard = fs.readFileSync(new URL('../core/note-card.js', import.meta.url), 'utf8');
 
 assert.doesNotMatch(source, /root\.addEventListener\('keyup', scheduleSelectionCaptureButton\)/);
 assert.match(captureView, /new MutationObserver\(records =>/);
@@ -32,13 +34,14 @@ assert.match(source, /<div class="\$\{ui\('window-actions'\)\}">[\s\S]*?id="\$\{
 assert.match(entry, /createObserverController/);
 assert.match(observerController, /observer\?\.observe|observer\.observe/);
 assert.match(source, /const directLimit = [^;]*panelWidth[^;]*;/);
+assert.match(entry, /const directLimit = Math\.min\(4,/, 'the primary toolbar must never expose more than four direct actions');
 assert.match(css, /repeat\(var\(--tn-header-action-columns, 5\)/);
 assert.match(
     effectiveCss,
     /\.tn-window-actions[\s\S]*?>\s*\.tn-language-select\s*\{[^}]*border-radius:\s*50% !important/,
     'language button circle rule must exist in shared/base.css or style.css',
 );
-assert.match(backend, /note\.source !== 'manual_inspiration'/);
+assert.match(noteStore, /note\.source === 'manual_inspiration'/, 'manual inspirations are never grouped or hidden as user inputs');
 assert.doesNotMatch(source, /params\.set\('includeUserInput'/, 'recording toggle must not hide stored notes');
 assert.match(userCapture, /prepareUserInputCapture/, 'recording toggle must still stop automatic capture');
 const autoCaptureToggle = entry.match(/async function toggleAutoCaptureUserInput\(\) \{[\s\S]*?\n\}/)?.[0] || '';
@@ -49,6 +52,20 @@ assert.match(entry, /\.tn-header'\)\?\.addEventListener\('click', expandArchiveR
 assert.match(sharedCss, /tn-reading-mode[\s\S]*?max-height:\s*0 !important[\s\S]*?transform:\s*translateY\(-8px\)/, 'reading mode controls should collapse with a transition');
 assert.match(sharedShell, /ui\('reading-mode-expand'\)[\s\S]*?t\('expandToolbar'\)/, 'collapsed mode needs a visible, labelled expand control');
 assert.match(sharedCss, /\.tn-reading-mode-expand[\s\S]*?border-radius:\s*999px[\s\S]*?backdrop-filter:\s*blur\(12px\)/, 'expand control should use the themed pill treatment');
+assert.match(entry, /function openFullNote\(note\) \{\s*resetArchiveReadingMode\(\);/, 'opening note details must expand the collapsed reading header');
+assert.match(noteDetailView, /classList\.add\(`\$\{classPrefix\}-detail-open`\)/, 'note details must mark the panel so the redundant panel close action can be hidden');
+assert.match(css, /container-name:\s*tavern-notes-panel/, 'responsive layout must follow actual panel width');
+assert.doesNotMatch(css, /#tavern-notes-panel\s*>\s*:not\(\.tn-theme-slot\)/, 'background slots must not force overlays into normal document flow');
+assert.match(css, /#tavern-notes-panel\s*>\s*:is\(\.tn-header,[^}]+\.tn-footer\)/, 'only normal panel sections should be lifted above the background slot');
+assert.doesNotMatch(css, /tn-archive-reading/, 'Secret Files reading mode must use the current class name');
+assert.match(css, /--_tn-z-archive-header:\s*35/, 'Secret Files header must stay below dialog overlays');
+assert.match(css, /tn-ui-font-control input\[type="range"\][\s\S]*?background-image:\s*none !important/, 'legacy studio sliders must clear host theme images');
+assert.match(entry, /readingModeExpandedAtScrollTop = document\.querySelector\('#tavern-notes-list'\)\?\.scrollTop \|\| 0/, 'reopening the panel must not immediately collapse at a retained scroll position');
+assert.doesNotMatch(css, /:is\(\.tn-header, \.tn-note, \.tn-empty, \.tn-footer\)\s*>\s*:not\(\.tn-theme-slot\)\s*\{[^}]*position:/, 'decoration slots must not replace absolute positioning inside note cards');
+assert.match(sharedCss, /theme-basic-grid[\s\S]*?input\[type="range"\][\s\S]*?background-image:\s*none !important/, 'basic theme sliders must own their appearance');
+assert.match(css, /@container tavern-notes-panel \(max-width:\s*980px\)[\s\S]*?grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/, 'narrow panels must keep filter cards in a horizontal row');
+assert.doesNotMatch(sharedShell, /\b(?:text_pole|menu_button)\b/, 'panel markup must not inherit SillyTavern appearance classes');
+assert.doesNotMatch(noteCard, /\bmenu_button\b/, 'note actions must use Tavern Notes-owned button styles');
 assert.equal([...entry.matchAll(/\bexpandToolbar:/g)].length, 4, 'expand control must include zh-CN, zh-TW, English, and Korean labels');
 assert.match(css, /--tn-panel-shadow:\s*0 18px 48px rgba\(74, 68, 58, 0\.18\)/, 'default day panel should use one restrained outer shadow');
 assert.doesNotMatch(css, /26px 26px 58px[\s\S]{0,120}-18px -18px 42px/, 'default day panel must not restore the bidirectional glow');

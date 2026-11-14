@@ -69,3 +69,13 @@ await assert.rejects(
 );
 
 console.log('share-card export tests passed');
+
+// Truncation keeps the ellipsis on the last visible line (it used to add a line that overlapped the footer).
+{
+    const { fitTruncatedLines } = await import('../features/share-card-renderer.js');
+    const ctx = { measureText: text => ({ width: Array.from(text).length * 10 }) };
+    const fitted = fitTruncatedLines(ctx, ['一二三四五', '', '六七八九十', '尾巴'], 3, 50);
+    assert.equal(fitted.length, 3);
+    assert.equal(fitted[2], '六七八九…');
+    assert.deepEqual(fitTruncatedLines(ctx, ['a', 'b'], 3, 50), ['a', 'b']);
+}

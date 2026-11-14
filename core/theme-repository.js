@@ -46,43 +46,11 @@ export function createThemeRepository({ request }) {
         }));
     }
 
-    async function openThemeFolder() {
-        return request('/themes/folder/open', { method: 'POST' });
-    }
-
     return {
         listThemes,
         getActiveTheme,
         activateTheme,
         importTheme,
         deleteTheme,
-        openThemeFolder,
-    };
-}
-
-export function createModeThemeRepository({ getMode, repositories }) {
-    if (typeof getMode !== 'function') {
-        throw new TypeError('Mode Theme Repository requires getMode().');
-    }
-
-    function current() {
-        const repository = repositories?.[getMode()];
-        if (!repository) throw new Error('Theme Repository is unavailable for the current storage mode.');
-        return repository;
-    }
-
-    return {
-        listThemes: () => current().listThemes(),
-        getActiveTheme: () => current().getActiveTheme(),
-        activateTheme: id => current().activateTheme(id),
-        importTheme: (theme, options) => current().importTheme(theme, options),
-        deleteTheme: id => current().deleteTheme(id),
-        openThemeFolder: () => {
-            const repository = current();
-            if (typeof repository.openThemeFolder !== 'function') {
-                throw new Error('Theme folder access is unavailable.');
-            }
-            return repository.openThemeFolder();
-        },
     };
 }

@@ -13,6 +13,7 @@ export function createThemeController({
     notify,
     confirm,
     beforeOpen = () => {},
+    validateThemeCss = () => {},
 }) {
     const t = translate;
     let mounted = false;
@@ -117,6 +118,7 @@ export function createThemeController({
         const id = !requestedId || requestedId === 'default' || isAppleThemeId(requestedId)
             ? null
             : requestedId;
+        validateThemeCss(clean.customCss, { themeId: id || current.activeId || 'theme' });
         const nextState = commitRepositoryState(
             await repository.importTheme(clean, { id, activate }),
             clean,
@@ -231,12 +233,6 @@ export function createThemeController({
         }
     }
 
-    async function openThemeFolder() {
-        if (!capabilities.openThemeFolder) return;
-        await repository.openThemeFolder();
-        notify(t('requestedThemeFolder'), 'success');
-    }
-
     function exportTheme() {
         if (!capabilities.exportTheme) return;
         const theme = studio?.getThemeFromEditor() || state().theme || defaultTheme;
@@ -272,7 +268,6 @@ export function createThemeController({
             import: file => report(importThemeFile(file)),
             delete: () => report(deleteSelectedTheme()),
             export: exportTheme,
-            openFolder: () => report(openThemeFolder()),
             reset: () => report(activateTheme('default')),
             toggleMode: () => report(toggleAppleThemeMode()),
         });
@@ -318,7 +313,6 @@ export function createThemeController({
         revertThemePreview,
         toggleAppleThemeMode,
         exportTheme,
-        openThemeFolder,
         getThemeState: state,
         setDraft,
         render,

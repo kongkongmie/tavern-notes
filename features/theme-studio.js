@@ -6,11 +6,12 @@ export function renderThemeStudioMarkup({
     uiFontScale = 1,
     floatingButtonScale = 1,
     floatingButtonOpacity = 0.9,
+    themeAnimationsEnabled = true,
 }) {
     const t = translate;
     const escape = escapeHtml;
     return `
-        <div class="${classPrefix}-theme-studio" data-theme-studio>
+        <div class="${classPrefix}-theme-studio" data-theme-studio data-tn-theme-protected="surface">
             <div class="${classPrefix}-ui-font-control">
                 <label for="${idPrefix}-ui-font-scale"><i class="fa-solid fa-text-height"></i><span>${escape(t('uiFontSize'))}</span><output id="${idPrefix}-ui-font-scale-value">${Math.round(uiFontScale * 100)}%</output></label>
                 <div><input id="${idPrefix}-ui-font-scale" type="range" min="80" max="120" step="5" value="${Math.round(uiFontScale * 100)}" /><button id="${idPrefix}-ui-font-reset" type="button">${escape(t('resetDefault'))}</button></div>
@@ -23,16 +24,39 @@ export function renderThemeStudioMarkup({
                 <label for="${idPrefix}-floating-button-opacity"><i class="fa-solid fa-circle-half-stroke"></i><span>${escape(t('floatingButtonOpacity'))}</span><output id="${idPrefix}-floating-button-opacity-value">${Math.round(floatingButtonOpacity * 100)}%</output></label>
                 <div><input id="${idPrefix}-floating-button-opacity" type="range" min="30" max="100" step="5" value="${Math.round(floatingButtonOpacity * 100)}" /><button id="${idPrefix}-floating-button-opacity-reset" type="button">${escape(t('resetDefault'))}</button></div>
             </div>
+            <label class="${classPrefix}-theme-motion-toggle"><input id="${idPrefix}-theme-animations" type="checkbox" ${themeAnimationsEnabled ? 'checked' : ''} /><span>${escape(t('themeAnimations'))}</span></label>
             <input id="${idPrefix}-theme-name-input" class="${classPrefix}-theme-input" type="text" placeholder="${escape(t('themeName'))}" />
-            <button id="${idPrefix}-theme-merge-st" class="${classPrefix}-theme-merge-button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>${escape(t('mergeTheme'))}</span></button>
-            <div class="${classPrefix}-theme-actions">
-                <button id="${idPrefix}-theme-preview-save" class="${classPrefix}-export-choice"><i class="fa-solid fa-eye"></i><span>${escape(t('previewSave'))}</span></button>
-                <button id="${idPrefix}-theme-save-as" class="${classPrefix}-export-choice"><i class="fa-solid fa-copy"></i><span>${escape(t('saveAs'))}</span></button>
-                <button id="${idPrefix}-theme-reset" class="${classPrefix}-export-choice"><i class="fa-solid fa-rotate-left"></i><span>${escape(t('resetDefault'))}</span></button>
+            <section class="${classPrefix}-theme-basics" aria-labelledby="${idPrefix}-theme-basics-title">
+                <h3 id="${idPrefix}-theme-basics-title">${escape(t('themeBasics'))}</h3>
+                <div class="${classPrefix}-theme-basic-grid">
+                    <label>${escape(t('mainBackground'))}<input id="${idPrefix}-theme-basic-paper" data-theme-basic-field="paper" type="color" /></label>
+                    <label>${escape(t('secondaryBackground'))}<input id="${idPrefix}-theme-basic-paper-2" data-theme-basic-field="paper2" type="color" /></label>
+                    <label>${escape(t('bodyText'))}<input id="${idPrefix}-theme-basic-ink" data-theme-basic-field="ink" type="color" /></label>
+                    <label>${escape(t('mutedText'))}<input id="${idPrefix}-theme-basic-muted" data-theme-basic-field="muted" type="color" /></label>
+                    <label>${escape(t('accentColor'))}<input id="${idPrefix}-theme-basic-gold" data-theme-basic-field="gold" type="color" /></label>
+                    <label>${escape(t('themeFontFamily'))}<input id="${idPrefix}-theme-basic-font" data-theme-basic-field="font" type="text" /></label>
+                    <label>${escape(t('themeFontSize'))}<input id="${idPrefix}-theme-basic-font-size" data-theme-basic-field="fontSize" type="range" min="12" max="20" step="1" /></label>
+                    <label>${escape(t('themeRoundness'))}<input id="${idPrefix}-theme-basic-radius" data-theme-basic-field="radius" type="range" min="0" max="36" step="2" /></label>
+                    <label>${escape(t('themeShadow'))}<select id="${idPrefix}-theme-basic-shadow" data-theme-basic-field="shadow"><option value="none">${escape(t('shadowNone'))}</option><option value="soft">${escape(t('shadowSoft'))}</option><option value="strong">${escape(t('shadowStrong'))}</option><option value="custom">${escape(t('shadowCustom'))}</option></select></label>
+                    <label class="${classPrefix}-theme-basic-wide">${escape(t('backgroundImage'))}<input id="${idPrefix}-theme-basic-background" data-theme-basic-field="background" type="text" inputmode="url" placeholder="https://..." /></label>
+                    <label class="${classPrefix}-theme-basic-wide">${escape(t('backgroundOpacity'))}<input id="${idPrefix}-theme-basic-background-opacity" data-theme-basic-field="backgroundOpacity" type="range" min="0" max="100" step="5" /></label>
+                </div>
+            </section>
+            <button id="${idPrefix}-theme-merge-st" data-tn-theme-protected="control" class="${classPrefix}-theme-merge-button"><i class="fa-solid fa-wand-magic-sparkles"></i><span>${escape(t('mergeTheme'))}</span></button>
+            <div class="${classPrefix}-theme-actions" data-tn-theme-protected="actions">
+                <button id="${idPrefix}-theme-preview-save" data-tn-theme-protected="control" class="${classPrefix}-export-choice"><i class="fa-solid fa-eye"></i><span>${escape(t('previewSave'))}</span></button>
+                <button id="${idPrefix}-theme-save-as" data-tn-theme-protected="control" class="${classPrefix}-export-choice"><i class="fa-solid fa-copy"></i><span>${escape(t('saveAs'))}</span></button>
+                <button id="${idPrefix}-theme-reset" data-tn-theme-protected="control" class="${classPrefix}-export-choice"><i class="fa-solid fa-rotate-left"></i><span>${escape(t('resetDefault'))}</span></button>
             </div>
             <details class="${classPrefix}-theme-guide">
                 <summary><i class="fa-solid fa-circle-info"></i><span>${escape(t('themeGuide'))}</span></summary>
                 <pre>${escape(t('themeGuideContent'))}</pre>
+            </details>
+            <details class="${classPrefix}-theme-advanced">
+                <summary><i class="fa-solid fa-code"></i><span>${escape(t('advancedThemeCss'))}</span></summary>
+                <p>${escape(t('advancedThemeCssHelp'))}</p>
+                <textarea id="${idPrefix}-theme-custom-css" class="${classPrefix}-theme-custom-css" spellcheck="false" placeholder=".tn-note::before { ... }"></textarea>
+                <output id="${idPrefix}-theme-css-status" class="${classPrefix}-theme-css-status" aria-live="polite"></output>
             </details>
             <textarea id="${idPrefix}-theme-code" spellcheck="false"></textarea>
         </div>
@@ -52,24 +76,107 @@ export function createThemeStudio({
     updateUiFontScale = async () => {},
     getFloatingAppearance = () => ({ scale: 1, opacity: 0.9 }),
     updateFloatingAppearance = async () => {},
+    getThemeAnimationsEnabled = () => true,
+    updateThemeAnimationsEnabled = async () => {},
+    validateThemeCss = () => {},
     idPrefix = 'tavern-notes',
+    classPrefix = 'tn',
 }) {
     const t = translate;
     let mounted = false;
+    let syncedCustomCss = '';
+    let syncedBasicValues = {};
     const listeners = [];
+
+    const basicFieldIds = {
+        paper: 'paper', paper2: 'paper-2', ink: 'ink', muted: 'muted', gold: 'gold', font: 'font',
+        fontSize: 'font-size', radius: 'radius', shadow: 'shadow', background: 'background', backgroundOpacity: 'background-opacity',
+    };
+
+    function basicElements() {
+        return Object.fromEntries(Object.entries(basicFieldIds).map(([name, suffix]) => [name, document.querySelector(`#${idPrefix}-theme-basic-${suffix}`)]));
+    }
+
+    function colorInputValue(value, fallback = '#000000') {
+        const parsed = parseColor(value) || parseColor(fallback);
+        if (!parsed) return '#000000';
+        return `#${parsed.rgb.map(channel => Math.round(channel).toString(16).padStart(2, '0')).join('')}`;
+    }
+
+    function shadowChoice(value) {
+        const shadow = String(value || '');
+        if (!shadow || shadow === 'none') return 'none';
+        if (shadow === defaultTheme.variables['--tn-panel-shadow']) return 'soft';
+        if (/0\s+2[4-9]px|0\s+3[0-9]px|0\s+4[0-9]px/.test(shadow)) return 'strong';
+        return 'custom';
+    }
+
+    function readBasicValues() {
+        return Object.fromEntries(Object.entries(basicElements()).map(([name, input]) => [name, String(input?.value || '')]));
+    }
+
+    function syncBasicEditor(theme) {
+        const fields = basicElements();
+        const variables = theme.variables || {};
+        const defaults = defaultTheme.variables || {};
+        const set = (name, value) => { if (fields[name]) fields[name].value = String(value); };
+        set('paper', colorInputValue(variables['--tn-paper'], defaults['--tn-paper']));
+        set('paper2', colorInputValue(variables['--tn-paper-2'], defaults['--tn-paper-2']));
+        set('ink', colorInputValue(variables['--tn-ink'], defaults['--tn-ink']));
+        set('muted', colorInputValue(variables['--tn-muted'], defaults['--tn-muted']));
+        set('gold', colorInputValue(variables['--tn-gold'], defaults['--tn-gold']));
+        set('font', variables['--tn-font-family'] || defaults['--tn-font-family'] || 'inherit');
+        set('fontSize', Number.parseFloat(variables['--tn-font-size']) || 15);
+        set('radius', Number.parseFloat(variables['--tn-radius-panel']) || 0);
+        set('shadow', shadowChoice(variables['--tn-panel-shadow']));
+        set('background', theme.assets?.backgroundImage || '');
+        set('backgroundOpacity', Math.round(Math.min(1, Math.max(0, Number(theme.assets?.backgroundOpacity ?? 1))) * 100));
+        syncedBasicValues = readBasicValues();
+    }
 
     function syncEditor(theme = themeController.getThemeState().theme || defaultTheme) {
         const clean = normalizeTheme(theme);
         const nameInput = document.querySelector(`#${idPrefix}-theme-name-input`);
         const code = document.querySelector(`#${idPrefix}-theme-code`);
+        const customCss = document.querySelector(`#${idPrefix}-theme-custom-css`);
         if (nameInput) nameInput.value = clean.name || '';
         if (code) code.value = JSON.stringify(clean, null, 2);
+        syncedCustomCss = clean.customCss || '';
+        if (customCss) customCss.value = syncedCustomCss;
+        syncBasicEditor(clean);
     }
 
     function getThemeFromEditor() {
         const code = document.querySelector(`#${idPrefix}-theme-code`);
         const nameInput = document.querySelector(`#${idPrefix}-theme-name-input`);
+        const customCss = document.querySelector(`#${idPrefix}-theme-custom-css`);
         const theme = JSON.parse(code?.value || '{}');
+        const editorCss = customCss?.value || '';
+        theme.customCss = editorCss !== syncedCustomCss ? editorCss : String(theme.customCss || '');
+        theme.variables = { ...(theme.variables || {}) };
+        theme.assets = { ...(theme.assets || {}) };
+        const currentBasicValues = readBasicValues();
+        const changed = name => currentBasicValues[name] !== syncedBasicValues[name];
+        for (const [name, variable] of Object.entries({ paper: '--tn-paper', paper2: '--tn-paper-2', ink: '--tn-ink', muted: '--tn-muted', gold: '--tn-gold' })) {
+            if (changed(name)) theme.variables[variable] = currentBasicValues[name];
+        }
+        if (changed('font')) theme.variables['--tn-font-family'] = currentBasicValues.font.trim() || 'inherit';
+        if (changed('fontSize')) theme.variables['--tn-font-size'] = `${Number(currentBasicValues.fontSize) || 15}px`;
+        if (changed('radius')) {
+            const radius = Math.max(0, Number(currentBasicValues.radius) || 0);
+            theme.variables['--tn-radius-panel'] = `${radius}px`;
+            theme.variables['--tn-radius-card'] = `${Math.max(0, radius - 4)}px`;
+        }
+        if (changed('shadow') && currentBasicValues.shadow !== 'custom') {
+            const shadows = {
+                none: ['none', 'none'],
+                soft: [defaultTheme.variables['--tn-panel-shadow'] || '0 18px 48px rgba(0, 0, 0, 0.18)', defaultTheme.variables['--tn-note-shadow'] || '0 8px 22px rgba(0, 0, 0, 0.14)'],
+                strong: ['0 28px 64px rgba(0, 0, 0, 0.34)', '0 18px 38px rgba(0, 0, 0, 0.28)'],
+            };
+            [theme.variables['--tn-panel-shadow'], theme.variables['--tn-note-shadow']] = shadows[currentBasicValues.shadow];
+        }
+        if (changed('background')) theme.assets.backgroundImage = currentBasicValues.background.trim();
+        if (changed('backgroundOpacity')) theme.assets.backgroundOpacity = Math.min(1, Math.max(0, Number(currentBasicValues.backgroundOpacity) / 100));
         if (nameInput?.value?.trim()) theme.name = nameInput.value.trim();
         if (theme.format && theme.format !== 'tavern-notes-theme') throw new Error(t('invalidThemeFile'));
         return normalizeTheme(theme);
@@ -357,6 +464,31 @@ export function createThemeStudio({
         listeners.push([element, listener, eventName]);
     }
 
+    function validateCustomCssEditor() {
+        const input = document.querySelector(`#${idPrefix}-theme-custom-css`);
+        const status = document.querySelector(`#${idPrefix}-theme-css-status`);
+        if (!status) return true;
+        try {
+            validateThemeCss(input?.value || '', { themeId: 'preview' });
+            status.textContent = input?.value?.trim() ? t('themeCssValid') : '';
+            status.classList.remove('error');
+            return true;
+        } catch (error) {
+            status.textContent = error.message;
+            status.classList.add('error');
+            return false;
+        }
+    }
+
+    function previewBasicEditor() {
+        const theme = getThemeFromEditor();
+        const code = document.querySelector(`#${idPrefix}-theme-code`);
+        if (code) code.value = JSON.stringify(theme, null, 2);
+        syncedBasicValues = readBasicValues();
+        themeController.setDraft(true);
+        themeController.previewTheme(theme);
+    }
+
     function syncUiFontScale(value = getUiFontScale()) {
         const percent = Math.round(Number(value || 1) * 100);
         const input = document.querySelector(`#${idPrefix}-ui-font-scale`);
@@ -388,6 +520,13 @@ export function createThemeStudio({
         await updateFloatingAppearance({ [kind === 'scale' ? 'floatingButtonScale' : 'floatingButtonOpacity']: value });
     }
 
+    function syncThemeAnimations(enabled = getThemeAnimationsEnabled()) {
+        const active = enabled !== false;
+        const input = document.querySelector(`#${idPrefix}-theme-animations`);
+        if (input) input.checked = active;
+        document.querySelector(`#${idPrefix}-panel`)?.classList.toggle(`${classPrefix}-theme-motion-disabled`, !active);
+    }
+
     function mount() {
         destroy();
         listen(`#${idPrefix}-theme-preview-save`, previewAndSaveFromEditor);
@@ -401,10 +540,20 @@ export function createThemeStudio({
             listen(`#${idPrefix}-floating-button-${kind}`, event => saveFloatingControl(kind, event.target.value), 'change');
             listen(`#${idPrefix}-floating-button-${kind}-reset`, () => saveFloatingControl(kind, fallback * 100));
         }
+        listen(`#${idPrefix}-theme-animations`, async event => {
+            syncThemeAnimations(event.target.checked);
+            await updateThemeAnimationsEnabled(event.target.checked);
+        }, 'change');
+        listen(`#${idPrefix}-theme-custom-css`, validateCustomCssEditor, 'change');
+        for (const suffix of Object.values(basicFieldIds)) {
+            listen(`#${idPrefix}-theme-basic-${suffix}`, previewBasicEditor, suffix === 'background' ? 'change' : 'input');
+        }
         syncUiFontScale();
         const appearance = getFloatingAppearance();
         syncFloatingControl('scale', appearance.scale || 1);
         syncFloatingControl('opacity', appearance.opacity || 0.9);
+        syncThemeAnimations();
+        validateCustomCssEditor();
         mounted = true;
     }
 

@@ -28,14 +28,15 @@ const repository = createUpdateRepository({
             updateCalls.push(JSON.parse(options.body));
             return { ok: true, json: async () => ({ isUpToDate: false, shortCommitHash: 'abc1234' }) };
         }
+        if (url === '/api/extensions/discover') return { ok: true, json: async () => [{ name: 'third-party/tavern-notes', type: 'global' }] };
         if (url.startsWith('/installed')) return { ok: true, json: async () => ({ version: '1.0.23' }) };
-        if (url.startsWith('/manifest')) return { ok: true, json: async () => ({ version: '1.0.24', server_plugin_update_required: true }) };
+        if (url.startsWith('/manifest')) return { ok: true, json: async () => ({ version: '1.0.24' }) };
         return { ok: true, text: async () => changelogText };
     },
     installedManifestUrl: '/installed', fallbackVersion: '1.0.23', manifestUrl: '/manifest', changelogUrl: '/changelog',
     noticeStorage: { getItem: () => '', setItem() {} }, noticeKey: 'notice', getRequestHeaders: () => ({ 'X-CSRF-Token': 'token' }),
 });
-assert.equal((await repository.check()).serverPluginUpdateRequired, true);
+assert.equal((await repository.check()).latestVersion, '1.0.24');
 assert.equal((await repository.update()).shortCommitHash, 'abc1234');
-assert.deepEqual(updateCalls[0], { extensionName: '/tavern-notes', global: false });
+assert.deepEqual(updateCalls[0], { extensionName: '/tavern-notes', global: true }, 'a global install is updated in the global folder');
 console.log('Shared update center test passed.');

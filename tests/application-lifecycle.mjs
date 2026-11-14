@@ -3,7 +3,6 @@ import { createLifecycleRegistry } from '../services/lifecycle-registry.js';
 import { createApplication } from '../services/application.js';
 import { bootstrapApplication } from '../services/application-bootstrap.js';
 import { createObserverController } from '../features/observer-controller.js';
-import { createCoexistenceController } from '../features/coexistence-controller.js';
 import { createQuickReplyController } from '../features/quick-reply-controller.js';
 
 {
@@ -84,27 +83,6 @@ import { createQuickReplyController } from '../features/quick-reply-controller.j
     queued.shift()?.();
     assert.equal(refreshed, 1);
     assert.equal(disconnected, 1);
-}
-
-{
-    let full = false;
-    let pauses = 0;
-    let removed = 0;
-    let trigger;
-    const coexistence = createCoexistenceController({
-        isFullActive: () => full,
-        application: { pause: () => { pauses += 1; } },
-        removeLiteUi: () => { removed += 1; },
-        createObserver: callback => ({ observe() { trigger = callback; }, disconnect() {} }),
-        getTarget: () => ({}),
-    });
-    coexistence.mount();
-    full = true;
-    trigger();
-    trigger();
-    assert.equal(pauses, 1);
-    assert.equal(removed, 1);
-    coexistence.destroy();
 }
 
 {

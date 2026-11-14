@@ -62,7 +62,13 @@ export function createNoteBatchController({
     async function deleteSelected() {
         if (!selected.size) return onEvent('empty');
         if (!await confirmDelete(selected.size)) return;
-        const result = await mutationController.deleteNotes([...selected.keys()]);
+        // A card that groups several input versions of one chat floor has a group id; delete every version in it.
+        const ids = [...selected.values()].flatMap(note => (
+            Array.isArray(note?.variants) && note.variants.length
+                ? note.variants.map(variant => String(variant.id))
+                : [String(note?.id)]
+        ));
+        const result = await mutationController.deleteNotes(ids);
         if (!result.ok) return onEvent('error', result.error);
         const count = selected.size;
         selected.clear();

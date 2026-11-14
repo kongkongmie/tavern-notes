@@ -1,3 +1,5 @@
+import { toNotesExport } from '../core/legacy-migration-model.js';
+
 function stamp(now) {
     return now().toISOString().replace(/[:.]/g, '-');
 }
@@ -97,12 +99,11 @@ export function createNoteExportController({
     async function exportAll(format) {
         return run('exportRunning', async () => {
             const exported = await repository.exportNotes({ format, ...getExportOptions() });
-            const edition = exported.source === 'lite' ? '-lite' : '';
             const content = format === 'json'
                 ? JSON.stringify(exported.data, null, 2)
                 : typeof exported.data === 'string' ? exported.data : buildPlainTextExport(exported.notes || []);
             const type = format === 'json' ? 'application/json;charset=utf-8' : 'text/plain;charset=utf-8';
-            download(content, `tavern-notes${edition}-all-${stamp(now)}.${format}`, type);
+            download(content, `tavern-notes-all-${stamp(now)}.${format}`, type);
             return exported;
         });
     }
@@ -144,6 +145,7 @@ export function createNoteExportController({
                 } catch {
                     throw new Error('INVALID_BACKUP');
                 }
+                payload = toNotesExport(payload);
                 if (payload?.format !== 'tavern-notes-export' || !Array.isArray(payload.notes)) throw new Error('INVALID_BACKUP');
                 const result = await repository.importNotes(payload, options);
                 replaceQueryState({ ...getQueryState(), page: 1 });

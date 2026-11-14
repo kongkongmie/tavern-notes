@@ -53,6 +53,8 @@ assert.equal(normalizeSettings({ floatingButtonScale: 0.1 }).floatingButtonScale
 assert.equal(normalized.floatingButtonOpacity, 0.3);
 assert.equal(normalizeSettings({ uiFontScale: 0.2 }).uiFontScale, 0.8);
 assert.equal(normalizeSettings({ uiFontScale: 'bad' }).uiFontScale, 1);
+assert.equal(normalizeSettings({ themeAnimationsEnabled: false }).themeAnimationsEnabled, false);
+assert.equal(normalizeSettings({}).themeAnimationsEnabled, true);
 assert.deepEqual(normalized.recentTags, []);
 assert.equal(normalized.shareCard.theme, 'calendar');
 assert.equal(normalized.shareCard.fontScale, 0.8);

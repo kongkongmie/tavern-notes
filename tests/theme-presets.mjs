@@ -16,7 +16,9 @@ const records = createBuiltInThemeRecords({
     normalizeTheme,
 });
 
-assert.deepEqual(records.map(record => record.id), ['default', 'apple-glass']);
+assert.deepEqual(records.map(record => record.id), ['default', 'apple-glass', 'blueprint-pixel']);
+assert.equal(records[2].theme.variables['--tn-theme-flavor'], 'blueprint-pixel');
+assert.ok(records[2].theme.customCss.includes('--bp-bar-blue'), 'pixel preset keeps its window CSS');
 assert.equal(records[1].theme.variables['--tn-theme-flavor'], 'apple');
 assert.equal(records[1].theme.variables['--tn-radius-panel'], '26px');
 assert.equal(records[1].theme.variables['--tn-paper'], '#f5f5f7');

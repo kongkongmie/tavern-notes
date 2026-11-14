@@ -1,4 +1,6 @@
 import { normalizeThemeFlavor, replaceThemeVariables } from '../core/theme-runtime.js';
+import { compileThemeCss } from '../core/theme-css.js';
+import { isSafeThemeImage } from '../core/theme-decorations.js';
 
 export function renderThemeViewMarkup({
     idPrefix,
@@ -15,23 +17,17 @@ export function renderThemeViewMarkup({
             <button id="${idPrefix}-theme-export" class="${classPrefix}-theme-icon-button ${classPrefix}-theme-studio-action" title="${escape(t('exportCurrentTheme'))}" aria-label="${escape(t('exportCurrentTheme'))}"><i class="fa-solid fa-file-export"></i></button>
         `
         : '';
-    const folderAction = capabilities.openThemeFolder
-        ? `
-            <button id="${idPrefix}-theme-open-folder" class="${classPrefix}-theme-icon-button ${classPrefix}-theme-studio-action" title="${escape(t('openThemeFolder'))}" aria-label="${escape(t('openThemeFolder'))}"><i class="fa-solid fa-folder-open"></i></button>
-        `
-        : '';
     return `
         <div id="${idPrefix}-theme-menu" aria-hidden="true">
-            <div class="${classPrefix}-theme-card">
-                <button class="${classPrefix}-icon-button ${classPrefix}-theme-close" data-theme-action="close" title="${escape(t('closeThemePanel'))}" aria-label="${escape(t('closeThemePanel'))}"><i class="fa-solid fa-xmark"></i></button>
+            <div class="${classPrefix}-theme-card" data-tn-theme-protected="surface">
+                <button class="${classPrefix}-icon-button ${classPrefix}-theme-close" data-theme-action="close" data-tn-theme-protected="control" title="${escape(t('closeThemePanel'))}" aria-label="${escape(t('closeThemePanel'))}"><i class="fa-solid fa-xmark"></i></button>
                 <div class="${classPrefix}-export-title">${escape(t('themeFiles'))}</div>
                 <div class="${classPrefix}-theme-name">${escape(t('currentTheme', { name: 'Soft Neomorphism' }))}</div>
-                <div class="${classPrefix}-theme-picker">
-                    <select id="${idPrefix}-theme-select" data-theme-action="select" title="${escape(t('switchTheme'))}"></select>
-                    <button id="${idPrefix}-theme-import" data-theme-action="import" class="${classPrefix}-theme-icon-button" title="${escape(t('importTheme'))}" aria-label="${escape(t('importTheme'))}"><i class="fa-solid fa-file-import"></i></button>
+                <div class="${classPrefix}-theme-picker" data-tn-theme-protected="actions">
+                    <select id="${idPrefix}-theme-select" data-theme-action="select" data-tn-theme-protected="select" title="${escape(t('switchTheme'))}"></select>
+                    <button id="${idPrefix}-theme-import" data-theme-action="import" data-tn-theme-protected="control" class="${classPrefix}-theme-icon-button" title="${escape(t('importTheme'))}" aria-label="${escape(t('importTheme'))}"><i class="fa-solid fa-file-import"></i></button>
                     ${exportAction}
-                    ${folderAction}
-                    <button id="${idPrefix}-theme-delete" data-theme-action="delete" class="${classPrefix}-theme-icon-button" title="${escape(t('deleteTheme'))}" aria-label="${escape(t('deleteTheme'))}"><i class="fa-solid fa-trash-can"></i></button>
+                    <button id="${idPrefix}-theme-delete" data-theme-action="delete" data-tn-theme-protected="control" class="${classPrefix}-theme-icon-button" title="${escape(t('deleteTheme'))}" aria-label="${escape(t('deleteTheme'))}"><i class="fa-solid fa-trash-can"></i></button>
                 </div>
                 ${studioMarkup}
                 <input id="${idPrefix}-theme-file" data-theme-action="file" type="file" accept=".json,application/json" hidden />
@@ -52,6 +48,8 @@ export function createThemeView({
     scheduleLayout = () => {},
     exportFile,
     iconConfig = {},
+    compileCss = compileThemeCss,
+    getAnimationsEnabled = () => true,
 }) {
     const t = translate;
     const selectors = {
@@ -65,6 +63,8 @@ export function createThemeView({
     let mounted = false;
     let clickListener = null;
     let changeListener = null;
+    let activeDecorations = [];
+    const customStyleId = `${idPrefix}-theme-custom-css`;
 
     const query = selector => document.querySelector(selector);
 
@@ -157,7 +157,6 @@ export function createThemeView({
             if (action === 'import') return requestThemeFile();
             if (action === 'delete') return handlers.delete?.();
             if (id === `${idPrefix}-theme-export`) return handlers.export?.();
-            if (id === `${idPrefix}-theme-open-folder`) return handlers.openFolder?.();
             if (id === `${idPrefix}-theme-reset`) return handlers.reset?.();
         };
         changeListener = event => {
@@ -179,7 +178,79 @@ export function createThemeView({
         if (changeListener) document.removeEventListener('change', changeListener);
         clickListener = null;
         changeListener = null;
+        query(`#${customStyleId}`)?.remove();
+        query(selectors.panel)?.removeAttribute?.('data-tn-theme-id');
+        activeDecorations = [];
         mounted = false;
+    }
+
+    function createDecorationElement(item) {
+        const element = document.createElement(item.type === 'image' ? 'img' : 'span');
+        element.className = `${classPrefix}-theme-decoration ${classPrefix}-theme-decoration-${item.type}${item.className ? ` ${classPrefix}-theme-decoration-user-${item.className}` : ''}`;
+        element.setAttribute('data-tn-decoration-type', item.type);
+        if (item.className) element.setAttribute('data-tn-decoration-class', item.className);
+        if (item.type === 'image') {
+            element.src = item.value;
+            element.alt = item.alt || '';
+            element.draggable = false;
+        } else if (item.type === 'shape') {
+            element.setAttribute('data-tn-shape', item.value);
+        } else {
+            element.textContent = item.value;
+        }
+        return element;
+    }
+
+    function refreshDecorations() {
+        const panel = query(selectors.panel);
+        if (!panel) return;
+        (panel.querySelectorAll?.('[data-tn-theme-slot]') || []).forEach(slot => {
+            const name = slot.getAttribute('data-tn-theme-slot');
+            const items = activeDecorations.filter(item => item.slot === name);
+            slot.replaceChildren(...items.map(createDecorationElement));
+        });
+    }
+
+    function applyBackgroundAsset(theme, panel) {
+        const slot = panel.querySelector?.('[data-tn-theme-slot="panel-background"]');
+        if (!slot?.style) return;
+        const image = String(theme.assets?.backgroundImage || '').trim();
+        let cssImage = 'none';
+        if (isSafeThemeImage(image)) cssImage = `url("${image}")`;
+        else if (/^url\(/i.test(image)) {
+            const source = image.slice(image.indexOf('(') + 1, image.lastIndexOf(')')).trim().replace(/^['"]|['"]$/g, '');
+            if (!isSafeThemeImage(source)) throw new Error('Theme background images must use HTTPS or data:image URLs.');
+            cssImage = image;
+        } else if (/^(repeating-)?(linear-gradient|radial-gradient|conic-gradient)\(/i.test(image)) {
+            compileCss(`${selectors.panel} { background-image: ${image}; }`, { themeId: 'background-check', panelSelector: selectors.panel });
+            cssImage = image;
+        } else if (image) {
+            throw new Error('Theme background images must use HTTPS, data:image, or a CSS gradient.');
+        }
+        slot.style.backgroundImage = cssImage;
+        slot.style.backgroundPosition = 'center';
+        slot.style.backgroundSize = 'cover';
+        slot.style.backgroundRepeat = 'no-repeat';
+        slot.style.opacity = String(Math.min(1, Math.max(0, Number(theme.assets?.backgroundOpacity ?? 1))));
+    }
+
+    function applyCustomCss(theme, themeState, panel) {
+        const sourceId = themeState.previewActive ? `preview-${themeState.activeId || 'theme'}` : (themeState.activeId || 'theme');
+        const compiled = compileCss(theme.customCss, { themeId: sourceId, panelSelector: selectors.panel });
+        panel.setAttribute('data-tn-theme-id', compiled.themeId);
+        let style = query(`#${customStyleId}`);
+        if (!compiled.css) {
+            style?.remove();
+            return;
+        }
+        if (!style) {
+            style = document.createElement('style');
+            style.id = customStyleId;
+            style.setAttribute('data-tavern-notes-theme-style', '');
+            (document.head || panel).appendChild(style);
+        }
+        const root = `${selectors.panel}[data-tn-theme-id="${compiled.themeId}"]`;
+        style.textContent = `${compiled.css}\n${root} [data-tn-theme-protected] { visibility: visible !important; opacity: 1 !important; pointer-events: auto !important; }`;
     }
 
     function renderDefaultIcon(src, extraClass = '') {
@@ -258,22 +329,24 @@ export function createThemeView({
         const panel = query(selectors.panel);
         if (panel) {
             const flavorName = `${variablePrefix}theme-flavor`;
-            clean.variables[flavorName] = normalizeThemeFlavor(clean.variables[flavorName]);
+            const normalizedFlavor = normalizeThemeFlavor(clean.variables[flavorName]);
+            const isSecretFiles = ['archive', 'secret-files'].includes(normalizedFlavor)
+                || /secret\s*files?|秘密档案|秘密檔案/i.test(String(clean.name || ''));
+            clean.variables[flavorName] = isSecretFiles ? 'secret-files' : normalizedFlavor;
             replaceThemeVariables(panel, clean.variables, variablePrefix);
             const flavor = clean.variables[flavorName];
             if (flavor) panel.dataset.themeFlavor = flavor;
             else delete panel.dataset.themeFlavor;
+            panel.classList.toggle(`${classPrefix}-secret-files-theme`, isSecretFiles);
             if (flavor === 'default') panel.dataset.themeMode = themeState.defaultMode;
             else delete panel.dataset.themeMode;
-            if (flavor !== 'archive') panel.classList.remove(`${classPrefix}-archive-reading`);
-            const backgroundImage = clean.assets?.backgroundImage;
-            if (backgroundImage) {
-                const image = String(backgroundImage).trim();
-                const cssImage = /^(url|linear-gradient|radial-gradient|conic-gradient)\(/i.test(image) ? image : `url("${image}")`;
-                panel.style.setProperty(`${variablePrefix}background-image`, cssImage);
-            } else {
-                panel.style.removeProperty(`${variablePrefix}background-image`);
-            }
+            if (!isSecretFiles) panel.classList.remove(`${classPrefix}-reading-mode`);
+            panel.style.removeProperty(`${variablePrefix}background-image`);
+            applyCustomCss(clean, themeState, panel);
+            panel.classList.toggle(`${classPrefix}-theme-motion-disabled`, getAnimationsEnabled() === false);
+            activeDecorations = Array.isArray(clean.decorations) ? clean.decorations : [];
+            refreshDecorations();
+            applyBackgroundAsset(clean, panel);
         }
         updateIcons(clean);
         return clean;
@@ -290,6 +363,7 @@ export function createThemeView({
         getSelectedThemeId,
         downloadTheme,
         applyTheme,
+        refreshDecorations,
         renderDefaultIcon,
         updateIcons,
     };

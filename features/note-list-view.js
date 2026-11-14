@@ -69,6 +69,7 @@ export function createNoteListRenderer({
     getActiveVariant,
     renderTagShelf = () => {},
     getBatchState = () => ({ active: false, selectedIds: new Set() }),
+    afterRender = () => {},
 }) {
     const c = suffix => `${classPrefix}-${suffix}`;
 
@@ -88,7 +89,7 @@ export function createNoteListRenderer({
         const userCharacter = state.characters.find(character => character.isUser || character.id === 'tavern-notes-user');
         const rest = state.characters.filter(character => getCharacterKey(character) !== currentKey && character !== userCharacter);
         if (!state.characters.length && !current.name) {
-            return `<div class="${c('empty')}"><div class="${c('empty-orb')}"><i class="fa-solid fa-user"></i></div><div class="${c('empty-title')}">${escapeHtml(translate('noCharacterNotes'))}</div><small>${escapeHtml(translate('noCharacterNotesHint'))}</small></div>`;
+            return `<div class="${c('empty')}"><div class="${c('theme-slot')}" data-tn-theme-slot="empty-state-decoration" aria-hidden="true"></div><div class="${c('empty-orb')}"><i class="fa-solid fa-user"></i></div><div class="${c('empty-title')}">${escapeHtml(translate('noCharacterNotes'))}</div><small>${escapeHtml(translate('noCharacterNotesHint'))}</small></div>`;
         }
         const card = (character, isCurrent = false) => {
             const avatar = getCharacterAvatar(character);
@@ -118,7 +119,7 @@ export function createNoteListRenderer({
 
     function renderArticles(state) {
         if (!state.notes.length) {
-            return `<div class="${c('empty')}"><div class="${c('empty-orb')}"><i class="fa-regular fa-note-sticky"></i></div><div class="${c('empty-title')}">${escapeHtml(translate('noNotes'))}</div><small>${escapeHtml(translate('noNotesHint'))}</small></div>`;
+            return `<div class="${c('empty')}"><div class="${c('theme-slot')}" data-tn-theme-slot="empty-state-decoration" aria-hidden="true"></div><div class="${c('empty-orb')}"><i class="fa-regular fa-note-sticky"></i></div><div class="${c('empty-title')}">${escapeHtml(translate('noNotes'))}</div><small>${escapeHtml(translate('noNotesHint'))}</small></div>`;
         }
         const batch = getBatchState();
         return renderCards(state.notes, {
@@ -200,6 +201,7 @@ export function createNoteListRenderer({
             const directory = state.filter === 'characters' && !state.characterFilter;
             list.innerHTML = directory ? renderCharacterOverview(state) : `${renderCharacterScope(state)}${renderArticles(state)}`;
             renderPagination(state, !directory);
+            afterRender();
         },
         renderPagination(visible = true) {
             renderPagination(getState(), visible);

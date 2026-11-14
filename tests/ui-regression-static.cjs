@@ -5,7 +5,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const source = [
     fs.readFileSync(path.join(root, 'index.js'), 'utf8'),
-    fs.readFileSync(path.join(root, 'repositories', 'full-app-shell-markup.js'), 'utf8'),
+    fs.readFileSync(path.join(root, 'features', 'app-shell-markup.js'), 'utf8'),
     fs.readFileSync(path.join(root, 'features', 'app-shell-markup.js'), 'utf8'),
 ].join('\n');
 const themeStudio = fs.readFileSync(path.join(root, 'features', 'theme-studio.js'), 'utf8');
@@ -26,8 +26,7 @@ assert.match(source, /id="\\?\$\{idPrefix\}-update-indicator"[^>]*\$\{ui\('hidde
 assert.match(updateView, /indicator\?\.classList\.toggle\(`\$\{classPrefix\}-hidden`, !hasUpdate\)/);
 assert.doesNotMatch(source, /tavern-notes-update-banner/);
 assert.match(css, /Compact main shell:[\s\S]*?\.tn-header\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\)\s*auto/s);
-assert.match(css, /grid-template-columns:\s*repeat\(var\(--tn-header-action-columns,\s*var\(--tnl-header-action-columns,\s*4\)\),\s*minmax\(0,\s*1fr\)\)\s*!important/);
+assert.match(css, /grid-template-columns:\s*repeat\(var\(--tn-header-action-columns,\s*4\),\s*minmax\(0,\s*1fr\)\)\s*!important/);
 assert.match(css, /\.tn-shell\s*\{[\s\S]*?grid-template-rows:\s*auto minmax\(0,\s*1fr\)[\s\S]*?gap:\s*6px/s);
-assert.match(css, /\.tn-subtitle::after\s*\{\s*display:\s*none;/s);
 
 console.log('Full UI regression static checks passed.');
