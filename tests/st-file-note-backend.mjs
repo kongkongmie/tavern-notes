@@ -46,17 +46,21 @@ await post(note('third from A'));
 const fresh = await readNotesFresh();
 assert.deepEqual(fresh.map(item => item.content).sort(), ['first', 'second from B', 'third from A'], 'writes from both devices are kept');
 
-// Same chat floor replacement still works on files.
-await post({ type: 'user_input', content: 'opening v1', character: { id: '1', name: 'Hero', avatar: 'hero.png' }, chat: { id: 'c', name: 'c', messageId: 1 }, tags: ['开局'] });
-const replaced = await post({ type: 'user_input', content: 'opening v2', character: { id: '1', name: 'Hero', avatar: 'hero.png' }, chat: { id: 'c', name: 'c', messageId: 1 } });
-assert.equal(replaced.replaced, 1);
-assert.deepEqual(replaced.note.tags, ['开局']);
+// Same chat floor on files: edited text adds a version, identical text keeps one copy.
+const hero = { id: '1', name: 'Hero', avatar: 'hero.png' };
+await post({ type: 'user_input', content: 'opening v1', character: hero, chat: { id: 'c', name: 'c', messageId: 1 }, tags: ['开局'] });
+const version = await post({ type: 'user_input', content: 'opening v2', character: hero, chat: { id: 'c', name: 'c', messageId: 1 } });
+assert.equal(version.replaced, 0);
+assert.deepEqual(version.note.tags, ['开局']);
+const same = await post({ type: 'user_input', content: 'opening v1', character: hero, chat: { id: 'c', name: 'c', messageId: 1 }, collapseRepeated: false });
+assert.equal(same.replaced, 1);
+assert.deepEqual((await readNotesFresh()).filter(item => item.chat?.id === 'c').map(item => item.content).sort(), ['opening v1', 'opening v2']);
 
 // Edits and deletes rewrite the right shard.
 const target = (await readNotesFresh()).find(item => item.content === 'first');
 await notesApi(`/notes/${target.id}`, { method: 'PATCH', body: JSON.stringify({ content: 'first edited', tags: ['x'] }) }, 'test');
 await notesApi(`/notes/${(await readNotesFresh()).find(item => item.content === 'third from A').id}`, { method: 'DELETE' }, 'test');
-assert.deepEqual((await readNotesFresh()).map(item => item.content).sort(), ['first edited', 'opening v2', 'second from B']);
+assert.deepEqual((await readNotesFresh()).map(item => item.content).sort(), ['first edited', 'opening v1', 'opening v2', 'second from B']);
 
 // Notes from another month land in their own shard; exact replace keeps ids and timestamps.
 const migrated = buildNotesExport([

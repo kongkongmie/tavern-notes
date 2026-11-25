@@ -710,7 +710,7 @@
     color: #c94747;
 }
 
-#chat .mes .mes_buttons > .tn-floor-capture-integrated {
+#chat .mes :is(.mes_buttons, .extraMesButtons) > .tn-floor-capture-integrated {
     position: static;
     inset: auto;
     z-index: auto;
@@ -730,12 +730,12 @@
     appearance: none;
 }
 
-#chat .mes .mes_buttons > .tn-floor-capture-integrated span {
+#chat .mes :is(.mes_buttons, .extraMesButtons) > .tn-floor-capture-integrated span {
     display: none;
 }
 
-#chat .mes .mes_buttons > .tn-floor-capture-integrated:hover,
-#chat .mes .mes_buttons > .tn-floor-capture-integrated:focus-visible {
+#chat .mes :is(.mes_buttons, .extraMesButtons) > .tn-floor-capture-integrated:hover,
+#chat .mes :is(.mes_buttons, .extraMesButtons) > .tn-floor-capture-integrated:focus-visible {
     color: inherit;
     background: none;
     box-shadow: none;

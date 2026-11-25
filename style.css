@@ -703,21 +703,6 @@
     box-shadow: none;
 }
 
-#tavern-notes-panel.tn-secret-files-theme .tn-variant-side {
-    width: 18px;
-    height: 40px;
-    color: rgba(17, 17, 15, 0.5);
-    text-shadow: none;
-}
-
-#tavern-notes-panel.tn-secret-files-theme .tn-variant-prev {
-    left: -18px;
-}
-
-#tavern-notes-panel.tn-secret-files-theme .tn-variant-next {
-    right: -18px;
-}
-
 #tavern-notes-panel.tn-secret-files-theme .tn-note-actions {
     padding-top: 8px;
     border-top: 1px solid rgba(58, 57, 53, 0.22);
@@ -1721,63 +1706,68 @@
     color: var(--tn-quote);
 }
 
+.tn-variant-pager {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    margin-left: auto;
+    padding: 1px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--tn-paper-2) 72%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tn-line) 70%, transparent);
+    line-height: 1;
+}
+
+.tn-variant-pager + .tn-note-time {
+    margin-left: 4px;
+}
+
 .tn-variant-side {
-    position: absolute;
-    top: 52%;
-    z-index: 2;
-    width: 24px;
-    height: 46px;
-    transform: translateY(-50%);
-    border: 0;
-    padding: 0;
+    width: 20px;
+    height: 20px;
     display: grid;
     place-items: center;
-    color: color-mix(in srgb, var(--tn-muted) 58%, var(--tn-ink));
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    color: var(--tn-muted);
     background: transparent;
     box-shadow: none;
     cursor: pointer;
-    font-size: calc(22px * var(--tavern-notes-ui-scale, 1));
-    opacity: 0.72;
-    text-shadow: 0 1px 0 var(--tn-inset-light), 0 2px 8px color-mix(in srgb, var(--tn-shadow-dark) 36%, transparent);
-    transition: opacity 120ms ease, color 120ms ease, transform 120ms ease;
+    font-size: calc(9px * var(--tavern-notes-ui-scale, 1));
+    transition: color 120ms ease, background 120ms ease;
 }
 
-.tn-variant-prev {
-    left: -4px;
-}
-
-.tn-variant-next {
-    right: 44px;
-}
-
-.tn-variant-side:hover:not(:disabled) {
+.tn-variant-side:hover:not(:disabled),
+.tn-variant-side:focus-visible {
     color: var(--tn-quote);
-    opacity: 1;
-    transform: translateY(-50%) scale(1.08);
+    background: color-mix(in srgb, var(--tn-quote) 14%, transparent);
 }
 
 .tn-variant-side:disabled {
-    opacity: 0.22;
+    opacity: 0.3;
     cursor: default;
 }
 
 .tn-variant-count {
-    position: absolute;
-    right: 52px;
-    bottom: 12px;
-    z-index: 2;
+    min-width: 24px;
+    text-align: center;
+    color: var(--tn-ink);
     font-size: calc(11px * var(--tavern-notes-ui-scale, 1));
-    color: color-mix(in srgb, var(--tn-muted) 82%, transparent);
-    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 700px) {
+    .tn-variant-side {
+        width: 26px;
+        height: 24px;
+    }
 }
 
 .tn-note-body {
     position: relative;
     margin: 4px 42px 8px 0;
-}
-
-.tn-note-has-variants .tn-note-body {
-    margin-right: 70px;
 }
 
 .tn-note-content {
@@ -4314,7 +4304,7 @@
 .tn-batch-mode .tn-note-topline { padding-left: 0; }
 .tn-batch-mode .tn-note-side-actions,
 .tn-batch-mode .tn-note-actions,
-.tn-batch-mode .tn-variant-side { display: none !important; }
+.tn-batch-mode .tn-variant-pager { display: none !important; }
 .tn-note.tn-batch-selected {
     outline: 2px solid color-mix(in srgb, var(--tn-accent, #54b88a) 72%, var(--tn-line, transparent));
     outline-offset: -2px;

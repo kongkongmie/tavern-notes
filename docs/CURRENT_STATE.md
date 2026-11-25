@@ -1,14 +1,12 @@
 # Current State
 
-最后核对：2026-11-14
+最后核对：2026-11-25
 
 ## 发布状态
 
 - 主仓库：`https://github.com/kongkongmie/tavern-notes`
 - 主分支：`main`
-- 已发布版本：`2.0.5`（提交 `c97e81e`）
-- 本地待发布：`3.0.0`，在本地 `tavern-notes-v3` 文件夹准备，用户测试通过并明确同意后才推送。
-- 独立 Lite 仓库 `kongkongmie/tavern-notes-lite` 准备最终版 `1.0.0`（一键升级到主扩展），同样等用户同意后推送。
+- 已发布版本：`3.0.1`；独立 Lite 仓库已发布最终版 `1.0.0`。
 
 ## 当前产品形态
 

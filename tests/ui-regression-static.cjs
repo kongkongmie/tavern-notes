@@ -21,7 +21,7 @@ assert.match(captureView, /button\.addEventListener\('click', event => \{[\s\S]*
 assert.doesNotMatch(themeStudio, /'--tn-input-bg':\s*inputSolid/, 'merged themes must not copy arbitrary host input backgrounds');
 assert.match(themeStudio, /'--tn-input-bg':\s*cardLift/);
 assert.match(css, /\.tn-modal-kicker\s*\{[^}]*color:\s*var\(--tn-em\)/s);
-assert.match(css, /\.tn-variant-next\s*\{[^}]*right:\s*44px/s);
+assert.doesNotMatch(css, /\.tn-variant-side\s*\{[^}]*position:\s*absolute/s, 'version arrows no longer hang off the card edges');
 assert.match(source, /id="\\?\$\{idPrefix\}-update-indicator"[^>]*\$\{ui\('hidden'\)\}/);
 assert.match(updateView, /indicator\?\.classList\.toggle\(`\$\{classPrefix\}-hidden`, !hasUpdate\)/);
 assert.doesNotMatch(source, /tavern-notes-update-banner/);

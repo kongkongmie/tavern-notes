@@ -23,25 +23,23 @@ export function renderNoteCards(notes, options) {
         const variantIndex = getVariantIndex(note);
         const created = activeNote.createdAt ? new Date(activeNote.createdAt).toLocaleString() : '';
         const chatName = activeNote.chat?.name || note.chat?.name || '';
+        // One compact pager in the title row (like SillyTavern's swipe counter) instead of arrows on the card edges.
         const variantControls = variants.length <= 1 ? '' : `
-            <button class="${c('variant-side')} ${c('variant-prev')}" type="button" ${variantIndex <= 0 ? 'disabled' : ''} title="${escapeHtml(translate('prevPage'))}">
-                <i class="fa-solid fa-chevron-left"></i>
-            </button>
-            <button class="${c('variant-side')} ${c('variant-next')}" type="button" ${variantIndex >= variants.length - 1 ? 'disabled' : ''} title="${escapeHtml(translate('nextPage'))}">
-                <i class="fa-solid fa-chevron-right"></i>
-            </button>
-            <span class="${c('variant-count')}">${variantIndex + 1}/${variants.length}</span>
-        `;
+                    <span class="${c('variant-pager')}">
+                        <button class="${c('variant-side')} ${c('variant-prev')}" type="button" ${variantIndex <= 0 ? 'disabled' : ''} title="${escapeHtml(translate('prevPage'))}" aria-label="${escapeHtml(translate('prevPage'))}"><i class="fa-solid fa-chevron-left"></i></button>
+                        <span class="${c('variant-count')}">${variantIndex + 1}/${variants.length}</span>
+                        <button class="${c('variant-side')} ${c('variant-next')}" type="button" ${variantIndex >= variants.length - 1 ? 'disabled' : ''} title="${escapeHtml(translate('nextPage'))}" aria-label="${escapeHtml(translate('nextPage'))}"><i class="fa-solid fa-chevron-right"></i></button>
+                    </span>`;
 
         return `
             <article class="${uiClass('note', { classPrefix })} ${c(`note-${escapeHtml(noteTypeClass(note.type))}`)}${variants.length > 1 ? ` ${c('note-has-variants')}` : ''}${selectedIds.has(String(note.id)) ? ` ${c('batch-selected')}` : ''}" data-note-id="${escapeHtml(note.id)}" data-chat-name="${escapeHtml(chatName)}" tabindex="0" aria-label="${escapeHtml(translate('viewFull'))}">
                 <div class="${c('theme-slot')}" data-tn-theme-slot="card-decoration" aria-hidden="true"></div>
                 ${batchMode ? `<label class="${c('batch-check')}" title="${escapeHtml(translate('selectNote'))}"><input class="${c('batch-checkbox')}" type="checkbox" value="${escapeHtml(note.id)}" ${selectedIds.has(String(note.id)) ? 'checked' : ''} /><span><i class="fa-solid fa-check"></i></span></label>` : ''}
-                ${variantControls}
                 <div class="${c('note-topline')}">
                     <span class="${c('note-type')}">${escapeHtml(noteTypeLabel(note.type))}</span>
                     ${Number(activeNote.repeatCount || 1) > 1 ? `<span class="${c('repeat-badge')}" title="${escapeHtml(translate('repeatedTimes', { count: activeNote.repeatCount }))}"><i class="fa-solid fa-repeat"></i><span>×${escapeHtml(activeNote.repeatCount)}</span></span>` : ''}
                     <span class="${c('note-character')}">${escapeHtml(note.character?.name || translate('unnamedCharacter'))}</span>
+                    ${variantControls}
                     <span class="${c('note-time')}">${escapeHtml(created)}</span>
                 </div>
                 <div class="${c('note-body')}">

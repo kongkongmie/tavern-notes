@@ -133,11 +133,21 @@ function mergeNoteTags(notes) {
     return normalizeTags(notes.flatMap(note => normalizeTags(note?.tags)));
 }
 
+// Same floor and the same text: only one copy is kept. Different text on the same floor are versions
+// (swiped left / right in the list) and are all kept.
+function sameFloorSameText(left, right) {
+    const floorKey = userInputFloorKey(left);
+    return Boolean(floorKey)
+        && floorKey === userInputFloorKey(right)
+        && normalizeRepeatContent(left.content) === normalizeRepeatContent(right.content);
+}
+
 function findFloorDedupeGroups(notes) {
     const floors = new Map();
     for (const note of [...notes].sort((left, right) => safeNumber(left.seq) - safeNumber(right.seq))) {
-        const key = userInputFloorKey(note);
-        if (!key) continue;
+        const floorKey = userInputFloorKey(note);
+        if (!floorKey) continue;
+        const key = `${floorKey}\u0001${normalizeRepeatContent(note.content)}`;
         if (!floors.has(key)) floors.set(key, []);
         floors.get(key).push(note);
     }
@@ -360,10 +370,13 @@ async function addNote(payload) {
     }
     const nextSeq = safeNumber(await readMeta('nextSeq', 1), 1);
     const note = cleanNote(payload, nextSeq);
-    // Re-sending or editing the same chat floor replaces the earlier input: only the newest one is kept.
+    // Re-sending the same text on the same floor keeps one copy (the newest). Edited text is a new
+    // version of that floor and sits next to the older ones.
     const floorKey = userInputFloorKey(note);
-    const replaced = floorKey ? (await readAllNotes()).filter(item => userInputFloorKey(item) === floorKey) : [];
-    if (replaced.length) note.tags = mergeNoteTags([note, ...replaced]);
+    const floorNotes = floorKey ? (await readAllNotes()).filter(item => userInputFloorKey(item) === floorKey) : [];
+    const replaced = floorNotes.filter(item => sameFloorSameText(item, note));
+    // Tags describe the floor, so a new version keeps the tags given to the earlier ones.
+    if (floorNotes.length) note.tags = mergeNoteTags([note, ...floorNotes]);
     await commit({
         put: [note],
         remove: replaced.map(item => item.id),

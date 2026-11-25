@@ -29,6 +29,8 @@ const persistedStateFields = [
     'userInputIgnorePrefixes',
     'showSelectionCaptureButton',
     'showFloorCaptureButton',
+    'showFloorSnapshotButton',
+    'floorButtonsInMenu',
     'floorCaptureSelector',
     'floorCaptureExcludedTags',
     'shareCardSettings',

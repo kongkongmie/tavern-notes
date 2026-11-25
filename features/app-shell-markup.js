@@ -178,6 +178,12 @@ export function renderAppShellMarkup({
                     <button id="${idPrefix}-floor-capture-setting" class="${ui('soft-button')} ${classPrefix}-floor-capture-toggle ${state.showFloorCaptureButton ? 'active' : ''}" title="${htmlEscape(t('floorCaptureButtonTitle'))}" aria-label="${htmlEscape(t('floorCaptureButtonTitle'))}">
                         <i class="fa-solid fa-file-lines"></i><span>${htmlEscape(t('floorCaptureButton'))}</span>
                     </button>
+                    <button id="${idPrefix}-floor-snapshot-setting" class="${ui('soft-button')} ${classPrefix}-floor-capture-toggle ${state.showFloorSnapshotButton ? 'active' : ''}" title="${htmlEscape(t('floorSnapshotButtonTitle'))}" aria-label="${htmlEscape(t('floorSnapshotButtonTitle'))}">
+                        <i class="fa-solid fa-camera"></i><span>${htmlEscape(t('floorSnapshotButton'))}</span>
+                    </button>
+                    <button id="${idPrefix}-floor-buttons-menu-setting" class="${ui('soft-button')} ${classPrefix}-floor-capture-toggle ${state.floorButtonsInMenu ? 'active' : ''}" title="${htmlEscape(t('floorButtonsInMenuTitle'))}" aria-label="${htmlEscape(t('floorButtonsInMenuTitle'))}">
+                        <i class="fa-solid fa-ellipsis"></i><span>${htmlEscape(t('floorButtonsInMenu'))}</span>
+                    </button>
                     <div class="${classPrefix}-floor-capture-help">
                         <b>${htmlEscape(t('floorCaptureStepsTitle'))}</b>
                         <small>${htmlEscape(t('floorCaptureSteps'))}</small>

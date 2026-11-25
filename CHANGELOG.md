@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.0.1
+
+- User inputs on the same floor are versions again. Editing or rewriting a message adds a new version you can switch between with the left / right arrows, as before 3.0.0. Only an identical text sent again on the same floor is kept once (the newest copy), and a new version keeps the floor's tags.
+- **Input cleanup** removes only identical copies on a floor and never deletes other versions.
+- The version arrows on user-input cards are now one small `‹ 2/3 ›` switcher in the card's title row, next to the time, instead of two arrows hanging off the card edges over the text.
+- The two message buttons (**Capture floor**, page icon; **Floor image**, camera icon) now have separate switches under **Capture floor** settings, and by default sit inside each message's **…** menu instead of on the message itself. Turn off **Put them in the “…” menu** to show them directly again.
+
 ## 3.0.0
 
 Tavern Notes now has one edition. Full mode, Lite mode and the Server Plugin are gone: install the extension and it works, on computers and phones alike.

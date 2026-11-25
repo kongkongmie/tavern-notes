@@ -27,6 +27,8 @@ const html = renderNoteCards(notes, {
 
 assert.match(html, /class="tn-note tn-note-user-input tn-note-has-variants"/);
 assert.match(html, /class="tn-variant-side tn-variant-next"/);
+assert.match(html, /class="tn-note-topline">[\s\S]*?class="tn-variant-pager"[\s\S]*?class="tn-note-time"/, 'the version pager sits in the title row, before the time');
+assert.match(html, /tn-variant-prev[\s\S]*?tn-variant-count">1\/2<[\s\S]*?tn-variant-next/, 'reads ‹ 1/2 ›');
 assert.match(html, /tabindex="0"/);
 assert.match(html, /class="tn-note-menu-toggle"/);
 assert.match(html, /class="tn-note-quick-fill tn-fill"/);

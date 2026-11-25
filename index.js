@@ -99,7 +99,7 @@ const MIGRATION_DISMISSED_KEY = 'tavern-notes-file-migration-dismissed';
 const THEME_FILE = 'tavern-notes__themes.json';
 const SETTINGS_KEY = 'tavern-notes-settings';
 const UPDATE_NOTICE_KEY = 'tavern-notes-update-notice';
-const EXTENSION_VERSION = '3.0.0';
+const EXTENSION_VERSION = '3.0.1';
 const REMOTE_MANIFEST_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/manifest.json';
 const REMOTE_CHANGELOG_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/CHANGELOG.md';
 const REMOTE_CHANGELOG_ANNOTATION_URL = 'https://raw.githubusercontent.com/kongkongmie/tavern-notes/main/CHANGELOG.zh-CN.md';
@@ -220,6 +220,8 @@ const SETTINGS_STATE_FIELDS = {
     userInputIgnorePrefixes: 'userInputIgnorePrefixes',
     showSelectionCaptureButton: 'showSelectionCaptureButton',
     showFloorCaptureButton: 'showFloorCaptureButton',
+    showFloorSnapshotButton: 'showFloorSnapshotButton',
+    floorButtonsInMenu: 'floorButtonsInMenu',
     floorCaptureSelector: 'floorCaptureSelector',
     floorCaptureExcludedTags: 'floorCaptureExcludedTags',
     uiFontScale: 'uiFontScale',
@@ -451,7 +453,7 @@ const TEXT_ZH_CN = {
     floorCaptureEntry: '整楼摘录',
     floorCaptureEntryTitle: '是否开启整楼摘录功能，点击查看配置说明',
     floorCaptureSettingsTitle: '整楼摘录设置',
-    floorCaptureSettingsIntro: '这个功能会在每层楼右上角加一个“摘录整层”按钮。普通聊天不用配置，打开开关就能用。',
+    floorCaptureSettingsIntro: '每层楼可以有两个按钮：“摘录整层”（文件图标）和“整层长图”（相机图标），各自单独开关，也可以收进楼层的「…」菜单。普通聊天不用配置。',
     floorCaptureStepsTitle: '怎么用',
     floorCaptureSteps: '1. 打开“是否开启整楼摘录功能”。\n2. 回到聊天页面。\n3. 在想保存的那层楼右上角点“摘录整层”。',
     floorCaptureContentTitle: '正文标签名是什么',
@@ -462,6 +464,14 @@ const TEXT_ZH_CN = {
     floorCaptureButtonTitle: '是否开启每层楼右上角的“摘录整层”按钮',
     floorCaptureButtonOn: '已开启整层摘录按钮。',
     floorCaptureButtonOff: '已关闭整层摘录按钮。',
+    floorSnapshotButton: '是否开启整层长图按钮',
+    floorSnapshotButtonTitle: '是否在每层楼加“整层长图”按钮（相机图标）',
+    floorSnapshotButtonOn: '已开启整层长图按钮。',
+    floorSnapshotButtonOff: '已关闭整层长图按钮。',
+    floorButtonsInMenu: '收进楼层的「…」菜单',
+    floorButtonsInMenuTitle: '开启时，两个按钮放进每层楼右上角的「…」菜单里；关闭时直接显示在楼层上',
+    floorButtonsInMenuOn: '楼层按钮已收进「…」菜单。',
+    floorButtonsInMenuOff: '楼层按钮改为直接显示。',
     floorCaptureSelectorLabel: '正文标签名',
     floorCaptureSelectorPlaceholder: 'content',
     floorCaptureSelectorHelp: '只填标签名，不要填尖括号。比如正文写在 <story>正文</story> 里，就填 story。',
@@ -712,7 +722,7 @@ const TEXTS = {
         floorCaptureEntry: '整樓摘錄',
         floorCaptureEntryTitle: '是否開啟整樓摘錄功能，點擊查看配置說明',
         floorCaptureSettingsTitle: '整樓摘錄設定',
-        floorCaptureSettingsIntro: '這個功能會在每層樓右上角加一個「摘錄整層」按鈕。普通聊天不用配置，打開開關就能用。',
+        floorCaptureSettingsIntro: '每層樓可以有兩個按鈕：「摘錄整層」（檔案圖示）和「整層長圖」（相機圖示），各自單獨開關，也可以收進樓層的「…」選單。普通聊天不用設定。',
         floorCaptureStepsTitle: '怎麼用',
         floorCaptureSteps: '1. 打開「是否開啟整樓摘錄功能」。\n2. 回到聊天頁面。\n3. 在想保存的那層樓右上角點「摘錄整層」。',
         floorCaptureContentTitle: '如果訊息裡有摘要、狀態列或裝飾程式碼',
@@ -723,6 +733,14 @@ const TEXTS = {
         floorCaptureButtonTitle: '是否開啟每層樓右上角的「摘錄整層」按鈕',
         floorCaptureButtonOn: '已開啟整層摘錄按鈕。',
         floorCaptureButtonOff: '已關閉整層摘錄按鈕。',
+        floorSnapshotButton: '是否開啟整層長圖按鈕',
+        floorSnapshotButtonTitle: '是否在每層樓加「整層長圖」按鈕（相機圖示）',
+        floorSnapshotButtonOn: '已開啟整層長圖按鈕。',
+        floorSnapshotButtonOff: '已關閉整層長圖按鈕。',
+        floorButtonsInMenu: '收進樓層的「…」選單',
+        floorButtonsInMenuTitle: '開啟時，兩個按鈕放進每層樓右上角的「…」選單裡；關閉時直接顯示在樓層上',
+        floorButtonsInMenuOn: '樓層按鈕已收進「…」選單。',
+        floorButtonsInMenuOff: '樓層按鈕改為直接顯示。',
         floorCaptureSelectorLabel: '正文標籤名',
         floorCaptureSelectorPlaceholder: 'content',
         floorCaptureSelectorHelp: '只填標籤名，不要填尖括號。比如正文寫在 <story>正文</story> 裡，就填 story。',
@@ -1016,7 +1034,7 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         floorCaptureEntry: 'Floor capture',
         floorCaptureEntryTitle: 'Enable or configure whole-message floor capture',
         floorCaptureSettingsTitle: 'Floor capture settings',
-        floorCaptureSettingsIntro: 'This adds a Capture floor button to each message. Normal chats need no setup; just turn it on.',
+        floorCaptureSettingsIntro: 'Each message can have two buttons: Capture floor (page icon) and Floor image (camera icon). Turn each on or off, or put them in the message’s “…” menu. Normal chats need no setup.',
         floorCaptureStepsTitle: 'How to use',
         floorCaptureSteps: '1. Turn on floor capture.\n2. Return to the chat.\n3. Click Capture floor on the message you want to save.',
         floorCaptureContentTitle: 'If a message has summaries, status text, or decorative code',
@@ -1027,6 +1045,14 @@ assets 控制標題圖示和背景圖；輸入列與摘錄按鈕使用固定預�
         floorCaptureButtonTitle: 'Enable the Capture floor button on each message',
         floorCaptureButtonOn: 'Floor capture buttons are on.',
         floorCaptureButtonOff: 'Floor capture buttons are off.',
+        floorSnapshotButton: 'Enable floor image',
+        floorSnapshotButtonTitle: 'Add the Floor image button (camera icon) to each message',
+        floorSnapshotButtonOn: 'Floor image buttons are on.',
+        floorSnapshotButtonOff: 'Floor image buttons are off.',
+        floorButtonsInMenu: 'Put them in the “…” menu',
+        floorButtonsInMenuTitle: 'When on, both buttons sit inside each message’s “…” menu; when off, they show directly on the message',
+        floorButtonsInMenuOn: 'Floor buttons moved into the “…” menu.',
+        floorButtonsInMenuOff: 'Floor buttons now show directly on messages.',
         floorCaptureSelectorLabel: 'Body tag name',
         floorCaptureSelectorPlaceholder: 'content',
         floorCaptureSelectorHelp: 'Enter only the tag name, without angle brackets. If the body is in <story>text</story>, enter story.',
@@ -1318,7 +1344,7 @@ Click Preview & save or Save as to create a theme file.`,
         floorCaptureEntry: '전체 발췌',
         floorCaptureEntryTitle: '전체 메시지 발췌 기능 켜기 및 설정',
         floorCaptureSettingsTitle: '전체 발췌 설정',
-        floorCaptureSettingsIntro: '각 메시지에 전체 발췌 버튼을 추가합니다. 일반 채팅은 설정 없이 켜기만 하면 됩니다.',
+        floorCaptureSettingsIntro: '각 메시지에 전체 발췌(문서 아이콘)와 전체 긴 이미지(카메라 아이콘) 버튼을 둘 수 있습니다. 각각 켜고 끌 수 있고, 메시지의 「…」 메뉴에 넣을 수도 있습니다. 일반 채팅은 설정이 필요 없습니다.',
         floorCaptureStepsTitle: '사용 방법',
         floorCaptureSteps: '1. 전체 발췌 기능을 켭니다.\n2. 채팅으로 돌아갑니다.\n3. 저장할 메시지의 전체 발췌 버튼을 누릅니다.',
         floorCaptureContentTitle: '본문 태그 이름이란?',
@@ -1329,6 +1355,14 @@ Click Preview & save or Save as to create a theme file.`,
         floorCaptureButtonTitle: '각 메시지의 전체 발췌 버튼 켜기',
         floorCaptureButtonOn: '전체 발췌 버튼을 켰습니다.',
         floorCaptureButtonOff: '전체 발췌 버튼을 껐습니다.',
+        floorSnapshotButton: '전체 긴 이미지 버튼 켜기',
+        floorSnapshotButtonTitle: '각 메시지에 전체 긴 이미지 버튼(카메라 아이콘) 추가',
+        floorSnapshotButtonOn: '전체 긴 이미지 버튼을 켰습니다.',
+        floorSnapshotButtonOff: '전체 긴 이미지 버튼을 껐습니다.',
+        floorButtonsInMenu: '「…」 메뉴에 넣기',
+        floorButtonsInMenuTitle: '켜면 두 버튼이 각 메시지의 「…」 메뉴 안에 들어가고, 끄면 메시지에 바로 표시됩니다',
+        floorButtonsInMenuOn: '메시지 버튼을 「…」 메뉴에 넣었습니다.',
+        floorButtonsInMenuOff: '메시지 버튼을 바로 표시합니다.',
         floorCaptureSelectorLabel: '본문 태그 이름',
         floorCaptureSelectorPlaceholder: 'content',
         floorCaptureSelectorHelp: '꺾쇠괄호 없이 태그 이름만 입력하세요. 본문이 <story>본문</story> 안에 있으면 story를 입력합니다.',
@@ -2181,6 +2215,7 @@ const captureView = createCaptureView({
         floorButton: '.tn-floor-capture:not(.tn-floor-snapshot)',
         floorSnapshotButton: '.tn-floor-snapshot',
         floorActions: '.mes_buttons',
+        floorMenu: '.mes_buttons .extraMesButtons',
         chat: '#chat',
         messages: '.mes, [mesid], [data-mesid]',
         message: '.mes, [mesid], [data-mesid]',
@@ -2189,6 +2224,8 @@ const captureView = createCaptureView({
     escapeHtml: htmlEscape,
     isSelectionEnabled: () => state.showSelectionCaptureButton,
     isFloorEnabled: () => state.showFloorCaptureButton,
+    isSnapshotEnabled: () => state.showFloorSnapshotButton,
+    isInMenu: () => state.floorButtonsInMenu,
     getSelectionSnapshot: readCaptureSelection,
     onSelectionCapture: snapshot => captureController.handleManualCapture(snapshot),
     onFloorCapture: message => captureController.captureWholeFloor(message),
@@ -2556,14 +2593,21 @@ async function toggleSelectionCaptureButtonSetting() {
     notify(state.showSelectionCaptureButton ? t('selectionCaptureButtonOn') : t('selectionCaptureButtonOff'), 'success');
 }
 
+const FLOOR_BUTTON_SETTINGS = [
+    { id: '#tavern-notes-floor-capture-setting', field: 'showFloorCaptureButton', label: 'floorCaptureButton', title: 'floorCaptureButtonTitle', on: 'floorCaptureButtonOn', off: 'floorCaptureButtonOff' },
+    { id: '#tavern-notes-floor-snapshot-setting', field: 'showFloorSnapshotButton', label: 'floorSnapshotButton', title: 'floorSnapshotButtonTitle', on: 'floorSnapshotButtonOn', off: 'floorSnapshotButtonOff' },
+    { id: '#tavern-notes-floor-buttons-menu-setting', field: 'floorButtonsInMenu', label: 'floorButtonsInMenu', title: 'floorButtonsInMenuTitle', on: 'floorButtonsInMenuOn', off: 'floorButtonsInMenuOff' },
+];
+
 function updateFloorCaptureButtonSetting() {
-    const button = document.querySelector('#tavern-notes-floor-capture-setting');
-    if (button) {
-        button.classList.toggle('active', state.showFloorCaptureButton);
-        const label = t('floorCaptureButtonTitle');
+    for (const setting of FLOOR_BUTTON_SETTINGS) {
+        const button = document.querySelector(setting.id);
+        if (!button) continue;
+        button.classList.toggle('active', Boolean(state[setting.field]));
+        const label = t(setting.title);
         button.title = label;
         button.setAttribute('aria-label', label);
-        button.querySelector('span')?.replaceChildren(document.createTextNode(t('floorCaptureButton')));
+        button.querySelector('span')?.replaceChildren(document.createTextNode(t(setting.label)));
     }
     updateFloorCaptureEntryButton();
 }
@@ -2571,7 +2615,7 @@ function updateFloorCaptureButtonSetting() {
 function updateFloorCaptureEntryButton() {
     const button = document.querySelector('#tavern-notes-floor-capture-open');
     if (!button) return;
-    button.classList.toggle('active', state.showFloorCaptureButton);
+    button.classList.toggle('active', Boolean(state.showFloorCaptureButton || state.showFloorSnapshotButton));
     const label = t('floorCaptureEntryTitle');
     button.title = label;
     button.setAttribute('aria-label', label);
@@ -2644,12 +2688,12 @@ function updateFloorCaptureSelectorSummary() {
         : t('floorCaptureSelectorCurrentCustom', { tag: getFloorCaptureTagName(), selector });
 }
 
-async function toggleFloorCaptureButtonSetting() {
-    const result = await updateSettings({ showFloorCaptureButton: !state.showFloorCaptureButton });
+async function toggleFloorButtonSetting(setting) {
+    const result = await updateSettings({ [setting.field]: !state[setting.field] });
     if (!result.ok) return;
     updateFloorCaptureButtonSetting();
     captureView.refreshFloorButtons();
-    notify(state.showFloorCaptureButton ? t('floorCaptureButtonOn') : t('floorCaptureButtonOff'), 'success');
+    notify(t(state[setting.field] ? setting.on : setting.off), 'success');
 }
 
 async function saveFloorCaptureSelector(value, silent = false) {
@@ -3215,7 +3259,7 @@ function bindEvents() {
     });
     document.querySelector('#tavern-notes-selection-capture-setting')?.addEventListener('click', toggleSelectionCaptureButtonSetting);
     document.querySelector('#tavern-notes-floor-capture-open')?.addEventListener('click', openFloorCaptureMenu);
-    document.querySelector('#tavern-notes-floor-capture-setting')?.addEventListener('click', toggleFloorCaptureButtonSetting);
+    FLOOR_BUTTON_SETTINGS.forEach(setting => document.querySelector(setting.id)?.addEventListener('click', () => toggleFloorButtonSetting(setting)));
     document.querySelector('.tn-floor-capture-close')?.addEventListener('click', closeFloorCaptureMenu);
     document.querySelector('.tn-close')?.addEventListener('click', closePanel);
     document.querySelector('.tn-reading-mode-expand')?.addEventListener('click', expandArchiveReadingMode);

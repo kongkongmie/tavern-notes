@@ -76,6 +76,8 @@ export function createCaptureView({
     escapeHtml,
     isSelectionEnabled,
     isFloorEnabled,
+    isSnapshotEnabled = () => true,
+    isInMenu = () => false,
     getSelectionSnapshot,
     onSelectionCapture,
     onFloorCapture,
@@ -144,16 +146,22 @@ export function createCaptureView({
         timer = setTimeout(updateSelectionButton, 80);
     }
 
+    function snapshotAvailable() {
+        return Boolean(selectors.floorSnapshotButton) && typeof onFloorSnapshot === 'function';
+    }
+
+    // Each floor button has its own switch: capture (the page icon) and long image (the camera).
     function floorButtonSpecs() {
-        const specs = [{
+        const specs = [];
+        if (isFloorEnabled()) specs.push({
             selector: selectors.floorButton,
             className: uiClass('floor-capture', { classPrefix }),
             title: 'captureFloorTitle',
             label: 'captureFloor',
             icon: 'fa-file-lines',
-        }];
+        });
         // Prepended in reverse so the action bar reads: capture, then long image.
-        if (selectors.floorSnapshotButton && typeof onFloorSnapshot === 'function') {
+        if (snapshotAvailable() && isSnapshotEnabled()) {
             specs.unshift({
                 selector: selectors.floorSnapshotButton,
                 className: `${uiClass('floor-capture', { classPrefix })} ${uiClass('floor-snapshot', { classPrefix })}`,
@@ -168,8 +176,9 @@ export function createCaptureView({
     function ensureFloorButton(candidate) {
         const message = candidate?.closest?.('.mes') || candidate;
         if (!message?.querySelector) return;
-        if (!isFloorEnabled()) return;
-        const actionBar = message.querySelector(selectors.floorActions || '.mes_buttons');
+        // Either directly in the message action bar, or inside SillyTavern's own "…" menu.
+        const menu = isInMenu() && selectors.floorMenu ? message.querySelector(selectors.floorMenu) : null;
+        const actionBar = menu || message.querySelector(selectors.floorActions || '.mes_buttons');
         for (const spec of floorButtonSpecs()) {
             const existing = message.querySelector(spec.selector);
             if (existing) {
@@ -210,11 +219,11 @@ export function createCaptureView({
     }
 
     function refreshFloorButtons(root = documentRef) {
-        if (!isFloorEnabled()) {
-            documentRef.querySelectorAll(selectors.floorButton).forEach(button => button.remove());
-            if (selectors.floorSnapshotButton) documentRef.querySelectorAll(selectors.floorSnapshotButton).forEach(button => button.remove());
-            return;
-        }
+        const captureOn = isFloorEnabled();
+        const snapshotOn = snapshotAvailable() && isSnapshotEnabled();
+        if (!captureOn) documentRef.querySelectorAll(selectors.floorButton).forEach(button => button.remove());
+        if (!snapshotOn && selectors.floorSnapshotButton) documentRef.querySelectorAll(selectors.floorSnapshotButton).forEach(button => button.remove());
+        if (!captureOn && !snapshotOn) return;
         const messageSelector = selectors.messages || selectors.message;
         const messages = new Set();
         const containingMessage = root?.closest?.(messageSelector);
